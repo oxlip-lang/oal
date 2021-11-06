@@ -1,28 +1,28 @@
 let id1 = num
 
 let uri0 = uri:/a
-let uri1 = uri:/a/{ id1 }/c%40
+let uri1 = uri:/a/{ id id1 }/c%40
 let uri2 = uri1
 
 let obj1 = {
   prop1 bool # todo: something
   prop2 uri:/b:get,put -> obj2
-  prop3 uri1:get -> {}
+  prop3 uri1:get -> { prop str } & obj2
   prop4 uri:get -> {}
   prop5 {
     prop str
   }
-  prop6 | num str |
+  prop6 num | str
 }
 
 let obj2 = {
-  prop1 obj1
+  prop1 obj3
 }
 
-let obj3 = | obj1 obj2 bool |
+let obj3 = {} | uri | bool # | obj1
 
-res uri1:get,put       -> obj3
-res uri:/c:get         -> { prop num }
-res uri:/d/{id1}/e:get -> { prop num }
+res uri1:get,put          -> obj1
+res uri:/c:get            -> { prop num }
+res uri:/d/{id id1}/e:get -> { prop num }
 
 # note: blahblahblah

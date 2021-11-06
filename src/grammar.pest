@@ -7,8 +7,6 @@
 /// red
 ident = @{ !keyword ~ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
-expr = { ident }
-
 num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
 str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
 uri_kw  = @{ "uri"  ~ !ASCII_ALPHANUMERIC }
@@ -22,27 +20,32 @@ put_kw = @{ "put" ~ !ASCII_ALPHANUMERIC }
 method = { get_kw | put_kw }
 
 /// green
-keyword = @{ num_kw | str_kw | uri_kw | bool_kw | let_kw | res_kw | get_kw | put_kw }
+keyword = { num_kw | str_kw | uri_kw | bool_kw | let_kw | res_kw | get_kw | put_kw }
 
-uri_chr = @{ ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" }
-uri_seg = @{ "/" ~ uri_chr* }
-uri_tpl = !{ "/{" ~ expr ~ "}" }
+uri_seg = @{ ( ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" )+ }
+uri_lit = { "/" ~ uri_seg }
+uri_tpl = { "/{" ~ prop ~ "}" }
+uri_spec = { ( uri_tpl | uri_lit )+ }
 
 /// yellow
-uri_type = { uri_kw ~ ( ":" ~ ( uri_tpl | uri_seg )+ )? }
+uri_type = { uri_kw ~ ( ":" ~ uri_spec )? }
 
-rel_type = { ( uri_type | expr ) ~ ":" ~ method ~ ( "," ~ method )* ~ "->" ~ ( prod_type | expr ) }
+methods = { method ~ ( "," ~ method )* }
+
+rel_type = { ( uri_type | ident ) ~ ":" ~ methods ~ "->" ~ sum_type }
 
 prim_type = { num_kw | str_kw | bool_kw  }
 
-any_type =  { prim_type | rel_type | uri_type | prod_type | sum_type | expr }
+/// TODO: fix the precedence of join vs sum when used with variables
+comp_type =  { prim_type | rel_type | uri_type | join_type }
+join_type = { ( block_type | ident ) ~ ( "&" ~ ( block_type | ident ) )* }
+prop = { ident ~ sum_type }
+block_type = { "{" ~ prop* ~ "}" }
+sum_type = { comp_type ~ ( "|" ~ comp_type )* }
 
-prod_type = { "{" ~ ( ident ~ any_type )* ~ "}" }
-sum_type = { "|" ~ any_type+ ~ "|" }
+decl = { let_kw ~ ident ~ "=" ~ sum_type }
 
-decl = { let_kw ~ ident ~ "=" ~ any_type }
-
-res = { res_kw ~ rel_type }
+res = { res_kw ~ ( rel_type | ident ) }
 
 stmt = { decl | res }
 
