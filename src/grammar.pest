@@ -1,0 +1,55 @@
+//
+// Created by intellij-pest on 2021-10-16
+// grammar.pest
+// Author: ebastien
+//
+
+/// red
+ident = @{ !keyword ~ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+
+expr = { ident }
+
+num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
+str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
+uri_kw  = @{ "uri"  ~ !ASCII_ALPHANUMERIC }
+bool_kw = @{ "bool" ~ !ASCII_ALPHANUMERIC }
+let_kw  = @{ "let"  ~ !ASCII_ALPHANUMERIC }
+res_kw  = @{ "res"  ~ !ASCII_ALPHANUMERIC }
+
+get_kw = @{ "get" ~ !ASCII_ALPHANUMERIC }
+put_kw = @{ "put" ~ !ASCII_ALPHANUMERIC }
+
+method = { get_kw | put_kw }
+
+/// green
+keyword = @{ num_kw | str_kw | uri_kw | bool_kw | let_kw | res_kw | get_kw | put_kw }
+
+uri_chr = @{ ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" }
+uri_seg = @{ "/" ~ uri_chr* }
+uri_tpl = !{ "/{" ~ expr ~ "}" }
+
+/// yellow
+uri_type = { uri_kw ~ ( ":" ~ ( uri_tpl | uri_seg )+ )? }
+
+rel_type = { ( uri_type | expr ) ~ ":" ~ method ~ ( "," ~ method )* ~ "->" ~ ( prod_type | expr ) }
+
+prim_type = { num_kw | str_kw | bool_kw  }
+
+any_type =  { prim_type | rel_type | uri_type | prod_type | sum_type | expr }
+
+prod_type = { "{" ~ ( ident ~ any_type )* ~ "}" }
+sum_type = { "|" ~ any_type+ ~ "|" }
+
+decl = { let_kw ~ ident ~ "=" ~ any_type }
+
+res = { res_kw ~ rel_type }
+
+stmt = { decl | res }
+
+doc = { SOI ~ stmt* ~ EOI }
+
+block_comment = _{ "/*" ~ ( block_comment | !"*/" ~ ANY )* ~ "*/" }
+line_comment = _{ "#" ~ ( !NEWLINE ~ ANY )* }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ line_comment }

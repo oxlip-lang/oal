@@ -1,0 +1,28 @@
+let id1 = num
+
+let uri0 = uri:/a
+let uri1 = uri:/a/{ id1 }/c%40
+let uri2 = uri1
+
+let obj1 = {
+  prop1 bool # todo: something
+  prop2 uri:/b:get,put -> obj2
+  prop3 uri1:get -> {}
+  prop4 uri:get -> {}
+  prop5 {
+    prop str
+  }
+  prop6 | num str |
+}
+
+let obj2 = {
+  prop1 obj1
+}
+
+let obj3 = | obj1 obj2 bool |
+
+res uri1:get,put       -> obj3
+res uri:/c:get         -> { prop num }
+res uri:/d/{id1}/e:get -> { prop num }
+
+# note: blahblahblah
