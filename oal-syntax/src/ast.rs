@@ -2,7 +2,7 @@ use crate::{Pair, Rule};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
-pub enum TypeAny {
+pub enum TypeExpr {
     Prim(TypePrim),
     Rel(TypeRel),
     Uri(TypeUri),
@@ -32,8 +32,8 @@ impl From<Pair<'_>> for Doc {
 
 #[derive(Clone, Debug)]
 pub enum Stmt {
-    Decl { var: Ident, expr: TypeAny },
-    Res { rel: TypeAny },
+    Decl { var: Ident, expr: TypeExpr },
+    Res { rel: TypeExpr },
 }
 
 impl From<Pair<'_>> for Stmt {
@@ -72,16 +72,16 @@ impl From<Pair<'_>> for Method {
 
 #[derive(Clone, Debug)]
 pub struct TypeRel {
-    pub uri: Box<TypeAny>,
+    pub uri: Box<TypeExpr>,
     pub methods: Vec<Method>,
-    pub range: Box<TypeAny>,
+    pub range: Box<TypeExpr>,
 }
 
 impl From<Pair<'_>> for TypeRel {
     fn from(p: Pair) -> Self {
         let mut inner = p.into_inner();
 
-        let uri: Box<_> = TypeAny::from(inner.next().unwrap()).into();
+        let uri: Box<_> = TypeExpr::from(inner.next().unwrap()).into();
 
         let methods: Vec<_> = inner
             .next()
@@ -90,7 +90,7 @@ impl From<Pair<'_>> for TypeRel {
             .map(|p| p.into())
             .collect();
 
-        let range: Box<_> = TypeAny::from(inner.next().unwrap()).into();
+        let range: Box<_> = TypeExpr::from(inner.next().unwrap()).into();
 
         TypeRel {
             uri,
@@ -138,7 +138,7 @@ impl From<Pair<'_>> for TypeUri {
 pub type Ident = Rc<str>;
 
 #[derive(Clone, Debug)]
-pub struct Prop(pub Ident, pub TypeAny);
+pub struct Prop(pub Ident, pub TypeExpr);
 
 impl From<Pair<'_>> for Prop {
     fn from(p: Pair) -> Self {
@@ -159,7 +159,7 @@ impl From<Pair<'_>> for TypeBlock {
 }
 
 #[derive(Clone, Debug)]
-pub struct TypeJoin(pub Vec<TypeAny>);
+pub struct TypeJoin(pub Vec<TypeExpr>);
 
 impl From<Pair<'_>> for TypeJoin {
     fn from(p: Pair) -> Self {
@@ -168,7 +168,7 @@ impl From<Pair<'_>> for TypeJoin {
 }
 
 #[derive(Clone, Debug)]
-pub struct TypeSum(pub Vec<TypeAny>);
+pub struct TypeSum(pub Vec<TypeExpr>);
 
 impl From<Pair<'_>> for TypeSum {
     fn from(p: Pair) -> Self {
@@ -198,22 +198,22 @@ impl From<Pair<'_>> for TypePrim {
     }
 }
 
-impl From<Pair<'_>> for TypeAny {
+impl From<Pair<'_>> for TypeExpr {
     fn from(p: Pair<'_>) -> Self {
         match p.as_rule() {
-            Rule::prim_type => TypeAny::Prim(p.into()),
-            Rule::rel_type => TypeAny::Rel(p.into()),
-            Rule::uri_type => TypeAny::Uri(p.into()),
+            Rule::prim_type => TypeExpr::Prim(p.into()),
+            Rule::rel_type => TypeExpr::Rel(p.into()),
+            Rule::uri_type => TypeExpr::Uri(p.into()),
             Rule::join_type => match TypeJoin::from(p) {
                 TypeJoin(join) if join.len() == 1 => join.first().unwrap().clone(),
-                t @ _ => TypeAny::Join(t),
+                t @ _ => TypeExpr::Join(t),
             },
             Rule::sum_type => match TypeSum::from(p) {
                 TypeSum(sum) if sum.len() == 1 => sum.first().unwrap().clone(),
-                t @ _ => TypeAny::Sum(t),
+                t @ _ => TypeExpr::Sum(t),
             },
-            Rule::block_type => TypeAny::Block(p.into()),
-            Rule::ident => TypeAny::Var(p.as_str().into()),
+            Rule::block_type => TypeExpr::Block(p.into()),
+            Rule::ident => TypeExpr::Var(p.as_str().into()),
             _ => unreachable!(),
         }
     }

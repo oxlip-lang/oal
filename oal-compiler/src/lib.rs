@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use oal_syntax::ast::*;
 
-type Env = HashMap<Ident, TypeAny>;
+type Env = HashMap<Ident, TypeExpr>;
 
 #[derive(Debug)]
 enum List<T> {
@@ -49,10 +49,10 @@ enum TypeTag {
     Unknown,
 }
 
-fn welltype(expr: &TypeAny) -> Result<TypeTag> {
+fn welltype(expr: &TypeExpr) -> Result<TypeTag> {
     match expr {
-        TypeAny::Prim(_) => Ok(TypeTag::Prim),
-        TypeAny::Rel(TypeRel {
+        TypeExpr::Prim(_) => Ok(TypeTag::Prim),
+        TypeExpr::Rel(TypeRel {
             uri,
             methods: _methods,
             range,
@@ -74,7 +74,7 @@ fn welltype(expr: &TypeAny) -> Result<TypeTag> {
 
             uri.and_then(|_| range.and_then(|_| Ok(TypeTag::Unknown)))
         }
-        TypeAny::Uri(TypeUri { spec }) => {
+        TypeExpr::Uri(TypeUri { spec }) => {
             let r: Result<Vec<_>> = spec
                 .iter()
                 .map(|s| match s {
@@ -91,7 +91,7 @@ fn welltype(expr: &TypeAny) -> Result<TypeTag> {
 
             r.map(|_| TypeTag::Uri)
         }
-        TypeAny::Sum(TypeSum(sum)) => {
+        TypeExpr::Sum(TypeSum(sum)) => {
             let sum: Result<Vec<_>> = sum.iter().map(|e| welltype(e)).collect();
 
             sum.map(|sum| {
@@ -101,8 +101,8 @@ fn welltype(expr: &TypeAny) -> Result<TypeTag> {
                     .clone()
             })
         }
-        TypeAny::Var(_) => Err("unresolved variable".into()),
-        TypeAny::Join(TypeJoin(join)) => {
+        TypeExpr::Var(_) => Err("unresolved variable".into()),
+        TypeExpr::Join(TypeJoin(join)) => {
             let r: Result<Vec<_>> = join
                 .iter()
                 .map(|e| {
@@ -118,13 +118,13 @@ fn welltype(expr: &TypeAny) -> Result<TypeTag> {
 
             r.map(|_| TypeTag::Block)
         }
-        TypeAny::Block(_) => Ok(TypeTag::Block),
+        TypeExpr::Block(_) => Ok(TypeTag::Block),
     }
 }
 
-fn resolve(env: &Env, from: Path, expr: &TypeAny) -> Result<TypeAny> {
+fn resolve(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
     match expr {
-        TypeAny::Var(v) => {
+        TypeExpr::Var(v) => {
             if from.contains(v) {
                 Err("cycle detected".into())
             } else {
@@ -135,8 +135,8 @@ fn resolve(env: &Env, from: Path, expr: &TypeAny) -> Result<TypeAny> {
                 }
             }
         }
-        TypeAny::Prim(_) => Ok(expr.clone()),
-        TypeAny::Rel(TypeRel {
+        TypeExpr::Prim(_) => Ok(expr.clone()),
+        TypeExpr::Rel(TypeRel {
             uri,
             methods,
             range,
@@ -147,7 +147,7 @@ fn resolve(env: &Env, from: Path, expr: &TypeAny) -> Result<TypeAny> {
 
             uri.and_then(|uri| {
                 range.and_then(|range| {
-                    Ok(TypeAny::Rel(TypeRel {
+                    Ok(TypeExpr::Rel(TypeRel {
                         uri: Box::new(uri),
                         methods,
                         range: Box::new(range),
@@ -155,7 +155,7 @@ fn resolve(env: &Env, from: Path, expr: &TypeAny) -> Result<TypeAny> {
                 })
             })
         }
-        TypeAny::Uri(TypeUri { spec }) => {
+        TypeExpr::Uri(TypeUri { spec }) => {
             let spec: Result<Vec<_>> = spec
                 .iter()
                 .map(|s| match s {
@@ -165,25 +165,25 @@ fn resolve(env: &Env, from: Path, expr: &TypeAny) -> Result<TypeAny> {
                 })
                 .collect();
 
-            spec.map(|spec| TypeAny::Uri(TypeUri { spec }))
+            spec.map(|spec| TypeExpr::Uri(TypeUri { spec }))
         }
-        TypeAny::Block(TypeBlock(props)) => {
+        TypeExpr::Block(TypeBlock(props)) => {
             let props: Result<Vec<_>> = props
                 .iter()
                 .map(|Prop(p, e)| resolve(env, from.clone(), e).map(|e| Prop(p.clone(), e)))
                 .collect();
 
-            props.map(|props| TypeAny::Block(TypeBlock(props)))
+            props.map(|props| TypeExpr::Block(TypeBlock(props)))
         }
-        TypeAny::Sum(TypeSum(sum)) => {
+        TypeExpr::Sum(TypeSum(sum)) => {
             let sum: Result<Vec<_>> = sum.iter().map(|e| resolve(env, from.clone(), e)).collect();
 
-            sum.map(|sum| TypeAny::Sum(TypeSum(sum)))
+            sum.map(|sum| TypeExpr::Sum(TypeSum(sum)))
         }
-        TypeAny::Join(TypeJoin(join)) => {
+        TypeExpr::Join(TypeJoin(join)) => {
             let join: Result<Vec<_>> = join.iter().map(|e| resolve(env, from.clone(), e)).collect();
 
-            join.map(|join| TypeAny::Join(TypeJoin(join)))
+            join.map(|join| TypeExpr::Join(TypeJoin(join)))
         }
     }
 }
