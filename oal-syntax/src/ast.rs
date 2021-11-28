@@ -31,9 +31,20 @@ impl From<Pair<'_>> for Doc {
 }
 
 #[derive(Clone, Debug)]
+pub struct StmtDecl {
+    pub var: Ident,
+    pub expr: TypeExpr,
+}
+
+#[derive(Clone, Debug)]
+pub struct StmtRes {
+    pub rel: TypeExpr,
+}
+
+#[derive(Clone, Debug)]
 pub enum Stmt {
-    Decl { var: Ident, expr: TypeExpr },
-    Res { rel: TypeExpr },
+    Decl(StmtDecl),
+    Res(StmtRes),
 }
 
 impl From<Pair<'_>> for Stmt {
@@ -44,11 +55,11 @@ impl From<Pair<'_>> for Stmt {
                 let mut p = p.into_inner();
                 let var = p.nth(1).unwrap().as_str().into();
                 let expr = p.next().unwrap().into();
-                Stmt::Decl { var, expr }
+                Stmt::Decl(StmtDecl { var, expr })
             }
-            Rule::res => Stmt::Res {
+            Rule::res => Stmt::Res(StmtRes {
                 rel: p.into_inner().nth(1).unwrap().into(),
-            },
+            }),
             _ => unreachable!(),
         }
     }
@@ -138,14 +149,17 @@ impl From<Pair<'_>> for TypeUri {
 pub type Ident = Rc<str>;
 
 #[derive(Clone, Debug)]
-pub struct Prop(pub Ident, pub TypeExpr);
+pub struct Prop {
+    pub ident: Ident,
+    pub expr: TypeExpr,
+}
 
 impl From<Pair<'_>> for Prop {
     fn from(p: Pair) -> Self {
         let mut inner = p.into_inner();
-        let id = inner.next().unwrap().as_str().into();
+        let ident = inner.next().unwrap().as_str().into();
         let expr = inner.next().unwrap().into();
-        Prop(id, expr)
+        Prop { ident, expr }
     }
 }
 
@@ -158,12 +172,24 @@ impl From<Pair<'_>> for TypeBlock {
     }
 }
 
+impl TypeBlock {
+    pub fn iter(&self) -> std::slice::Iter<Prop> {
+        self.0.iter()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct TypeJoin(pub Vec<TypeExpr>);
 
 impl From<Pair<'_>> for TypeJoin {
     fn from(p: Pair) -> Self {
         TypeJoin(p.into_inner().map(|p| p.into()).collect())
+    }
+}
+
+impl TypeJoin {
+    pub fn iter(&self) -> std::slice::Iter<TypeExpr> {
+        self.0.iter()
     }
 }
 
@@ -177,6 +203,12 @@ impl From<Pair<'_>> for TypeSum {
             .map(|p| p.into_inner().next().unwrap().into())
             .collect();
         TypeSum(types)
+    }
+}
+
+impl TypeSum {
+    pub fn iter(&self) -> std::slice::Iter<TypeExpr> {
+        self.0.iter()
     }
 }
 

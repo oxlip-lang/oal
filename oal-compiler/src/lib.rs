@@ -49,22 +49,18 @@ enum TypeTag {
     Unknown,
 }
 
-fn welltype(expr: &TypeExpr) -> Result<TypeTag> {
+fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
     match expr {
         TypeExpr::Prim(_) => Ok(TypeTag::Prim),
-        TypeExpr::Rel(TypeRel {
-            uri,
-            methods: _methods,
-            range,
-        }) => {
-            let uri = welltype(uri).and_then(|t| {
+        TypeExpr::Rel(rel) => {
+            let uri = well_type(&rel.uri).and_then(|t| {
                 if let TypeTag::Uri = t {
                     Ok(t)
                 } else {
                     Err("expected uri as relation base".into())
                 }
             });
-            let range = welltype(range).and_then(|t| {
+            let range = well_type(&rel.range).and_then(|t| {
                 if let TypeTag::Block = t {
                     Ok(t)
                 } else {
@@ -74,11 +70,12 @@ fn welltype(expr: &TypeExpr) -> Result<TypeTag> {
 
             uri.and_then(|_| range.and_then(|_| Ok(TypeTag::Unknown)))
         }
-        TypeExpr::Uri(TypeUri { spec }) => {
-            let r: Result<Vec<_>> = spec
+        TypeExpr::Uri(uri) => {
+            let r: Result<Vec<_>> = uri
+                .spec
                 .iter()
                 .map(|s| match s {
-                    UriSegment::Template(Prop(_, e)) => welltype(e).and_then(|t| {
+                    UriSegment::Template(p) => well_type(&p.expr).and_then(|t| {
                         if let TypeTag::Prim = t {
                             Ok(())
                         } else {
@@ -91,8 +88,8 @@ fn welltype(expr: &TypeExpr) -> Result<TypeTag> {
 
             r.map(|_| TypeTag::Uri)
         }
-        TypeExpr::Sum(TypeSum(sum)) => {
-            let sum: Result<Vec<_>> = sum.iter().map(|e| welltype(e)).collect();
+        TypeExpr::Sum(sum) => {
+            let sum: Result<Vec<_>> = sum.iter().map(|e| well_type(e)).collect();
 
             sum.map(|sum| {
                 sum.iter()
@@ -102,11 +99,11 @@ fn welltype(expr: &TypeExpr) -> Result<TypeTag> {
             })
         }
         TypeExpr::Var(_) => Err("unresolved variable".into()),
-        TypeExpr::Join(TypeJoin(join)) => {
+        TypeExpr::Join(join) => {
             let r: Result<Vec<_>> = join
                 .iter()
                 .map(|e| {
-                    welltype(e).and_then(|t| {
+                    well_type(e).and_then(|t| {
                         if t == TypeTag::Block {
                             Ok(())
                         } else {
@@ -122,7 +119,14 @@ fn welltype(expr: &TypeExpr) -> Result<TypeTag> {
     }
 }
 
-fn resolve(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
+fn resolve_prop(env: &Env, from: Path, p: &Prop) -> Result<Prop> {
+    resolve_expr(env, from, &p.expr).map(|e| Prop {
+        ident: p.ident.clone(),
+        expr: e,
+    })
+}
+
+fn resolve_expr(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
     match expr {
         TypeExpr::Var(v) => {
             if from.contains(v) {
@@ -131,19 +135,15 @@ fn resolve(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
                 let path = Rc::new(List::Cons(v.clone(), from));
                 match env.get(v) {
                     None => Err("unknown identifier".into()),
-                    Some(e) => resolve(env, path, e),
+                    Some(e) => resolve_expr(env, path, e),
                 }
             }
         }
         TypeExpr::Prim(_) => Ok(expr.clone()),
-        TypeExpr::Rel(TypeRel {
-            uri,
-            methods,
-            range,
-        }) => {
-            let uri = resolve(env, from.clone(), uri);
-            let methods = methods.clone();
-            let range = resolve(env, from, range);
+        TypeExpr::Rel(rel) => {
+            let uri = resolve_expr(env, from.clone(), &rel.uri);
+            let methods = rel.methods.clone();
+            let range = resolve_expr(env, from, &rel.range);
 
             uri.and_then(|uri| {
                 range.and_then(|range| {
@@ -155,33 +155,41 @@ fn resolve(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
                 })
             })
         }
-        TypeExpr::Uri(TypeUri { spec }) => {
-            let spec: Result<Vec<_>> = spec
+        TypeExpr::Uri(uri) => {
+            let spec: Result<Vec<_>> = uri
+                .spec
                 .iter()
                 .map(|s| match s {
                     UriSegment::Literal(_) => Ok(s.clone()),
-                    UriSegment::Template(Prop(id, e)) => resolve(env, from.clone(), e)
-                        .map(|e| UriSegment::Template(Prop(id.clone(), e))),
+                    UriSegment::Template(p) => {
+                        resolve_prop(env, from.clone(), p).map(|p| UriSegment::Template(p))
+                    }
                 })
                 .collect();
 
             spec.map(|spec| TypeExpr::Uri(TypeUri { spec }))
         }
-        TypeExpr::Block(TypeBlock(props)) => {
-            let props: Result<Vec<_>> = props
+        TypeExpr::Block(block) => {
+            let props: Result<Vec<_>> = block
                 .iter()
-                .map(|Prop(p, e)| resolve(env, from.clone(), e).map(|e| Prop(p.clone(), e)))
+                .map(|p| resolve_prop(env, from.clone(), p))
                 .collect();
 
             props.map(|props| TypeExpr::Block(TypeBlock(props)))
         }
-        TypeExpr::Sum(TypeSum(sum)) => {
-            let sum: Result<Vec<_>> = sum.iter().map(|e| resolve(env, from.clone(), e)).collect();
+        TypeExpr::Sum(sum) => {
+            let sum: Result<Vec<_>> = sum
+                .iter()
+                .map(|e| resolve_expr(env, from.clone(), e))
+                .collect();
 
             sum.map(|sum| TypeExpr::Sum(TypeSum(sum)))
         }
-        TypeExpr::Join(TypeJoin(join)) => {
-            let join: Result<Vec<_>> = join.iter().map(|e| resolve(env, from.clone(), e)).collect();
+        TypeExpr::Join(join) => {
+            let join: Result<Vec<_>> = join
+                .iter()
+                .map(|e| resolve_expr(env, from.clone(), e))
+                .collect();
 
             join.map(|join| TypeExpr::Join(TypeJoin(join)))
         }
@@ -192,7 +200,7 @@ fn environment(d: &Doc) -> Env {
     d.stmts
         .iter()
         .flat_map(|s| match s {
-            Stmt::Decl { var, expr } => Some((var.clone(), expr.clone())),
+            Stmt::Decl(d) => Some((d.var.clone(), d.expr.clone())),
             _ => None,
         })
         .collect()
@@ -205,10 +213,12 @@ pub fn visit(d: &Doc) {
         .stmts
         .iter()
         .flat_map(|s| match s {
-            Stmt::Res { rel } => Some(rel),
+            Stmt::Res(r) => Some(&r.rel),
             _ => None,
         })
-        .map(|e| resolve(&env, Rc::new(List::Nil), e).and_then(|e| welltype(&e).map(|t| (e, t))))
+        .map(|e| {
+            resolve_expr(&env, Rc::new(List::Nil), e).and_then(|e| well_type(&e).map(|t| (e, t)))
+        })
         .collect();
 
     println!("{:#?}", resources)
