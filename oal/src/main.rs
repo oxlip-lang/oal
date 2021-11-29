@@ -1,15 +1,15 @@
 use indexmap::indexmap;
 use openapiv3::{Info, OpenAPI};
 
-use oal_compiler::visit;
+use oal_compiler::paths;
 use oal_syntax::parse;
 
 fn main() {
-    let doc = parse("src/doc.txt");
+    let doc = parse("doc.txt");
 
     println!("{:#?}", doc);
 
-    visit(&doc);
+    let _paths = paths(&doc).expect("compilation failed");
 
     let spec = OpenAPI {
         openapi: "3.0.1".into(),
