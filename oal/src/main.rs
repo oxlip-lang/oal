@@ -1,7 +1,7 @@
 use indexmap::indexmap;
 use openapiv3::{Info, OpenAPI};
 
-use oal_compiler::paths;
+use oal_compiler::relations;
 use oal_syntax::parse;
 
 fn main() {
@@ -9,7 +9,9 @@ fn main() {
 
     println!("{:#?}", doc);
 
-    let _paths = paths(&doc).expect("compilation failed");
+    let rels = relations(&doc).expect("compilation failed");
+
+    println!("{:#?}", rels);
 
     let spec = OpenAPI {
         openapi: "3.0.1".into(),

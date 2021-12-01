@@ -7,17 +7,12 @@ use crate::environment::environment;
 use crate::errors::Result;
 use crate::resolver::resolve;
 use crate::type_checker::{well_type, TypeTag};
-use oal_syntax::ast::{Doc, Stmt};
+use oal_syntax::ast::{Doc, Stmt, TypeExpr, TypeRel};
 
-pub struct Paths {
-    _paths: Vec<openapiv3::PathItem>,
-}
+pub fn relations(doc: &Doc) -> Result<Vec<TypeRel>> {
+    let env = environment(doc);
 
-pub fn paths(d: &Doc) -> Result<Paths> {
-    let env = environment(&d);
-
-    let e: Result<Vec<_>> = d
-        .stmts
+    doc.stmts
         .iter()
         .flat_map(|s| match s {
             Stmt::Res(r) => Some(&r.rel),
@@ -25,18 +20,11 @@ pub fn paths(d: &Doc) -> Result<Paths> {
         })
         .map(|e| {
             resolve(&env, e).and_then(|e| {
-                well_type(&e).and_then(|t| {
-                    if t == TypeTag::Rel {
-                        Ok(e)
-                    } else {
-                        Err("expected relation".into())
-                    }
+                well_type(&e).and_then(|t| match e {
+                    TypeExpr::Rel(rel) if t == TypeTag::Rel => Ok(rel),
+                    _ => Err("expected relation".into()),
                 })
             })
         })
-        .collect();
-
-    println!("{:#?}", e);
-
-    Ok(Paths { _paths: vec![] })
+        .collect()
 }
