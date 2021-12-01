@@ -1,25 +1,8 @@
 use crate::environment::Env;
 use crate::errors::Result;
 use oal_syntax::ast::*;
-use std::rc::Rc;
 
-#[derive(Debug)]
-enum List<T> {
-    Nil,
-    Cons(T, Rc<List<T>>),
-}
-
-impl<T: Eq> List<T> {
-    fn contains(&self, x: &T) -> bool {
-        match self {
-            Self::Nil => false,
-            Self::Cons(h, t) => x == h || t.contains(x),
-        }
-    }
-}
-
-// TODO: a bare vector would be faster I guess.
-type Path = Rc<List<Ident>>;
+type Path = Vec<Ident>;
 
 fn resolve_prop(env: &Env, from: Path, p: &Prop) -> Result<Prop> {
     resolve_expr(env, from, &p.expr).map(|e| Prop {
@@ -34,10 +17,13 @@ fn resolve_expr(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
             if from.contains(v) {
                 Err("cycle detected".into())
             } else {
-                let path = Rc::new(List::Cons(v.clone(), from));
                 match env.get(v) {
                     None => Err("unknown identifier".into()),
-                    Some(e) => resolve_expr(env, path, e),
+                    Some(e) => {
+                        let mut path = from.clone();
+                        path.push(v.clone());
+                        resolve_expr(env, path, e)
+                    }
                 }
             }
         }
@@ -99,5 +85,5 @@ fn resolve_expr(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
 }
 
 pub fn resolve(env: &Env, expr: &TypeExpr) -> Result<TypeExpr> {
-    resolve_expr(env, Rc::new(List::Nil), expr)
+    resolve_expr(env, Default::default(), expr)
 }
