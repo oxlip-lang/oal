@@ -23,6 +23,8 @@ let obj3 = {} | uri | bool # | obj1
 
 res uri1:get,put          -> obj1
 res uri:/c:get            -> { prop num }
-res uri:/d/{id id1}/e:get -> { prop num }
+res uri:/d/{id id1}/e:get -> { prop num } | {} & obj4
+
+let obj4 = ( ( {} | {} ) & {} )
 
 # note: blahblahblah

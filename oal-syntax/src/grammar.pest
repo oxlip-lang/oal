@@ -36,11 +36,12 @@ rel_type = { ( uri_type | ident ) ~ ":" ~ methods ~ "->" ~ sum_type }
 
 prim_type = { num_kw | str_kw | bool_kw  }
 
-/// TODO: fix the precedence of join vs sum when used with variables
-comp_type =  { prim_type | rel_type | uri_type | join_type }
-join_type = { ( block_type | ident ) ~ ( "&" ~ ( block_type | ident ) )* }
 prop = { ident ~ sum_type }
 block_type = { "{" ~ prop* ~ "}" }
+paren_type = { "(" ~ sum_type ~ ")" }
+term_type = { block_type | paren_type | ident }
+join_type = { term_type ~ ( "&" ~ term_type )* }
+comp_type =  { prim_type | rel_type | uri_type | join_type }
 sum_type = { comp_type ~ ( "|" ~ comp_type )* }
 
 decl = { let_kw ~ ident ~ "=" ~ sum_type }

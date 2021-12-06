@@ -1,6 +1,9 @@
 use crate::{Pair, Rule};
 use std::rc::Rc;
 
+pub type Literal = Rc<str>;
+pub type Ident = Rc<str>;
+
 #[derive(Clone, Debug)]
 pub enum TypeExpr {
     Prim(TypePrim),
@@ -113,7 +116,7 @@ impl From<Pair<'_>> for TypeRel {
 
 #[derive(Clone, Debug)]
 pub enum UriSegment {
-    Literal(Rc<str>),
+    Literal(Literal),
     Template(Prop),
 }
 
@@ -145,8 +148,6 @@ impl From<Pair<'_>> for TypeUri {
         TypeUri { spec }
     }
 }
-
-pub type Ident = Rc<str>;
 
 #[derive(Clone, Debug)]
 pub struct Prop {
@@ -183,7 +184,11 @@ pub struct TypeJoin(pub Vec<TypeExpr>);
 
 impl From<Pair<'_>> for TypeJoin {
     fn from(p: Pair) -> Self {
-        TypeJoin(p.into_inner().map(|p| p.into()).collect())
+        TypeJoin(
+            p.into_inner()
+                .map(|p| p.into_inner().next().unwrap().into())
+                .collect(),
+        )
     }
 }
 
@@ -245,6 +250,7 @@ impl From<Pair<'_>> for TypeExpr {
                 t @ _ => TypeExpr::Sum(t),
             },
             Rule::block_type => TypeExpr::Block(p.into()),
+            Rule::paren_type => p.into_inner().next().unwrap().into(),
             Rule::ident => TypeExpr::Var(p.as_str().into()),
             _ => unreachable!(),
         }
