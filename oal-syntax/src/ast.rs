@@ -125,6 +125,15 @@ pub struct TypeUri {
     pub spec: Vec<UriSegment>,
 }
 
+impl<'a> IntoIterator for &'a TypeUri {
+    type Item = &'a UriSegment;
+    type IntoIter = core::slice::Iter<'a, UriSegment>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.spec.iter()
+    }
+}
+
 impl From<Pair<'_>> for TypeUri {
     fn from(p: Pair) -> Self {
         let mut p = p.into_inner();
