@@ -1,4 +1,4 @@
-use oal_codegen::Api;
+use oal_codegen::Builder;
 use oal_compiler::relations;
 use oal_syntax::parse;
 
@@ -13,7 +13,7 @@ fn main() {
 
     println!("{:#?}", rels);
 
-    let api = Api::new().expose_all(rels.iter()).render();
+    let api = Builder::new().expose_all(rels.iter()).open_api();
 
     let output = serde_yaml::to_string(&api).unwrap();
 
