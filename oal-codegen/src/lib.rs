@@ -2,8 +2,8 @@ use indexmap::indexmap;
 use oal_syntax::ast;
 use oal_syntax::ast::TypeExpr;
 use openapiv3::{
-    Info, MediaType, OpenAPI, Operation, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
-    SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
+    Info, MediaType, ObjectType, OpenAPI, Operation, PathItem, Paths, ReferenceOr, Response,
+    Responses, Schema, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
 pub struct Builder {
@@ -83,10 +83,48 @@ impl Builder {
         }
     }
 
-    fn default_schema(&self) -> Schema {
+    fn join_schema(&self, join: &ast::TypeJoin) -> Schema {
         Schema {
             schema_data: Default::default(),
-            schema_kind: SchemaKind::Any(Default::default()),
+            schema_kind: SchemaKind::AllOf {
+                all_of: join
+                    .iter()
+                    .map(|e| ReferenceOr::Item(self.expr_schema(e)))
+                    .collect(),
+            },
+        }
+    }
+
+    fn block_type(&self, block: &ast::TypeBlock) -> Type {
+        Type::Object(ObjectType {
+            properties: block
+                .iter()
+                .map(|e| {
+                    let ident = e.ident.as_ref().into();
+                    let expr = ReferenceOr::Item(self.expr_schema(&e.expr).into());
+                    (ident, expr)
+                })
+                .collect(),
+            ..Default::default()
+        })
+    }
+
+    fn block_schema(&self, block: &ast::TypeBlock) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::Type(self.block_type(block)),
+        }
+    }
+
+    fn sum_schema(&self, sum: &ast::TypeSum) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::OneOf {
+                one_of: sum
+                    .iter()
+                    .map(|e| ReferenceOr::Item(self.expr_schema(e)))
+                    .collect(),
+            },
         }
     }
 
@@ -95,9 +133,9 @@ impl Builder {
             ast::TypeExpr::Prim(prim) => self.prim_schema(prim),
             ast::TypeExpr::Rel(rel) => self.rel_schema(rel),
             ast::TypeExpr::Uri(uri) => self.uri_schema(uri),
-            ast::TypeExpr::Join(_) => self.default_schema(),
-            ast::TypeExpr::Block(_) => self.default_schema(),
-            ast::TypeExpr::Sum(_) => self.default_schema(),
+            ast::TypeExpr::Join(join) => self.join_schema(join),
+            ast::TypeExpr::Block(block) => self.block_schema(block),
+            ast::TypeExpr::Sum(sum) => self.sum_schema(sum),
             _ => panic!("unexpected type expression"),
         }
     }
