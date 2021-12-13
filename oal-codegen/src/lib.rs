@@ -2,8 +2,9 @@ use indexmap::indexmap;
 use oal_syntax::ast;
 use oal_syntax::ast::TypeExpr;
 use openapiv3::{
-    Info, MediaType, ObjectType, OpenAPI, Operation, PathItem, Paths, ReferenceOr, Response,
-    Responses, Schema, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
+    Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
+    ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
+    SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
 pub struct Builder {
@@ -140,8 +141,46 @@ impl Builder {
         }
     }
 
+    fn prop_param(&self, prop: &ast::Prop) -> Parameter {
+        Parameter::Path {
+            parameter_data: ParameterData {
+                name: prop.ident.as_ref().into(),
+                description: None,
+                required: true,
+                deprecated: None,
+                format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(
+                    self.expr_schema(&prop.expr),
+                )),
+                example: None,
+                examples: Default::default(),
+                explode: None,
+                extensions: Default::default(),
+            },
+            style: Default::default(),
+        }
+    }
+
+    fn path_params(&self, rel: &ast::TypeRel) -> Vec<Parameter> {
+        match rel.uri.as_ref() {
+            ast::TypeExpr::Uri(uri) => uri
+                .into_iter()
+                .flat_map(|s| match s {
+                    ast::UriSegment::Template(p) => Some(self.prop_param(p)),
+                    _ => None,
+                })
+                .collect(),
+            _ => panic!("expected uri type expression"),
+        }
+    }
+
     fn path_item(&self, r: &ast::TypeRel) -> PathItem {
+        let params = self
+            .path_params(r)
+            .into_iter()
+            .map(ReferenceOr::Item)
+            .collect();
         let mut path_item = PathItem {
+            parameters: params,
             ..Default::default()
         };
         let op = Operation {
