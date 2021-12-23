@@ -4,7 +4,7 @@ use oal_syntax::ast::TypeExpr;
 use openapiv3::{
     Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
-    SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
+    SchemaData, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
 pub struct Builder {
@@ -38,15 +38,18 @@ impl Builder {
         "application/json".into()
     }
 
-    fn path_uri(&self, rel: &ast::TypeRel) -> String {
+    fn uri_pattern(&self, uri: &ast::TypeUri) -> String {
+        uri.into_iter()
+            .map(|s| match s {
+                ast::UriSegment::Literal(l) => format!("/{}", l),
+                ast::UriSegment::Template(t) => format!("/{{{}}}", t.ident),
+            })
+            .collect()
+    }
+
+    fn rel_pattern(&self, rel: &ast::TypeRel) -> String {
         match rel.uri.as_ref() {
-            ast::TypeExpr::Uri(uri) => uri
-                .into_iter()
-                .map(|s| match s {
-                    ast::UriSegment::Literal(l) => format!("/{}", l),
-                    ast::UriSegment::Template(t) => format!("/{{{}}}", t.ident),
-                })
-                .collect(),
+            ast::TypeExpr::Uri(uri) => self.uri_pattern(uri),
             _ => panic!("expected uri type expression"),
         }
     }
@@ -74,9 +77,17 @@ impl Builder {
         self.uri_schema(uri)
     }
 
-    fn uri_schema(&self, _uri: &ast::TypeUri) -> Schema {
+    fn uri_schema(&self, uri: &ast::TypeUri) -> Schema {
+        let pattern = if uri.is_empty() {
+            None
+        } else {
+            Some(self.uri_pattern(uri).into())
+        };
         Schema {
-            schema_data: Default::default(),
+            schema_data: SchemaData {
+                example: pattern,
+                ..Default::default()
+            },
             schema_kind: SchemaKind::Type(Type::String(StringType {
                 format: VariantOrUnknownOrEmpty::Unknown("uri-reference".into()),
                 ..Default::default()
@@ -160,7 +171,7 @@ impl Builder {
         }
     }
 
-    fn path_params(&self, rel: &ast::TypeRel) -> Vec<Parameter> {
+    fn rel_params(&self, rel: &ast::TypeRel) -> Vec<Parameter> {
         match rel.uri.as_ref() {
             ast::TypeExpr::Uri(uri) => uri
                 .into_iter()
@@ -169,13 +180,13 @@ impl Builder {
                     _ => None,
                 })
                 .collect(),
-            _ => panic!("expected uri type expression"),
+            _ => panic!("expected type expression"),
         }
     }
 
-    fn path_item(&self, r: &ast::TypeRel) -> PathItem {
+    fn rel_path_item(&self, r: &ast::TypeRel) -> PathItem {
         let params = self
-            .path_params(r)
+            .rel_params(r)
             .into_iter()
             .map(ReferenceOr::Item)
             .collect();
@@ -210,7 +221,12 @@ impl Builder {
             paths: self
                 .rels
                 .iter()
-                .map(|r| (self.path_uri(r), ReferenceOr::Item(self.path_item(r))))
+                .map(|r| {
+                    (
+                        self.rel_pattern(r),
+                        ReferenceOr::Item(self.rel_path_item(r)),
+                    )
+                })
                 .collect(),
             extensions: Default::default(),
         }

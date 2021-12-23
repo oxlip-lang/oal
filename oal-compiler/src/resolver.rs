@@ -1,17 +1,17 @@
-use crate::environment::Env;
 use crate::errors::Result;
+use crate::scope::Scope;
 use oal_syntax::ast::*;
 
 type Path = Vec<Ident>;
 
-fn resolve_prop(env: &Env, from: Path, p: &Prop) -> Result<Prop> {
+fn resolve_prop(env: &Scope, from: Path, p: &Prop) -> Result<Prop> {
     resolve_expr(env, from, &p.expr).map(|e| Prop {
         ident: p.ident.clone(),
         expr: e,
     })
 }
 
-fn resolve_expr(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
+fn resolve_expr(env: &Scope, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
     match expr {
         TypeExpr::Var(v) => {
             if from.contains(v) {
@@ -84,6 +84,6 @@ fn resolve_expr(env: &Env, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
     }
 }
 
-pub fn resolve(env: &Env, expr: &TypeExpr) -> Result<TypeExpr> {
+pub fn resolve(env: &Scope, expr: &TypeExpr) -> Result<TypeExpr> {
     resolve_expr(env, Default::default(), expr)
 }

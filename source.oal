@@ -15,6 +15,11 @@ let obj1 = {
   prop6 num | str
 }
 
+/*
+ * Blahblah
+ *
+*/
+
 let obj2 = {
   prop1 obj3
 }

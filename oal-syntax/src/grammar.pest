@@ -56,4 +56,4 @@ block_comment = _{ "/*" ~ ( block_comment | !"*/" ~ ANY )* ~ "*/" }
 line_comment = _{ "#" ~ ( !NEWLINE ~ ANY )* }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
-COMMENT = _{ line_comment }
+COMMENT = _{ line_comment | block_comment }

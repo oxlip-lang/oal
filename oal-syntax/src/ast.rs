@@ -4,7 +4,7 @@ use std::rc::Rc;
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypeExpr {
     Prim(TypePrim),
     Rel(TypeRel),
@@ -15,7 +15,7 @@ pub enum TypeExpr {
     Var(Ident),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Doc {
     pub stmts: Vec<Stmt>,
 }
@@ -33,18 +33,18 @@ impl From<Pair<'_>> for Doc {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StmtDecl {
     pub var: Ident,
     pub expr: TypeExpr,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StmtRes {
     pub rel: TypeExpr,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Decl(StmtDecl),
     Res(StmtRes),
@@ -68,7 +68,7 @@ impl From<Pair<'_>> for Stmt {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Method {
     Get,
     Put,
@@ -84,7 +84,7 @@ impl From<Pair<'_>> for Method {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeRel {
     pub uri: Box<TypeExpr>,
     pub methods: Vec<Method>,
@@ -114,15 +114,21 @@ impl From<Pair<'_>> for TypeRel {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(Literal),
     Template(Prop),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeUri {
     pub spec: Vec<UriSegment>,
+}
+
+impl TypeUri {
+    pub fn is_empty(&self) -> bool {
+        self.spec.is_empty()
+    }
 }
 
 impl<'a> IntoIterator for &'a TypeUri {
@@ -158,7 +164,7 @@ impl From<Pair<'_>> for TypeUri {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Prop {
     pub ident: Ident,
     pub expr: TypeExpr,
@@ -173,7 +179,7 @@ impl From<Pair<'_>> for Prop {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeBlock(pub Vec<Prop>);
 
 impl From<Pair<'_>> for TypeBlock {
@@ -188,7 +194,7 @@ impl TypeBlock {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeJoin(pub Vec<TypeExpr>);
 
 impl From<Pair<'_>> for TypeJoin {
@@ -207,7 +213,7 @@ impl TypeJoin {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeSum(pub Vec<TypeExpr>);
 
 impl From<Pair<'_>> for TypeSum {
@@ -226,7 +232,7 @@ impl TypeSum {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypePrim {
     Num,
     Str,
