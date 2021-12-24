@@ -57,7 +57,14 @@ impl From<Pair<'_>> for Stmt {
             Rule::decl => {
                 let mut p = p.into_inner();
                 let var = p.nth(1).unwrap().as_str().into();
-                let expr = p.next().unwrap().into();
+                let next = p.next().unwrap();
+                let expr = if next.as_rule() == Rule::type_kw {
+                    let _ann = next;
+                    p.next().unwrap()
+                } else {
+                    next
+                };
+                let expr = expr.into();
                 Stmt::Decl(StmtDecl { var, expr })
             }
             Rule::res => Stmt::Res(StmtRes {
@@ -142,24 +149,20 @@ impl<'a> IntoIterator for &'a TypeUri {
 
 impl From<Pair<'_>> for TypeUri {
     fn from(p: Pair) -> Self {
-        let mut p = p.into_inner();
-        p.next();
-        let spec: Vec<_> = p
-            .next()
-            .map(|p| {
-                p.into_inner()
-                    .map(|p| match p.as_rule() {
-                        Rule::uri_tpl => {
-                            UriSegment::Template(p.into_inner().next().unwrap().into())
-                        }
-                        Rule::uri_lit => {
-                            UriSegment::Literal(p.into_inner().next().unwrap().as_str().into())
-                        }
-                        _ => unreachable!(),
-                    })
-                    .collect()
-            })
-            .unwrap_or(vec![]);
+        let p = p.into_inner().next().unwrap();
+        let spec: Vec<_> = match p.as_rule() {
+            Rule::uri_spec => p
+                .into_inner()
+                .map(|p| match p.as_rule() {
+                    Rule::uri_tpl => UriSegment::Template(p.into_inner().next().unwrap().into()),
+                    Rule::uri_lit => {
+                        UriSegment::Literal(p.into_inner().next().unwrap().as_str().into())
+                    }
+                    _ => unreachable!(),
+                })
+                .collect(),
+            _ => Default::default(),
+        };
         TypeUri { spec }
     }
 }
