@@ -34,7 +34,7 @@ pub fn relations(doc: &Doc) -> Result<Vec<TypeRel>> {
         .map(|e| {
             resolve(env.head(), e).and_then(|e| {
                 well_type(&e).and_then(|t| match e {
-                    TypeExpr::Rel(rel) if t == TypeTag::Rel => Ok(rel),
+                    TypeExpr::Rel(rel) if t == TypeTag::Relation => Ok(rel),
                     _ => Err("expected relation".into()),
                 })
             })

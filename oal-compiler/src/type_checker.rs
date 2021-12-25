@@ -3,33 +3,48 @@ use oal_syntax::ast::*;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum TypeTag {
-    Prim,
+    Number,
+    String,
+    Boolean,
+    Relation,
+    Object,
     Uri,
-    Rel,
-    Block,
-    Unknown,
+    Any,
+}
+
+impl TypeTag {
+    fn is_primitive(&self) -> bool {
+        *self == Self::Number || *self == Self::String || *self == Self::Boolean
+    }
 }
 
 pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
     match expr {
-        TypeExpr::Prim(_) => Ok(TypeTag::Prim),
+        TypeExpr::Prim(p) => {
+            let t = match p {
+                TypePrim::Num => TypeTag::Number,
+                TypePrim::Str => TypeTag::String,
+                TypePrim::Bool => TypeTag::Boolean,
+            };
+            Ok(t)
+        }
         TypeExpr::Rel(rel) => {
             let uri = well_type(&rel.uri).and_then(|t| {
-                if let TypeTag::Uri = t {
+                if t == TypeTag::Uri {
                     Ok(t)
                 } else {
                     Err("expected uri as relation base".into())
                 }
             });
             let range = well_type(&rel.range).and_then(|t| {
-                if let TypeTag::Block = t {
+                if t == TypeTag::Object {
                     Ok(t)
                 } else {
                     Err("expected block as range".into())
                 }
             });
 
-            uri.and_then(|_| range.and_then(|_| Ok(TypeTag::Rel)))
+            uri.and_then(|_| range.and_then(|_| Ok(TypeTag::Relation)))
         }
         TypeExpr::Uri(uri) => {
             let r: Result<Vec<_>> = uri
@@ -37,7 +52,7 @@ pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
                 .iter()
                 .map(|s| match s {
                     UriSegment::Template(p) => well_type(&p.expr).and_then(|t| {
-                        if let TypeTag::Prim = t {
+                        if t.is_primitive() {
                             Ok(())
                         } else {
                             Err("expected prim as uri template property".into())
@@ -54,8 +69,8 @@ pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
 
             sum.map(|sum| {
                 sum.iter()
-                    .reduce(|a, b| if a == b { a } else { &TypeTag::Unknown })
-                    .unwrap_or(&TypeTag::Unknown)
+                    .reduce(|a, b| if a == b { a } else { &TypeTag::Any })
+                    .unwrap_or(&TypeTag::Any)
                     .clone()
             })
         }
@@ -65,7 +80,7 @@ pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
                 .iter()
                 .map(|e| {
                     well_type(e).and_then(|t| {
-                        if t == TypeTag::Block {
+                        if t == TypeTag::Object {
                             Ok(())
                         } else {
                             Err("expected block as join element".into())
@@ -74,8 +89,8 @@ pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
                 })
                 .collect();
 
-            r.map(|_| TypeTag::Block)
+            r.map(|_| TypeTag::Object)
         }
-        TypeExpr::Block(_) => Ok(TypeTag::Block),
+        TypeExpr::Block(_) => Ok(TypeTag::Object),
     }
 }
