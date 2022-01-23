@@ -1,23 +1,6 @@
 use crate::errors::Result;
 use oal_syntax::ast::*;
 
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum TypeTag {
-    Number,
-    String,
-    Boolean,
-    Relation,
-    Object,
-    Uri,
-    Any,
-}
-
-impl TypeTag {
-    fn is_primitive(&self) -> bool {
-        *self == Self::Number || *self == Self::String || *self == Self::Boolean
-    }
-}
-
 pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
     match expr {
         TypeExpr::Prim(p) => {

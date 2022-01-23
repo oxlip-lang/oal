@@ -4,6 +4,24 @@ use std::rc::Rc;
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum TypeTag {
+    Number,
+    String,
+    Boolean,
+    Relation,
+    Object,
+    Uri,
+    Any,
+    Var(usize),
+}
+
+impl TypeTag {
+    pub fn is_primitive(&self) -> bool {
+        *self == Self::Number || *self == Self::String || *self == Self::Boolean
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeExpr {
     Prim(TypePrim),
@@ -36,6 +54,7 @@ impl From<Pair<'_>> for Doc {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtDecl {
     pub var: Ident,
+    pub tag: TypeTag,
     pub expr: TypeExpr,
 }
 
@@ -56,16 +75,19 @@ impl From<Pair<'_>> for Stmt {
         match p.as_rule() {
             Rule::decl => {
                 let mut p = p.into_inner();
-                let var = p.nth(1).unwrap().as_str().into();
-                let next = p.next().unwrap();
-                let expr = if next.as_rule() == Rule::type_kw {
-                    let _ann = next;
+                let var_pair = p.nth(1).unwrap();
+                let tag = TypeTag::Var(var_pair.as_span().start());
+                let var = var_pair.as_str().into();
+                let next_pair = p.next().unwrap();
+                let expr = if next_pair.as_rule() == Rule::type_kw {
+                    // TODO: parse the type annotation into a type tag
+                    let _ann = next_pair;
                     p.next().unwrap()
                 } else {
-                    next
+                    next_pair
                 };
                 let expr = expr.into();
-                Stmt::Decl(StmtDecl { var, expr })
+                Stmt::Decl(StmtDecl { var, tag, expr })
             }
             Rule::res => Stmt::Res(StmtRes {
                 rel: p.into_inner().nth(1).unwrap().into(),
@@ -170,68 +192,78 @@ impl From<Pair<'_>> for TypeUri {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Prop {
     pub ident: Ident,
+    pub tag: TypeTag,
     pub expr: TypeExpr,
 }
 
 impl From<Pair<'_>> for Prop {
     fn from(p: Pair) -> Self {
         let mut inner = p.into_inner();
-        let ident = inner.next().unwrap().as_str().into();
+        let ident_pair = inner.next().unwrap();
+        let ident = ident_pair.as_str().into();
+        let tag = TypeTag::Var(ident_pair.as_span().start());
         let expr = inner.next().unwrap().into();
-        Prop { ident, expr }
+        Prop { ident, tag, expr }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypeBlock(pub Vec<Prop>);
+pub struct TypeBlock {
+    pub props: Vec<Prop>,
+}
 
 impl From<Pair<'_>> for TypeBlock {
     fn from(p: Pair) -> Self {
-        TypeBlock(p.into_inner().map(|p| p.into()).collect())
+        let props = p.into_inner().map(|p| p.into()).collect();
+        TypeBlock { props }
     }
 }
 
 impl TypeBlock {
     pub fn iter(&self) -> std::slice::Iter<Prop> {
-        self.0.iter()
+        self.props.iter()
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypeJoin(pub Vec<TypeExpr>);
+pub struct TypeJoin {
+    pub exprs: Vec<TypeExpr>,
+}
 
 impl From<Pair<'_>> for TypeJoin {
     fn from(p: Pair) -> Self {
-        TypeJoin(
-            p.into_inner()
-                .map(|p| p.into_inner().next().unwrap().into())
-                .collect(),
-        )
+        let exprs = p
+            .into_inner()
+            .map(|p| p.into_inner().next().unwrap().into())
+            .collect();
+        TypeJoin { exprs }
     }
 }
 
 impl TypeJoin {
     pub fn iter(&self) -> std::slice::Iter<TypeExpr> {
-        self.0.iter()
+        self.exprs.iter()
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypeSum(pub Vec<TypeExpr>);
+pub struct TypeSum {
+    pub exprs: Vec<TypeExpr>,
+}
 
 impl From<Pair<'_>> for TypeSum {
     fn from(p: Pair) -> Self {
-        let types = p
+        let exprs = p
             .into_inner()
             .map(|p| p.into_inner().next().unwrap().into())
             .collect();
-        TypeSum(types)
+        TypeSum { exprs }
     }
 }
 
 impl TypeSum {
     pub fn iter(&self) -> std::slice::Iter<TypeExpr> {
-        self.0.iter()
+        self.exprs.iter()
     }
 }
 
@@ -259,14 +291,22 @@ impl From<Pair<'_>> for TypeExpr {
             Rule::prim_type => TypeExpr::Prim(p.into()),
             Rule::rel_type => TypeExpr::Rel(p.into()),
             Rule::uri_type => TypeExpr::Uri(p.into()),
-            Rule::join_type => match TypeJoin::from(p) {
-                TypeJoin(join) if join.len() == 1 => join.first().unwrap().clone(),
-                t @ _ => TypeExpr::Join(t),
-            },
-            Rule::sum_type => match TypeSum::from(p) {
-                TypeSum(sum) if sum.len() == 1 => sum.first().unwrap().clone(),
-                t @ _ => TypeExpr::Sum(t),
-            },
+            Rule::join_type => {
+                let join = TypeJoin::from(p);
+                if join.exprs.len() == 1 {
+                    join.exprs.first().unwrap().clone()
+                } else {
+                    TypeExpr::Join(join)
+                }
+            }
+            Rule::sum_type => {
+                let sum = TypeSum::from(p);
+                if sum.exprs.len() == 1 {
+                    sum.exprs.first().unwrap().clone()
+                } else {
+                    TypeExpr::Sum(sum)
+                }
+            }
             Rule::block_type => TypeExpr::Block(p.into()),
             Rule::paren_type => p.into_inner().next().unwrap().into(),
             Rule::ident => TypeExpr::Var(p.as_str().into()),

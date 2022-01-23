@@ -2,6 +2,9 @@ pub mod ast;
 pub mod errors;
 mod parser;
 
+#[cfg(test)]
+mod ast_tests;
+
 pub use self::parser::Parser;
 pub use self::parser::Rule;
 

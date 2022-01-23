@@ -1,4 +1,5 @@
 mod errors;
+mod inference;
 mod resolver;
 mod scope;
 mod type_checker;
@@ -9,8 +10,8 @@ mod scope_tests;
 use crate::errors::Result;
 use crate::resolver::resolve;
 use crate::scope::Env;
-use crate::type_checker::{well_type, TypeTag};
-use oal_syntax::ast::{Doc, Stmt, TypeExpr, TypeRel};
+use crate::type_checker::well_type;
+use oal_syntax::ast::{Doc, Stmt, TypeExpr, TypeRel, TypeTag};
 
 fn global_env(d: &Doc) -> Env {
     let mut e = Env::new();

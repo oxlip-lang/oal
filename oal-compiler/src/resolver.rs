@@ -7,6 +7,7 @@ type Path = Vec<Ident>;
 fn resolve_prop(env: &Scope, from: Path, p: &Prop) -> Result<Prop> {
     resolve_expr(env, from, &p.expr).map(|e| Prop {
         ident: p.ident.clone(),
+        tag: p.tag,
         expr: e,
     })
 }
@@ -63,23 +64,23 @@ fn resolve_expr(env: &Scope, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
                 .map(|p| resolve_prop(env, from.clone(), p))
                 .collect();
 
-            props.map(|props| TypeExpr::Block(TypeBlock(props)))
+            props.map(|props| TypeExpr::Block(TypeBlock { props }))
         }
         TypeExpr::Sum(sum) => {
-            let sum: Result<Vec<_>> = sum
+            let exprs: Result<Vec<_>> = sum
                 .iter()
                 .map(|e| resolve_expr(env, from.clone(), e))
                 .collect();
 
-            sum.map(|sum| TypeExpr::Sum(TypeSum(sum)))
+            exprs.map(|exprs| TypeExpr::Sum(TypeSum { exprs }))
         }
         TypeExpr::Join(join) => {
-            let join: Result<Vec<_>> = join
+            let exprs: Result<Vec<_>> = join
                 .iter()
                 .map(|e| resolve_expr(env, from.clone(), e))
                 .collect();
 
-            join.map(|join| TypeExpr::Join(TypeJoin(join)))
+            exprs.map(|exprs| TypeExpr::Join(TypeJoin { exprs }))
         }
     }
 }
