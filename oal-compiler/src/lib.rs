@@ -5,6 +5,8 @@ mod scope;
 mod type_checker;
 
 #[cfg(test)]
+mod inference_tests;
+#[cfg(test)]
 mod scope_tests;
 
 use crate::errors::Result;

@@ -11,12 +11,7 @@ fn parse_untyped_decl() {
 
     if let Stmt::Decl(decl) = s {
         assert_eq!(decl.var.as_ref(), "id1");
-        if let Tag::Var(n) = decl.tag {
-            assert_eq!(n, 4);
-        } else {
-            panic!("expected variable type tag");
-        }
-        if Expr::Prim(Prim::Num) != decl.body {
+        if Expr::Prim(Prim::Num) != decl.body.expr {
             panic!("expected numeric type expression");
         }
     } else {
