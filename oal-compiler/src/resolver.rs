@@ -5,17 +5,16 @@ use oal_syntax::ast::*;
 type Path = Vec<Ident>;
 
 fn resolve_prop(env: &Scope, from: Path, p: &Prop) -> Result<Prop> {
-    resolve_expr(env, from, &p.expr).map(|e| Prop {
-        ident: p.ident.clone(),
-        tag: p.tag,
-        expr: e,
+    resolve_expr(env, from, &p.val).map(|e| Prop {
+        key: p.key.clone(),
+        val: e,
     })
 }
 
-fn resolve_expr(env: &Scope, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
-    match expr {
-        TypeExpr::Var(v) => {
-            if from.contains(v) {
+fn resolve_expr(env: &Scope, from: Path, expr: &TypedExpr) -> Result<TypedExpr> {
+    match &expr.expr {
+        Expr::Var(v) => {
+            if from.contains(&v) {
                 Err("cycle detected".into())
             } else {
                 match env.get(v) {
@@ -28,23 +27,26 @@ fn resolve_expr(env: &Scope, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
                 }
             }
         }
-        TypeExpr::Prim(_) => Ok(expr.clone()),
-        TypeExpr::Rel(rel) => {
+        Expr::Prim(_) => Ok(expr.clone()),
+        Expr::Rel(rel) => {
             let uri = resolve_expr(env, from.clone(), &rel.uri);
             let methods = rel.methods.clone();
             let range = resolve_expr(env, from, &rel.range);
 
             uri.and_then(|uri| {
                 range.and_then(|range| {
-                    Ok(TypeExpr::Rel(TypeRel {
-                        uri: Box::new(uri),
-                        methods,
-                        range: Box::new(range),
-                    }))
+                    Ok(TypedExpr {
+                        tag: expr.tag,
+                        expr: Expr::Rel(Rel {
+                            uri: Box::new(uri),
+                            methods,
+                            range: Box::new(range),
+                        }),
+                    })
                 })
             })
         }
-        TypeExpr::Uri(uri) => {
+        Expr::Uri(uri) => {
             let spec: Result<Vec<_>> = uri
                 .spec
                 .iter()
@@ -56,35 +58,47 @@ fn resolve_expr(env: &Scope, from: Path, expr: &TypeExpr) -> Result<TypeExpr> {
                 })
                 .collect();
 
-            spec.map(|spec| TypeExpr::Uri(TypeUri { spec }))
+            spec.map(|spec| TypedExpr {
+                tag: expr.tag,
+                expr: Expr::Uri(Uri { spec }),
+            })
         }
-        TypeExpr::Block(block) => {
+        Expr::Block(block) => {
             let props: Result<Vec<_>> = block
                 .iter()
                 .map(|p| resolve_prop(env, from.clone(), p))
                 .collect();
 
-            props.map(|props| TypeExpr::Block(TypeBlock { props }))
+            props.map(|props| TypedExpr {
+                tag: expr.tag,
+                expr: Expr::Block(Block { props }),
+            })
         }
-        TypeExpr::Sum(sum) => {
+        Expr::Sum(sum) => {
             let exprs: Result<Vec<_>> = sum
                 .iter()
                 .map(|e| resolve_expr(env, from.clone(), e))
                 .collect();
 
-            exprs.map(|exprs| TypeExpr::Sum(TypeSum { exprs }))
+            exprs.map(|exprs| TypedExpr {
+                tag: expr.tag,
+                expr: Expr::Sum(Sum { exprs }),
+            })
         }
-        TypeExpr::Join(join) => {
+        Expr::Join(join) => {
             let exprs: Result<Vec<_>> = join
                 .iter()
                 .map(|e| resolve_expr(env, from.clone(), e))
                 .collect();
 
-            exprs.map(|exprs| TypeExpr::Join(TypeJoin { exprs }))
+            exprs.map(|exprs| TypedExpr {
+                tag: expr.tag,
+                expr: Expr::Join(Join { exprs }),
+            })
         }
     }
 }
 
-pub fn resolve(env: &Scope, expr: &TypeExpr) -> Result<TypeExpr> {
+pub fn resolve(env: &Scope, expr: &TypedExpr) -> Result<TypedExpr> {
     resolve_expr(env, Default::default(), expr)
 }

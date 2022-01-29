@@ -1,40 +1,40 @@
 use crate::errors::Result;
 use oal_syntax::ast::*;
 
-pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
-    match expr {
-        TypeExpr::Prim(p) => {
+pub fn well_type(expr: &TypedExpr) -> Result<Tag> {
+    match &expr.expr {
+        Expr::Prim(p) => {
             let t = match p {
-                TypePrim::Num => TypeTag::Number,
-                TypePrim::Str => TypeTag::String,
-                TypePrim::Bool => TypeTag::Boolean,
+                Prim::Num => Tag::Number,
+                Prim::Str => Tag::String,
+                Prim::Bool => Tag::Boolean,
             };
             Ok(t)
         }
-        TypeExpr::Rel(rel) => {
+        Expr::Rel(rel) => {
             let uri = well_type(&rel.uri).and_then(|t| {
-                if t == TypeTag::Uri {
+                if t == Tag::Uri {
                     Ok(t)
                 } else {
                     Err("expected uri as relation base".into())
                 }
             });
             let range = well_type(&rel.range).and_then(|t| {
-                if t == TypeTag::Object {
+                if t == Tag::Object {
                     Ok(t)
                 } else {
                     Err("expected block as range".into())
                 }
             });
 
-            uri.and_then(|_| range.and_then(|_| Ok(TypeTag::Relation)))
+            uri.and_then(|_| range.and_then(|_| Ok(Tag::Relation)))
         }
-        TypeExpr::Uri(uri) => {
+        Expr::Uri(uri) => {
             let r: Result<Vec<_>> = uri
                 .spec
                 .iter()
                 .map(|s| match s {
-                    UriSegment::Template(p) => well_type(&p.expr).and_then(|t| {
+                    UriSegment::Template(p) => well_type(&p.val).and_then(|t| {
                         if t.is_primitive() {
                             Ok(())
                         } else {
@@ -45,25 +45,25 @@ pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
                 })
                 .collect();
 
-            r.map(|_| TypeTag::Uri)
+            r.map(|_| Tag::Uri)
         }
-        TypeExpr::Sum(sum) => {
-            let sum: Result<Vec<_>> = sum.iter().map(|e| well_type(e)).collect();
+        Expr::Sum(sum) => {
+            let sum: Result<Vec<_>> = sum.iter().map(|e| well_type(&e)).collect();
 
             sum.map(|sum| {
                 sum.iter()
-                    .reduce(|a, b| if a == b { a } else { &TypeTag::Any })
-                    .unwrap_or(&TypeTag::Any)
+                    .reduce(|a, b| if a == b { a } else { &Tag::Any })
+                    .unwrap_or(&Tag::Any)
                     .clone()
             })
         }
-        TypeExpr::Var(_) => Err("unresolved variable".into()),
-        TypeExpr::Join(join) => {
+        Expr::Var(_) => Err("unresolved variable".into()),
+        Expr::Join(join) => {
             let r: Result<Vec<_>> = join
                 .iter()
                 .map(|e| {
                     well_type(e).and_then(|t| {
-                        if t == TypeTag::Object {
+                        if t == Tag::Object {
                             Ok(())
                         } else {
                             Err("expected block as join element".into())
@@ -72,8 +72,8 @@ pub fn well_type(expr: &TypeExpr) -> Result<TypeTag> {
                 })
                 .collect();
 
-            r.map(|_| TypeTag::Object)
+            r.map(|_| Tag::Object)
         }
-        TypeExpr::Block(_) => Ok(TypeTag::Object),
+        Expr::Block(_) => Ok(Tag::Object),
     }
 }

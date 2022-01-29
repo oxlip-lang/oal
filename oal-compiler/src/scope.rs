@@ -1,7 +1,7 @@
-use oal_syntax::ast::{Ident, TypeExpr};
+use oal_syntax::ast::{Ident, TypedExpr};
 use std::collections::HashMap;
 
-pub type Scope = HashMap<Ident, TypeExpr>;
+pub type Scope = HashMap<Ident, TypedExpr>;
 
 pub struct Env(Vec<Scope>);
 
@@ -15,10 +15,10 @@ impl Env {
     pub fn open(&mut self) {
         self.0.push(Scope::new());
     }
-    pub fn declare(&mut self, n: &Ident, e: &TypeExpr) {
+    pub fn declare(&mut self, n: &Ident, e: &TypedExpr) {
         self.0.last_mut().unwrap().insert(n.clone(), e.clone());
     }
-    pub fn lookup(&self, n: &Ident) -> Option<&TypeExpr> {
+    pub fn lookup(&self, n: &Ident) -> Option<&TypedExpr> {
         self.0
             .iter()
             .rev()

@@ -1,6 +1,6 @@
 use indexmap::indexmap;
 use oal_syntax::ast;
-use oal_syntax::ast::TypeExpr;
+use oal_syntax::ast::Expr;
 use openapiv3::{
     Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
@@ -8,7 +8,7 @@ use openapiv3::{
 };
 
 pub struct Builder {
-    rels: Vec<ast::TypeRel>,
+    rels: Vec<ast::Rel>,
 }
 
 impl Builder {
@@ -16,7 +16,7 @@ impl Builder {
         Builder { rels: Vec::new() }
     }
 
-    pub fn expose_all<'a, I: Iterator<Item = &'a ast::TypeRel>>(&mut self, rels: I) -> &Self {
+    pub fn expose_all<'a, I: Iterator<Item = &'a ast::Rel>>(&mut self, rels: I) -> &Self {
         self.rels = rels.cloned().collect();
         self
     }
@@ -38,46 +38,46 @@ impl Builder {
         "application/json".into()
     }
 
-    fn uri_pattern(&self, uri: &ast::TypeUri) -> String {
+    fn uri_pattern(&self, uri: &ast::Uri) -> String {
         uri.into_iter()
             .map(|s| match s {
                 ast::UriSegment::Literal(l) => format!("/{}", l),
-                ast::UriSegment::Template(t) => format!("/{{{}}}", t.ident),
+                ast::UriSegment::Template(t) => format!("/{{{}}}", t.key),
             })
             .collect()
     }
 
-    fn rel_pattern(&self, rel: &ast::TypeRel) -> String {
-        match rel.uri.as_ref() {
-            ast::TypeExpr::Uri(uri) => self.uri_pattern(uri),
+    fn rel_pattern(&self, rel: &ast::Rel) -> String {
+        match &rel.uri.expr {
+            ast::Expr::Uri(uri) => self.uri_pattern(&uri),
             _ => panic!("expected uri type expression"),
         }
     }
 
-    fn prim_type(&self, prim: &ast::TypePrim) -> Type {
+    fn prim_type(&self, prim: &ast::Prim) -> Type {
         match prim {
-            ast::TypePrim::Num => Type::Number(Default::default()),
-            ast::TypePrim::Str => Type::String(Default::default()),
-            ast::TypePrim::Bool => Type::Boolean {},
+            ast::Prim::Num => Type::Number(Default::default()),
+            ast::Prim::Str => Type::String(Default::default()),
+            ast::Prim::Bool => Type::Boolean {},
         }
     }
 
-    fn prim_schema(&self, prim: &ast::TypePrim) -> Schema {
+    fn prim_schema(&self, prim: &ast::Prim) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(self.prim_type(prim)),
         }
     }
 
-    fn rel_schema(&self, rel: &ast::TypeRel) -> Schema {
-        let uri = match rel.uri.as_ref() {
-            TypeExpr::Uri(uri) => uri,
+    fn rel_schema(&self, rel: &ast::Rel) -> Schema {
+        let uri = match &rel.uri.expr {
+            Expr::Uri(uri) => uri,
             _ => panic!("expected uri type"),
         };
         self.uri_schema(uri)
     }
 
-    fn uri_schema(&self, uri: &ast::TypeUri) -> Schema {
+    fn uri_schema(&self, uri: &ast::Uri) -> Schema {
         let pattern = if uri.is_empty() {
             None
         } else {
@@ -95,25 +95,25 @@ impl Builder {
         }
     }
 
-    fn join_schema(&self, join: &ast::TypeJoin) -> Schema {
+    fn join_schema(&self, join: &ast::Join) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AllOf {
                 all_of: join
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(e)))
+                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.expr)))
                     .collect(),
             },
         }
     }
 
-    fn block_type(&self, block: &ast::TypeBlock) -> Type {
+    fn block_type(&self, block: &ast::Block) -> Type {
         Type::Object(ObjectType {
             properties: block
                 .iter()
                 .map(|e| {
-                    let ident = e.ident.as_ref().into();
-                    let expr = ReferenceOr::Item(self.expr_schema(&e.expr).into());
+                    let ident = e.key.as_ref().into();
+                    let expr = ReferenceOr::Item(self.expr_schema(&e.val.expr).into());
                     (ident, expr)
                 })
                 .collect(),
@@ -121,33 +121,33 @@ impl Builder {
         })
     }
 
-    fn block_schema(&self, block: &ast::TypeBlock) -> Schema {
+    fn block_schema(&self, block: &ast::Block) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(self.block_type(block)),
         }
     }
 
-    fn sum_schema(&self, sum: &ast::TypeSum) -> Schema {
+    fn sum_schema(&self, sum: &ast::Sum) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::OneOf {
                 one_of: sum
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(e)))
+                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.expr)))
                     .collect(),
             },
         }
     }
 
-    fn expr_schema(&self, e: &ast::TypeExpr) -> Schema {
+    fn expr_schema(&self, e: &ast::Expr) -> Schema {
         match e {
-            ast::TypeExpr::Prim(prim) => self.prim_schema(prim),
-            ast::TypeExpr::Rel(rel) => self.rel_schema(rel),
-            ast::TypeExpr::Uri(uri) => self.uri_schema(uri),
-            ast::TypeExpr::Join(join) => self.join_schema(join),
-            ast::TypeExpr::Block(block) => self.block_schema(block),
-            ast::TypeExpr::Sum(sum) => self.sum_schema(sum),
+            ast::Expr::Prim(prim) => self.prim_schema(prim),
+            ast::Expr::Rel(rel) => self.rel_schema(rel),
+            ast::Expr::Uri(uri) => self.uri_schema(uri),
+            ast::Expr::Join(join) => self.join_schema(join),
+            ast::Expr::Block(block) => self.block_schema(block),
+            ast::Expr::Sum(sum) => self.sum_schema(sum),
             _ => panic!("unexpected type expression"),
         }
     }
@@ -155,12 +155,12 @@ impl Builder {
     fn prop_param(&self, prop: &ast::Prop) -> Parameter {
         Parameter::Path {
             parameter_data: ParameterData {
-                name: prop.ident.as_ref().into(),
+                name: prop.key.as_ref().into(),
                 description: None,
                 required: true,
                 deprecated: None,
                 format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(
-                    self.expr_schema(&prop.expr),
+                    self.expr_schema(&prop.val.expr),
                 )),
                 example: None,
                 examples: Default::default(),
@@ -171,9 +171,9 @@ impl Builder {
         }
     }
 
-    fn rel_params(&self, rel: &ast::TypeRel) -> Vec<Parameter> {
-        match rel.uri.as_ref() {
-            ast::TypeExpr::Uri(uri) => uri
+    fn rel_params(&self, rel: &ast::Rel) -> Vec<Parameter> {
+        match &rel.uri.expr {
+            ast::Expr::Uri(uri) => uri
                 .into_iter()
                 .flat_map(|s| match s {
                     ast::UriSegment::Template(p) => Some(self.prop_param(p)),
@@ -184,7 +184,7 @@ impl Builder {
         }
     }
 
-    fn rel_path_item(&self, r: &ast::TypeRel) -> PathItem {
+    fn rel_path_item(&self, r: &ast::Rel) -> PathItem {
         let params = self
             .rel_params(r)
             .into_iter()
@@ -198,7 +198,7 @@ impl Builder {
             responses: Responses {
                 default: Some(ReferenceOr::Item(Response {
                     content: indexmap! { self.media_type() => MediaType {
-                        schema: Some(ReferenceOr::Item(self.expr_schema(r.range.as_ref()))),
+                        schema: Some(ReferenceOr::Item(self.expr_schema(&r.range.expr))),
                         ..Default::default()
                     }},
                     ..Default::default()

@@ -1,4 +1,4 @@
-use crate::ast::{Stmt, TypeExpr, TypePrim, TypeTag};
+use crate::ast::{Expr, Prim, Stmt, Tag};
 use crate::parse;
 
 #[test]
@@ -11,12 +11,12 @@ fn parse_untyped_decl() {
 
     if let Stmt::Decl(decl) = s {
         assert_eq!(decl.var.as_ref(), "id1");
-        if let TypeTag::Var(n) = decl.tag {
+        if let Tag::Var(n) = decl.tag {
             assert_eq!(n, 4);
         } else {
             panic!("expected variable type tag");
         }
-        if TypeExpr::Prim(TypePrim::Num) != decl.expr {
+        if Expr::Prim(Prim::Num) != decl.body {
             panic!("expected numeric type expression");
         }
     } else {
