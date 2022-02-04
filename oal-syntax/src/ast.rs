@@ -320,3 +320,13 @@ impl From<Pair<'_>> for Prim {
         }
     }
 }
+
+impl From<&Prim> for Tag {
+    fn from(p: &Prim) -> Self {
+        match p {
+            Prim::Num => Tag::Number,
+            Prim::Str => Tag::String,
+            Prim::Bool => Tag::Boolean,
+        }
+    }
+}

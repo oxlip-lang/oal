@@ -1,50 +1,123 @@
 use crate::Env;
-use oal_syntax::ast::{Decl, Doc, Expr, Prim, Res, Stmt, Tag, TypedExpr, UriSegment};
+use oal_syntax::ast::{Decl, Doc, Expr, Ident, Res, Stmt, Tag, TypedExpr, UriSegment};
+use std::collections::HashMap;
 
+pub type Subst = HashMap<Ident, Tag>;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TypeEquation {
     pub left: Tag,
     pub right: Tag,
 }
 
-pub trait TypedNode {
-    fn equations(&self, eqs: &mut Vec<TypeEquation>);
+impl TypeEquation {
+    pub fn unify(&self, s: &mut Subst) -> bool {
+        todo!()
+    }
 }
 
-impl TypedNode for Expr {
-    fn equations(&self, _eqs: &mut Vec<TypeEquation>) {
-        match self {
-            Expr::Prim(_) => {}
-            Expr::Rel(_) => {}
-            Expr::Uri(_) => {}
-            Expr::Join(_) => {}
-            Expr::Block(_) => {}
-            Expr::Sum(_) => {}
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct TypeConstraint(Vec<TypeEquation>);
+
+impl TypeConstraint {
+    pub fn new() -> TypeConstraint {
+        Default::default()
+    }
+
+    pub fn push(&mut self, left: Tag, right: Tag) {
+        self.0.push(TypeEquation { left, right });
+    }
+
+    pub fn unify(&self) -> Option<Subst> {
+        let mut s = Subst::new();
+        for eq in self.0.iter() {
+            if !eq.unify(&mut s) {
+                return None;
+            }
+        }
+        Some(s)
+    }
+}
+
+pub trait TypeConstrained {
+    fn constrain(&self, c: &mut TypeConstraint);
+}
+
+impl TypeConstrained for TypedExpr {
+    fn constrain(&self, c: &mut TypeConstraint) {
+        match &self.expr {
+            Expr::Prim(prim) => c.push(self.tag.unwrap(), prim.into()),
+            Expr::Rel(rel) => {
+                rel.range.constrain(c);
+                rel.uri.constrain(c);
+                c.push(rel.range.tag.unwrap(), Tag::Object);
+                c.push(rel.uri.tag.unwrap(), Tag::Uri);
+                c.push(self.tag.unwrap(), Tag::Relation);
+            }
+            Expr::Uri(uri) => {
+                for s in uri.spec.iter() {
+                    match s {
+                        UriSegment::Literal(_) => {}
+                        UriSegment::Template(tpl) => {
+                            tpl.val.constrain(c);
+                            // TODO: a uri segment template is a primitive type
+                            c.push(tpl.val.tag.unwrap(), Tag::String);
+                        }
+                    }
+                }
+                c.push(self.tag.unwrap(), Tag::Uri);
+            }
+            Expr::Join(join) => {
+                for expr in join.exprs.iter() {
+                    expr.constrain(c);
+                    c.push(expr.tag.unwrap(), Tag::Object);
+                }
+                c.push(self.tag.unwrap(), Tag::Object);
+            }
+            Expr::Block(block) => {
+                for prop in block.props.iter() {
+                    prop.val.constrain(c);
+                }
+                c.push(self.tag.unwrap(), Tag::Object);
+            }
+            Expr::Sum(sum) => {
+                // TODO: a sum is either a specific subtype or the 'any' super type
+                for expr in sum.exprs.iter() {
+                    expr.constrain(c);
+                    c.push(expr.tag.unwrap(), Tag::Object);
+                }
+                c.push(self.tag.unwrap(), Tag::Object);
+            }
             Expr::Var(_) => {}
         }
     }
 }
 
-impl TypedNode for Decl {
-    fn equations(&self, eqs: &mut Vec<TypeEquation>) {
-        self.body.expr.equations(eqs);
-        eqs.push(TypeEquation {
-            left: todo!(),
-            right: todo!(),
-        })
+impl TypeConstrained for Decl {
+    fn constrain(&self, c: &mut TypeConstraint) {
+        self.body.constrain(c);
     }
 }
 
-impl TypedNode for Res {
-    fn equations(&self, eqs: &mut Vec<TypeEquation>) {
-        self.rel.expr.equations(eqs)
+impl TypeConstrained for Res {
+    fn constrain(&self, c: &mut TypeConstraint) {
+        self.rel.constrain(c)
     }
 }
 
-impl TypedNode for Stmt {
-    fn equations(&self, eqs: &mut Vec<TypeEquation>) {
+impl TypeConstrained for Stmt {
+    fn constrain(&self, c: &mut TypeConstraint) {
         match self {
-            Stmt::Decl(d) => d.equations(eqs),
-            Stmt::Res(r) => r.equations(eqs),
+            Stmt::Decl(d) => d.constrain(c),
+            Stmt::Res(r) => r.constrain(c),
+        }
+    }
+}
+
+impl TypeConstrained for Doc {
+    fn constrain(&self, c: &mut TypeConstraint) {
+        for s in self.stmts.iter() {
+            s.constrain(c);
         }
     }
 }
@@ -63,20 +136,15 @@ impl TagSeq {
     }
 }
 
-pub trait Tagged {
+pub trait TypeTagged {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env);
 }
 
-impl Tagged for TypedExpr {
+impl TypeTagged for TypedExpr {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
         match &mut self.expr {
             Expr::Prim(prim) => {
-                let tag = match prim {
-                    Prim::Num => Tag::Number,
-                    Prim::Str => Tag::String,
-                    Prim::Bool => Tag::Boolean,
-                };
-                self.tag = Some(tag);
+                self.tag = Some((&*prim).into());
             }
             Expr::Rel(rel) => {
                 self.tag = Some(Tag::Relation);
@@ -119,27 +187,33 @@ impl Tagged for TypedExpr {
     }
 }
 
-impl Tagged for Decl {
+impl TypeTagged for Decl {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
         self.body.tag_type(n, e);
         e.declare(&self.var, &self.body);
     }
 }
 
-impl Tagged for Res {
+impl TypeTagged for Res {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
         self.rel.tag_type(n, e);
     }
 }
 
-impl Tagged for Doc {
+impl TypeTagged for Stmt {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
+        match self {
+            Stmt::Decl(d) => d.tag_type(n, e),
+            Stmt::Res(r) => r.tag_type(n, e),
+        }
+    }
+}
+
+impl TypeTagged for Doc {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
         e.open();
         for s in self.stmts.iter_mut() {
-            match s {
-                Stmt::Decl(d) => d.tag_type(n, e),
-                Stmt::Res(r) => r.tag_type(n, e),
-            }
+            s.tag_type(n, e);
         }
         e.close();
     }
