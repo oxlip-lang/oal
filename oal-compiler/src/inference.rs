@@ -1,8 +1,33 @@
 use crate::Env;
-use oal_syntax::ast::{Decl, Doc, Expr, Ident, Res, Stmt, Tag, TypedExpr, UriSegment};
+use oal_syntax::ast::{Decl, Doc, Expr, Res, Stmt, Tag, TypedExpr, UriSegment};
 use std::collections::HashMap;
 
-pub type Subst = HashMap<Ident, Tag>;
+#[derive(Debug, Default)]
+pub struct Subst(HashMap<usize, Tag>);
+
+impl Subst {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn extend(&mut self, v: usize, t: Tag) {
+        self.0.insert(v, t);
+    }
+
+    pub fn substitute(&self, t: Tag) -> Tag {
+        let mut tag = &t;
+        loop {
+            if let Tag::Var(v) = tag {
+                if let Some(t) = self.0.get(v) {
+                    tag = t;
+                    continue;
+                }
+            }
+            break;
+        }
+        *tag
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TypeEquation {
@@ -10,9 +35,36 @@ pub struct TypeEquation {
     pub right: Tag,
 }
 
+fn occurs(a: Tag, b: Tag) -> bool {
+    assert!(a.is_variable());
+    // Trivial as we don't have function types yet and therefore Tag is not a recursive type.
+    a == b
+}
+
 impl TypeEquation {
     pub fn unify(&self, s: &mut Subst) -> bool {
-        todo!()
+        let left = s.substitute(self.left);
+        let right = s.substitute(self.right);
+
+        if left == right {
+            true
+        } else if let Tag::Var(v) = left {
+            if occurs(left, right) {
+                false
+            } else {
+                s.extend(v, right);
+                true
+            }
+        } else if let Tag::Var(v) = right {
+            if occurs(right, left) {
+                false
+            } else {
+                s.extend(v, left);
+                true
+            }
+        } else {
+            false
+        }
     }
 }
 
@@ -20,7 +72,7 @@ impl TypeEquation {
 pub struct TypeConstraint(Vec<TypeEquation>);
 
 impl TypeConstraint {
-    pub fn new() -> TypeConstraint {
+    pub fn new() -> Self {
         Default::default()
     }
 
@@ -126,9 +178,10 @@ impl TypeConstrained for Doc {
 pub struct TagSeq(usize);
 
 impl TagSeq {
-    pub fn new() -> TagSeq {
+    pub fn new() -> Self {
         TagSeq(0)
     }
+
     pub fn next(&mut self) -> usize {
         let n = self.0;
         self.0 += 1;

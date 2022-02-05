@@ -52,3 +52,20 @@ fn constraint() {
 
     println!("{:#?}", cnt);
 }
+
+#[test]
+fn unify() {
+    let mut c = TypeConstraint::new();
+
+    c.push(Tag::Var(0), Tag::Number);
+    c.push(Tag::Var(2), Tag::Var(1));
+    c.push(Tag::Var(1), Tag::Var(0));
+
+    let u = c.unify().expect("unification failed");
+
+    println!("{:#?}", u);
+
+    let t = u.substitute(Tag::Var(2));
+
+    assert_eq!(t, Tag::Number);
+}

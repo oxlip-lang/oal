@@ -20,6 +20,14 @@ impl Tag {
     pub fn is_primitive(&self) -> bool {
         *self == Self::Number || *self == Self::String || *self == Self::Boolean
     }
+
+    pub fn is_variable(&self) -> bool {
+        if let Tag::Var(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
