@@ -21,8 +21,8 @@ fn tag_decl() {
     println!("{:#?}", d);
 
     if let Stmt::Decl(decl) = d.stmts.first().unwrap() {
-        if Some(Tag::Number) != decl.body.tag {
-            panic!("expected numeric type tag");
+        if Some(Tag::Primitive) != decl.body.tag {
+            panic!("expected primitive type tag");
         }
     } else {
         panic!("expected declaration");
@@ -51,13 +51,21 @@ fn constraint() {
     d.constrain(cnt);
 
     println!("{:#?}", cnt);
+
+    let u = cnt.unify().expect("unification failed");
+
+    println!("{:#?}", u);
+
+    let t = u.substitute(Tag::Var(0));
+
+    assert_eq!(t, Tag::Object);
 }
 
 #[test]
 fn unify() {
     let mut c = TypeConstraint::new();
 
-    c.push(Tag::Var(0), Tag::Number);
+    c.push(Tag::Var(0), Tag::Primitive);
     c.push(Tag::Var(2), Tag::Var(1));
     c.push(Tag::Var(1), Tag::Var(0));
 
@@ -67,5 +75,5 @@ fn unify() {
 
     let t = u.substitute(Tag::Var(2));
 
-    assert_eq!(t, Tag::Number);
+    assert_eq!(t, Tag::Primitive);
 }

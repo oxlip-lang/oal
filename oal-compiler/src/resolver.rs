@@ -85,6 +85,7 @@ fn resolve_expr(env: &Scope, from: Path, expr: &TypedExpr) -> Result<TypedExpr> 
                 expr: Expr::Sum(Sum { exprs }),
             })
         }
+        Expr::Any(_) => todo!(),
         Expr::Join(join) => {
             let exprs: Result<Vec<_>> = join
                 .iter()

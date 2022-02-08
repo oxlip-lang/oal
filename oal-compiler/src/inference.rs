@@ -98,7 +98,7 @@ pub trait TypeConstrained {
 impl TypeConstrained for TypedExpr {
     fn constrain(&self, c: &mut TypeConstraint) {
         match &self.expr {
-            Expr::Prim(prim) => c.push(self.tag.unwrap(), prim.into()),
+            Expr::Prim(_) => c.push(self.tag.unwrap(), Tag::Primitive),
             Expr::Rel(rel) => {
                 rel.range.constrain(c);
                 rel.uri.constrain(c);
@@ -112,8 +112,7 @@ impl TypeConstrained for TypedExpr {
                         UriSegment::Literal(_) => {}
                         UriSegment::Template(tpl) => {
                             tpl.val.constrain(c);
-                            // TODO: a uri segment template is a primitive type
-                            c.push(tpl.val.tag.unwrap(), Tag::String);
+                            c.push(tpl.val.tag.unwrap(), Tag::Primitive);
                         }
                     }
                 }
@@ -133,12 +132,16 @@ impl TypeConstrained for TypedExpr {
                 c.push(self.tag.unwrap(), Tag::Object);
             }
             Expr::Sum(sum) => {
-                // TODO: a sum is either a specific subtype or the 'any' super type
                 for expr in sum.exprs.iter() {
                     expr.constrain(c);
-                    c.push(expr.tag.unwrap(), Tag::Object);
+                    c.push(self.tag.unwrap(), expr.tag.unwrap());
                 }
-                c.push(self.tag.unwrap(), Tag::Object);
+            }
+            Expr::Any(any) => {
+                for expr in any.exprs.iter() {
+                    expr.constrain(c);
+                }
+                c.push(self.tag.unwrap(), Tag::Any);
             }
             Expr::Var(_) => {}
         }
@@ -196,8 +199,8 @@ pub trait TypeTagged {
 impl TypeTagged for TypedExpr {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
         match &mut self.expr {
-            Expr::Prim(prim) => {
-                self.tag = Some((&*prim).into());
+            Expr::Prim(_) => {
+                self.tag = Some(Tag::Primitive);
             }
             Expr::Rel(rel) => {
                 self.tag = Some(Tag::Relation);
@@ -228,6 +231,12 @@ impl TypeTagged for TypedExpr {
             Expr::Sum(sum) => {
                 self.tag = Some(Tag::Var(n.next()));
                 for expr in sum.exprs.iter_mut() {
+                    expr.tag_type(n, e);
+                }
+            }
+            Expr::Any(any) => {
+                self.tag = Some(Tag::Any);
+                for expr in any.exprs.iter_mut() {
                     expr.tag_type(n, e);
                 }
             }

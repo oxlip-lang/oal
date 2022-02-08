@@ -6,9 +6,7 @@ pub type Ident = Rc<str>;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Tag {
-    Number,
-    String,
-    Boolean,
+    Primitive,
     Relation,
     Object,
     Uri,
@@ -17,10 +15,6 @@ pub enum Tag {
 }
 
 impl Tag {
-    pub fn is_primitive(&self) -> bool {
-        *self == Self::Number || *self == Self::String || *self == Self::Boolean
-    }
-
     pub fn is_variable(&self) -> bool {
         if let Tag::Var(_) = self {
             true
@@ -37,6 +31,7 @@ pub enum Expr {
     Uri(Uri),
     Join(Join),
     Block(Block),
+    Any(Any),
     Sum(Sum),
     Var(Ident),
 }
@@ -312,6 +307,27 @@ impl Sum {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Any {
+    pub exprs: Vec<TypedExpr>,
+}
+
+impl From<Pair<'_>> for Any {
+    fn from(p: Pair) -> Self {
+        let exprs = p
+            .into_inner()
+            .map(|p| p.into_inner().next().unwrap().into())
+            .collect();
+        Any { exprs }
+    }
+}
+
+impl Any {
+    pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
+        self.exprs.iter()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Prim {
     Num,
     Str,
@@ -325,16 +341,6 @@ impl From<Pair<'_>> for Prim {
             Rule::str_kw => Prim::Str,
             Rule::bool_kw => Prim::Bool,
             _ => unreachable!(),
-        }
-    }
-}
-
-impl From<&Prim> for Tag {
-    fn from(p: &Prim) -> Self {
-        match p {
-            Prim::Num => Tag::Number,
-            Prim::Str => Tag::String,
-            Prim::Bool => Tag::Boolean,
         }
     }
 }

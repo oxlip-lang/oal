@@ -3,14 +3,7 @@ use oal_syntax::ast::*;
 
 pub fn well_type(expr: &TypedExpr) -> Result<Tag> {
     match &expr.expr {
-        Expr::Prim(p) => {
-            let t = match p {
-                Prim::Num => Tag::Number,
-                Prim::Str => Tag::String,
-                Prim::Bool => Tag::Boolean,
-            };
-            Ok(t)
-        }
+        Expr::Prim(_) => Ok(Tag::Primitive),
         Expr::Rel(rel) => {
             let uri = well_type(&rel.uri).and_then(|t| {
                 if t == Tag::Uri {
@@ -35,7 +28,7 @@ pub fn well_type(expr: &TypedExpr) -> Result<Tag> {
                 .iter()
                 .map(|s| match s {
                     UriSegment::Template(p) => well_type(&p.val).and_then(|t| {
-                        if t.is_primitive() {
+                        if t == Tag::Primitive {
                             Ok(())
                         } else {
                             Err("expected prim as uri template property".into())
@@ -57,6 +50,7 @@ pub fn well_type(expr: &TypedExpr) -> Result<Tag> {
                     .clone()
             })
         }
+        Expr::Any(_) => todo!(),
         Expr::Var(_) => Err("unresolved variable".into()),
         Expr::Join(join) => {
             let r: Result<Vec<_>> = join
