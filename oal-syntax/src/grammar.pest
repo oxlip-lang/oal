@@ -42,11 +42,10 @@ prim_type = { num_kw | str_kw | bool_kw  }
 prop = { ident ~ sum_type }
 block_type = { "{" ~ prop* ~ "}" }
 paren_type = { "(" ~ sum_type ~ ")" }
-term_type = { block_type | paren_type | ident }
+term_type = { prim_type | rel_type | uri_type | block_type | paren_type | ident }
 join_type = { term_type ~ ( "&" ~ term_type )* }
-any_type = { term_type ~ ( "~" ~ term_type )* }
-comp_type =  { prim_type | rel_type | uri_type | join_type | any_type }
-sum_type = { comp_type ~ ( "|" ~ comp_type )* }
+any_type = { join_type ~ ( "~" ~ join_type )* }
+sum_type = { any_type ~ ( "|" ~ any_type )* }
 
 decl = { let_kw ~ ident ~ ( ":" ~ type_kw )? ~ "=" ~ sum_type }
 

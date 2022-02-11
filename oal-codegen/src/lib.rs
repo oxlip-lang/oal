@@ -1,6 +1,6 @@
 use indexmap::indexmap;
 use oal_syntax::ast;
-use oal_syntax::ast::Expr;
+use oal_syntax::ast::{Expr, Operator};
 use openapiv3::{
     Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
@@ -95,11 +95,11 @@ impl Builder {
         }
     }
 
-    fn join_schema(&self, join: &ast::Join) -> Schema {
+    fn join_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AllOf {
-                all_of: join
+                all_of: exprs
                     .iter()
                     .map(|e| ReferenceOr::Item(self.expr_schema(&e.expr)))
                     .collect(),
@@ -128,11 +128,11 @@ impl Builder {
         }
     }
 
-    fn sum_schema(&self, sum: &ast::Sum) -> Schema {
+    fn sum_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::OneOf {
-                one_of: sum
+                one_of: exprs
                     .iter()
                     .map(|e| ReferenceOr::Item(self.expr_schema(&e.expr)))
                     .collect(),
@@ -145,9 +145,12 @@ impl Builder {
             ast::Expr::Prim(prim) => self.prim_schema(prim),
             ast::Expr::Rel(rel) => self.rel_schema(rel),
             ast::Expr::Uri(uri) => self.uri_schema(uri),
-            ast::Expr::Join(join) => self.join_schema(join),
             ast::Expr::Block(block) => self.block_schema(block),
-            ast::Expr::Sum(sum) => self.sum_schema(sum),
+            ast::Expr::Op(operation) => match operation.op {
+                Operator::Join => self.join_schema(&operation.exprs),
+                Operator::Sum => self.sum_schema(&operation.exprs),
+                Operator::Any => todo!(),
+            },
             _ => panic!("unexpected type expression"),
         }
     }

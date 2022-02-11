@@ -29,11 +29,9 @@ pub enum Expr {
     Prim(Prim),
     Rel(Rel),
     Uri(Uri),
-    Join(Join),
     Block(Block),
-    Any(Any),
-    Sum(Sum),
     Var(Ident),
+    Op(VariadicOp),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -54,25 +52,17 @@ impl From<Pair<'_>> for TypedExpr {
             Rule::prim_type => Expr::Prim(p.into()).into(),
             Rule::rel_type => Expr::Rel(p.into()).into(),
             Rule::uri_type => Expr::Uri(p.into()).into(),
-            Rule::join_type => {
-                let join = Join::from(p);
-                if join.exprs.len() == 1 {
-                    join.exprs.first().unwrap().clone()
-                } else {
-                    Expr::Join(join).into()
-                }
-            }
-            Rule::sum_type => {
-                let sum = Sum::from(p);
-                if sum.exprs.len() == 1 {
-                    sum.exprs.first().unwrap().clone()
-                } else {
-                    Expr::Sum(sum).into()
-                }
-            }
             Rule::block_type => Expr::Block(p.into()).into(),
             Rule::paren_type => p.into_inner().next().unwrap().into(),
             Rule::ident => Expr::Var(p.as_str().into()).into(),
+            Rule::join_type | Rule::any_type | Rule::sum_type => {
+                let op = VariadicOp::from(p);
+                if op.exprs.len() == 1 {
+                    op.exprs.first().unwrap().clone()
+                } else {
+                    Expr::Op(op).into()
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -264,70 +254,42 @@ impl Block {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Operator {
+    Join,
+    Any,
+    Sum,
+}
+
 #[derive(Clone, Debug, PartialEq)]
-pub struct Join {
+pub struct VariadicOp {
+    pub op: Operator,
     pub exprs: Vec<TypedExpr>,
 }
 
-impl From<Pair<'_>> for Join {
+impl From<Pair<'_>> for VariadicOp {
     fn from(p: Pair) -> Self {
+        let op = match p.as_rule() {
+            Rule::join_type => Operator::Join,
+            Rule::any_type => Operator::Any,
+            Rule::sum_type => Operator::Sum,
+            _ => unreachable!(),
+        };
         let exprs = p
             .into_inner()
             .map(|p| p.into_inner().next().unwrap().into())
             .collect();
-        Join { exprs }
+        VariadicOp { op, exprs }
     }
 }
 
-impl Join {
+impl VariadicOp {
     pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
         self.exprs.iter()
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Sum {
-    pub exprs: Vec<TypedExpr>,
-}
-
-impl From<Pair<'_>> for Sum {
-    fn from(p: Pair) -> Self {
-        let exprs = p
-            .into_inner()
-            .map(|p| p.into_inner().next().unwrap().into())
-            .collect();
-        Sum { exprs }
-    }
-}
-
-impl Sum {
-    pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
-        self.exprs.iter()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Any {
-    pub exprs: Vec<TypedExpr>,
-}
-
-impl From<Pair<'_>> for Any {
-    fn from(p: Pair) -> Self {
-        let exprs = p
-            .into_inner()
-            .map(|p| p.into_inner().next().unwrap().into())
-            .collect();
-        Any { exprs }
-    }
-}
-
-impl Any {
-    pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
-        self.exprs.iter()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Prim {
     Num,
     Str,

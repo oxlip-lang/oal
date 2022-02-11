@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Prim, Stmt, Tag};
+use crate::ast::{Expr, Prim, Stmt};
 use crate::parse;
 
 #[test]
@@ -17,4 +17,10 @@ fn parse_untyped_decl() {
     } else {
         panic!("expected declaration");
     }
+}
+
+#[test]
+fn parse_any_type() {
+    let d = parse("let id1 = num ~ {}".into()).expect("parsing failed");
+    assert_eq!(d.stmts.len(), 1);
 }

@@ -2,7 +2,6 @@ mod errors;
 mod inference;
 mod resolver;
 mod scope;
-mod type_checker;
 
 #[cfg(test)]
 mod inference_tests;
@@ -12,8 +11,7 @@ mod scope_tests;
 use crate::errors::Result;
 use crate::resolver::resolve;
 use crate::scope::Env;
-use crate::type_checker::well_type;
-use oal_syntax::ast::{Doc, Expr, Rel, Stmt, Tag};
+use oal_syntax::ast::{Doc, Expr, Rel, Stmt};
 
 fn global_env(d: &Doc) -> Env {
     let mut e = Env::new();
@@ -35,11 +33,9 @@ pub fn relations(doc: &Doc) -> Result<Vec<Rel>> {
             _ => None,
         })
         .map(|e| {
-            resolve(env.head(), e).and_then(|e| {
-                well_type(&e).and_then(|t| match e.expr {
-                    Expr::Rel(rel) if t == Tag::Relation => Ok(rel),
-                    _ => Err("expected relation".into()),
-                })
+            resolve(env.head(), e).and_then(|e| match e.expr {
+                Expr::Rel(rel) => Ok(rel),
+                _ => Err("expected relation".into()),
             })
         })
         .collect()

@@ -1,5 +1,5 @@
 use crate::Env;
-use oal_syntax::ast::{Decl, Doc, Expr, Res, Stmt, Tag, TypedExpr, UriSegment};
+use oal_syntax::ast::{Decl, Doc, Expr, Operator, Res, Stmt, Tag, TypedExpr, UriSegment};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -118,30 +118,26 @@ impl TypeConstrained for TypedExpr {
                 }
                 c.push(self.tag.unwrap(), Tag::Uri);
             }
-            Expr::Join(join) => {
-                for expr in join.exprs.iter() {
-                    expr.constrain(c);
-                    c.push(expr.tag.unwrap(), Tag::Object);
-                }
-                c.push(self.tag.unwrap(), Tag::Object);
-            }
             Expr::Block(block) => {
                 for prop in block.props.iter() {
                     prop.val.constrain(c);
                 }
                 c.push(self.tag.unwrap(), Tag::Object);
             }
-            Expr::Sum(sum) => {
-                for expr in sum.exprs.iter() {
+            Expr::Op(operation) => {
+                for expr in operation.exprs.iter() {
                     expr.constrain(c);
-                    c.push(self.tag.unwrap(), expr.tag.unwrap());
+                    match operation.op {
+                        Operator::Join => c.push(expr.tag.unwrap(), Tag::Object),
+                        Operator::Sum => c.push(self.tag.unwrap(), expr.tag.unwrap()),
+                        _ => {}
+                    }
                 }
-            }
-            Expr::Any(any) => {
-                for expr in any.exprs.iter() {
-                    expr.constrain(c);
+                match operation.op {
+                    Operator::Join => c.push(self.tag.unwrap(), Tag::Object),
+                    Operator::Any => c.push(self.tag.unwrap(), Tag::Any),
+                    _ => {}
                 }
-                c.push(self.tag.unwrap(), Tag::Any);
             }
             Expr::Var(_) => {}
         }
@@ -216,27 +212,19 @@ impl TypeTagged for TypedExpr {
                     }
                 }
             }
-            Expr::Join(join) => {
-                self.tag = Some(Tag::Object);
-                for expr in join.exprs.iter_mut() {
-                    expr.tag_type(n, e);
-                }
-            }
             Expr::Block(block) => {
                 self.tag = Some(Tag::Object);
                 for prop in block.props.iter_mut() {
                     prop.val.tag_type(n, e);
                 }
             }
-            Expr::Sum(sum) => {
-                self.tag = Some(Tag::Var(n.next()));
-                for expr in sum.exprs.iter_mut() {
-                    expr.tag_type(n, e);
-                }
-            }
-            Expr::Any(any) => {
-                self.tag = Some(Tag::Any);
-                for expr in any.exprs.iter_mut() {
+            Expr::Op(operation) => {
+                self.tag = Some(match operation.op {
+                    Operator::Join => Tag::Object,
+                    Operator::Any => Tag::Any,
+                    Operator::Sum => Tag::Var(n.next()),
+                });
+                for expr in operation.exprs.iter_mut() {
                     expr.tag_type(n, e);
                 }
             }

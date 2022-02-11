@@ -74,27 +74,16 @@ fn resolve_expr(env: &Scope, from: Path, expr: &TypedExpr) -> Result<TypedExpr> 
                 expr: Expr::Block(Block { props }),
             })
         }
-        Expr::Sum(sum) => {
-            let exprs: Result<Vec<_>> = sum
+        Expr::Op(operation) => {
+            let op = operation.op;
+            let exprs: Result<Vec<_>> = operation
                 .iter()
                 .map(|e| resolve_expr(env, from.clone(), e))
                 .collect();
 
             exprs.map(|exprs| TypedExpr {
                 tag: expr.tag,
-                expr: Expr::Sum(Sum { exprs }),
-            })
-        }
-        Expr::Any(_) => todo!(),
-        Expr::Join(join) => {
-            let exprs: Result<Vec<_>> = join
-                .iter()
-                .map(|e| resolve_expr(env, from.clone(), e))
-                .collect();
-
-            exprs.map(|exprs| TypedExpr {
-                tag: expr.tag,
-                expr: Expr::Join(Join { exprs }),
+                expr: Expr::Op(VariadicOp { op, exprs }),
             })
         }
     }
