@@ -1,26 +1,26 @@
 use crate::Rule;
 
 #[derive(Debug, Clone)]
-pub struct ParseError {
+pub struct Error {
     msg: String,
 }
 
-impl ParseError {
-    fn new(msg: &str) -> ParseError {
-        ParseError { msg: msg.into() }
+impl Error {
+    pub fn new(msg: &str) -> Error {
+        Error { msg: msg.into() }
     }
 }
 
-impl From<&str> for ParseError {
+impl From<&str> for Error {
     fn from(msg: &str) -> Self {
         Self::new(msg)
     }
 }
 
-impl From<pest::error::Error<Rule>> for ParseError {
+impl From<pest::error::Error<Rule>> for Error {
     fn from(e: pest::error::Error<Rule>) -> Self {
-        ParseError { msg: e.to_string() }
+        Error { msg: e.to_string() }
     }
 }
 
-pub type Result<T> = std::result::Result<T, ParseError>;
+pub type Result<T> = std::result::Result<T, Error>;

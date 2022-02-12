@@ -1,5 +1,6 @@
 use crate::{Pair, Rule};
 use std::rc::Rc;
+use std::slice::Iter;
 
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
@@ -68,6 +69,28 @@ impl From<Pair<'_>> for TypedExpr {
     }
 }
 
+pub trait Composite<'a, U: 'a> {
+    fn foreach<F, T, E>(self, f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut U) -> Result<T, E>;
+}
+
+impl<'a, C, U> Composite<'a, U> for &'a mut C
+where
+    &'a mut C: IntoIterator<Item = &'a mut U>,
+    U: 'a,
+{
+    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut U) -> Result<T, E>,
+    {
+        self.into_iter()
+            .map(|e| f(e))
+            .collect::<Result<Vec<_>, _>>()
+            .map(|_| ())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Doc {
     pub stmts: Vec<Stmt>,
@@ -83,6 +106,16 @@ impl From<Pair<'_>> for Doc {
             })
             .collect();
         Doc { stmts }
+    }
+}
+
+impl<'a> Composite<'a, Stmt> for &'a mut Doc {
+    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut Stmt) -> Result<T, E>,
+    {
+        let r: Result<Vec<_>, _> = self.stmts.iter_mut().map(|s| f(s)).collect();
+        r.map(|_| ())
     }
 }
 
@@ -175,6 +208,17 @@ impl From<Pair<'_>> for Rel {
     }
 }
 
+impl<'a> Composite<'a, TypedExpr> for &'a mut Rel {
+    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
+    {
+        f(&mut self.range)
+            .and_then(|_| f(&mut self.uri))
+            .map(|_| ())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(Literal),
@@ -190,14 +234,25 @@ impl Uri {
     pub fn is_empty(&self) -> bool {
         self.spec.is_empty()
     }
+
+    pub fn iter(&self) -> Iter<UriSegment> {
+        self.spec.iter()
+    }
 }
 
-impl<'a> IntoIterator for &'a Uri {
-    type Item = &'a UriSegment;
-    type IntoIter = core::slice::Iter<'a, UriSegment>;
+impl<'a> IntoIterator for &'a mut Uri {
+    type Item = &'a mut TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.spec.iter()
+        let it = self.spec.iter_mut().filter_map(|s| {
+            if let UriSegment::Template(t) = s {
+                Some(&mut t.val)
+            } else {
+                None
+            }
+        });
+        Box::new(it)
     }
 }
 
@@ -249,8 +304,18 @@ impl From<Pair<'_>> for Block {
 }
 
 impl Block {
-    pub fn iter(&self) -> std::slice::Iter<Prop> {
+    pub fn iter(&self) -> Iter<Prop> {
         self.props.iter()
+    }
+}
+
+impl<'a> Composite<'a, TypedExpr> for &'a mut Block {
+    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
+    {
+        let r: Result<Vec<_>, _> = self.props.iter_mut().map(|p| f(&mut p.val)).collect();
+        r.map(|_| ())
     }
 }
 
@@ -286,6 +351,16 @@ impl From<Pair<'_>> for VariadicOp {
 impl VariadicOp {
     pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
         self.exprs.iter()
+    }
+}
+
+impl<'a> Composite<'a, TypedExpr> for &'a mut VariadicOp {
+    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
+    {
+        let r: Result<Vec<_>, _> = self.exprs.iter_mut().map(|p| f(p)).collect();
+        r.map(|_| ())
     }
 }
 

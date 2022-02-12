@@ -1,5 +1,8 @@
+use crate::errors::{Error, Result};
 use crate::Env;
-use oal_syntax::ast::{Decl, Doc, Expr, Operator, Res, Stmt, Tag, TypedExpr, UriSegment};
+use oal_syntax::ast::{
+    Composite, Decl, Doc, Expr, Operator, Res, Stmt, Tag, TypedExpr, UriSegment,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -189,34 +192,27 @@ impl TagSeq {
 }
 
 pub trait TypeTagged {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env);
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()>;
 }
 
 impl TypeTagged for TypedExpr {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         match &mut self.expr {
             Expr::Prim(_) => {
                 self.tag = Some(Tag::Primitive);
+                Ok(())
             }
             Expr::Rel(rel) => {
                 self.tag = Some(Tag::Relation);
-                rel.range.tag_type(n, e);
-                rel.uri.tag_type(n, e);
+                rel.foreach(|c| c.tag_type(n, e))
             }
             Expr::Uri(uri) => {
                 self.tag = Some(Tag::Uri);
-                for spec in uri.spec.iter_mut() {
-                    match spec {
-                        UriSegment::Literal(_) => {}
-                        UriSegment::Template(t) => t.val.tag_type(n, e),
-                    }
-                }
+                uri.foreach(|c| c.tag_type(n, e))
             }
             Expr::Block(block) => {
                 self.tag = Some(Tag::Object);
-                for prop in block.props.iter_mut() {
-                    prop.val.tag_type(n, e);
-                }
+                block.foreach(|c| c.tag_type(n, e))
             }
             Expr::Op(operation) => {
                 self.tag = Some(match operation.op {
@@ -224,34 +220,36 @@ impl TypeTagged for TypedExpr {
                     Operator::Any => Tag::Any,
                     Operator::Sum => Tag::Var(n.next()),
                 });
-                for expr in operation.exprs.iter_mut() {
-                    expr.tag_type(n, e);
+                operation.foreach(|c| c.tag_type(n, e))
+            }
+            Expr::Var(var) => match e.lookup(var) {
+                None => Err(Error::new("identifier not in scope")),
+                Some(expr) => {
+                    self.tag = expr.tag;
+                    Ok(())
                 }
-            }
-            Expr::Var(var) => {
-                // TODO: return error instead
-                let expr = e.lookup(var).expect("variable not in scope");
-                self.tag = expr.tag;
-            }
-        };
+            },
+        }
     }
 }
 
 impl TypeTagged for Decl {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
-        self.body.tag_type(n, e);
-        e.declare(&self.var, &self.body);
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
+        self.body.tag_type(n, e).and_then(|_| {
+            e.declare(&self.var, &self.body);
+            Ok(())
+        })
     }
 }
 
 impl TypeTagged for Res {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
-        self.rel.tag_type(n, e);
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
+        self.rel.tag_type(n, e)
     }
 }
 
 impl TypeTagged for Stmt {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         match self {
             Stmt::Decl(d) => d.tag_type(n, e),
             Stmt::Res(r) => r.tag_type(n, e),
@@ -260,11 +258,10 @@ impl TypeTagged for Stmt {
 }
 
 impl TypeTagged for Doc {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         e.open();
-        for s in self.stmts.iter_mut() {
-            s.tag_type(n, e);
-        }
+        let r = self.foreach(|s| s.tag_type(n, e));
         e.close();
+        r
     }
 }

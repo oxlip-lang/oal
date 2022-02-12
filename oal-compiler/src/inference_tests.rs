@@ -16,7 +16,7 @@ fn tag_decl() {
     let seq = &mut TagSeq::new();
     let env = &mut Env::new();
 
-    d.tag_type(seq, env);
+    d.tag_type(seq, env).expect("tagging failed");
 
     println!("{:#?}", d);
 
@@ -42,7 +42,7 @@ fn constraint() {
     let seq = &mut TagSeq::new();
     let env = &mut Env::new();
 
-    d.tag_type(seq, env);
+    d.tag_type(seq, env).expect("tagging failed");
 
     println!("{:#?}", d);
 

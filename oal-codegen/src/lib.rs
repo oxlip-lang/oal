@@ -39,7 +39,7 @@ impl Builder {
     }
 
     fn uri_pattern(&self, uri: &ast::Uri) -> String {
-        uri.into_iter()
+        uri.iter()
             .map(|s| match s {
                 ast::UriSegment::Literal(l) => format!("/{}", l),
                 ast::UriSegment::Template(t) => format!("/{{{}}}", t.key),
@@ -177,7 +177,7 @@ impl Builder {
     fn rel_params(&self, rel: &ast::Rel) -> Vec<Parameter> {
         match &rel.uri.expr {
             ast::Expr::Uri(uri) => uri
-                .into_iter()
+                .iter()
                 .flat_map(|s| match s {
                     ast::UriSegment::Template(p) => Some(self.prop_param(p)),
                     _ => None,

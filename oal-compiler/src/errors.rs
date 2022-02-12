@@ -1,18 +1,18 @@
 #[derive(Debug, Clone)]
-pub struct EvalError {
+pub struct Error {
     msg: String,
 }
 
-impl EvalError {
-    fn new(msg: &str) -> EvalError {
-        EvalError { msg: msg.into() }
+impl Error {
+    pub fn new(msg: &str) -> Error {
+        Error { msg: msg.into() }
     }
 }
 
-impl From<&str> for EvalError {
+impl From<&str> for Error {
     fn from(msg: &str) -> Self {
         Self::new(msg)
     }
 }
 
-pub type Result<T> = std::result::Result<T, EvalError>;
+pub type Result<T> = std::result::Result<T, Error>;
