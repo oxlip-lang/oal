@@ -5,18 +5,17 @@ use std::slice::{Iter, IterMut};
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
 
-pub trait Composite<'a, U: 'a> {
-    fn foreach<F, T, E>(self, f: F) -> Result<(), E>
+pub trait TryEach<'a, U: 'a> {
+    fn try_each<F, T, E>(self, f: F) -> Result<(), E>
     where
-        F: FnMut(&'a mut U) -> Result<T, E>;
+        F: FnMut(U) -> Result<T, E>;
 }
 
-impl<'a, C, U> Composite<'a, U> for &'a mut C
+impl<'a, C, U> TryEach<'a, &'a mut U> for &'a mut C
 where
     &'a mut C: IntoIterator<Item = &'a mut U>,
-    U: 'a,
 {
-    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
     where
         F: FnMut(&'a mut U) -> Result<T, E>,
     {
@@ -106,6 +105,15 @@ impl From<Pair<'_>> for Doc {
             })
             .collect();
         Doc { stmts }
+    }
+}
+
+impl<'a> IntoIterator for &'a Doc {
+    type Item = &'a Stmt;
+    type IntoIter = Iter<'a, Stmt>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.stmts.iter()
     }
 }
 
@@ -207,8 +215,8 @@ impl From<Pair<'_>> for Rel {
     }
 }
 
-impl<'a> Composite<'a, TypedExpr> for &'a mut Rel {
-    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+impl<'a> TryEach<'a, &'a mut TypedExpr> for &'a mut Rel {
+    fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
     where
         F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
     {
@@ -236,6 +244,22 @@ impl Uri {
 
     pub fn iter(&self) -> Iter<UriSegment> {
         self.spec.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Uri {
+    type Item = &'a TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let it = self.spec.iter().filter_map(|s| {
+            if let UriSegment::Template(t) = s {
+                Some(&t.val)
+            } else {
+                None
+            }
+        });
+        Box::new(it)
     }
 }
 
@@ -308,6 +332,15 @@ impl Block {
     }
 }
 
+impl<'a> IntoIterator for &'a Block {
+    type Item = &'a TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.props.iter().map(|p| &p.val))
+    }
+}
+
 impl<'a> IntoIterator for &'a mut Block {
     type Item = &'a mut TypedExpr;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
@@ -348,6 +381,15 @@ impl From<Pair<'_>> for VariadicOp {
 
 impl VariadicOp {
     pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
+        self.exprs.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a VariadicOp {
+    type Item = &'a TypedExpr;
+    type IntoIter = Iter<'a, TypedExpr>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.exprs.iter()
     }
 }

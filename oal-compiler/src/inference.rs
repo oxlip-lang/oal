@@ -1,8 +1,6 @@
 use crate::errors::{Error, Result};
 use crate::Env;
-use oal_syntax::ast::{
-    Composite, Decl, Doc, Expr, Operator, Res, Stmt, Tag, TypedExpr, UriSegment,
-};
+use oal_syntax::ast::{Decl, Doc, Expr, Operator, Res, Stmt, Tag, TryEach, TypedExpr, UriSegment};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -124,15 +122,15 @@ impl TypeConstrained for TypedExpr {
             }
             Expr::Rel(rel) => {
                 self.tag = Some(Tag::Relation);
-                rel.foreach(|c| c.tag_type(n, e))
+                rel.try_each(|c| c.tag_type(n, e))
             }
             Expr::Uri(uri) => {
                 self.tag = Some(Tag::Uri);
-                uri.foreach(|c| c.tag_type(n, e))
+                uri.try_each(|c| c.tag_type(n, e))
             }
             Expr::Block(block) => {
                 self.tag = Some(Tag::Object);
-                block.foreach(|c| c.tag_type(n, e))
+                block.try_each(|c| c.tag_type(n, e))
             }
             Expr::Op(operation) => {
                 self.tag = Some(match operation.op {
@@ -140,7 +138,7 @@ impl TypeConstrained for TypedExpr {
                     Operator::Any => Tag::Any,
                     Operator::Sum => Tag::Var(n.next()),
                 });
-                operation.foreach(|c| c.tag_type(n, e))
+                operation.try_each(|c| c.tag_type(n, e))
             }
             Expr::Var(var) => match e.lookup(var) {
                 None => Err(Error::new("identifier not in scope")),
@@ -163,29 +161,24 @@ impl TypeConstrained for TypedExpr {
                 c.push(self.tag.unwrap(), Tag::Relation);
             }
             Expr::Uri(uri) => {
-                for s in uri.spec.iter() {
-                    match s {
-                        UriSegment::Literal(_) => {}
-                        UriSegment::Template(tpl) => {
-                            tpl.val.constrain(c);
-                            c.push(tpl.val.tag.unwrap(), Tag::Primitive);
-                        }
-                    }
+                for e in uri.into_iter() {
+                    e.constrain(c);
+                    c.push(e.tag.unwrap(), Tag::Primitive);
                 }
                 c.push(self.tag.unwrap(), Tag::Uri);
             }
             Expr::Block(block) => {
-                for prop in block.props.iter() {
-                    prop.val.constrain(c);
+                for e in block.into_iter() {
+                    e.constrain(c);
                 }
                 c.push(self.tag.unwrap(), Tag::Object);
             }
             Expr::Op(operation) => {
-                for expr in operation.exprs.iter() {
-                    expr.constrain(c);
+                for e in operation.into_iter() {
+                    e.constrain(c);
                     match operation.op {
-                        Operator::Join => c.push(expr.tag.unwrap(), Tag::Object),
-                        Operator::Sum => c.push(self.tag.unwrap(), expr.tag.unwrap()),
+                        Operator::Join => c.push(e.tag.unwrap(), Tag::Object),
+                        Operator::Sum => c.push(self.tag.unwrap(), e.tag.unwrap()),
                         _ => {}
                     }
                 }
@@ -261,19 +254,19 @@ impl TypeConstrained for Stmt {
 impl TypeConstrained for Doc {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         e.open();
-        let r = self.foreach(|s| s.tag_type(n, e));
+        let r = self.try_each(|s| s.tag_type(n, e));
         e.close();
         r
     }
 
     fn constrain(&self, c: &mut TypeConstraint) {
-        for s in self.stmts.iter() {
+        for s in self.into_iter() {
             s.constrain(c);
         }
     }
 
     fn substitute(&mut self, subst: &Subst) {
-        for s in self.stmts.iter_mut() {
+        for s in self.into_iter() {
             s.substitute(subst)
         }
     }
