@@ -1,4 +1,4 @@
-use crate::inference::{TagSeq, TypeConstrained, TypeConstraint, TypeTagged};
+use crate::inference::{TagSeq, TypeConstrained, TypeConstraint};
 use crate::scope::Env;
 use oal_syntax::ast::{Stmt, Tag};
 use oal_syntax::parse;
@@ -52,13 +52,17 @@ fn constraint() {
 
     println!("{:#?}", cnt);
 
-    let u = cnt.unify().expect("unification failed");
+    let subst = cnt.unify().expect("unification failed");
 
-    println!("{:#?}", u);
+    println!("{:#?}", subst);
 
-    let t = u.substitute(Tag::Var(0));
+    let t = subst.substitute(Tag::Var(0));
 
     assert_eq!(t, Tag::Object);
+
+    d.substitute(&subst);
+
+    println!("{:#?}", d);
 }
 
 #[test]

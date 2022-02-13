@@ -1,9 +1,31 @@
 use crate::{Pair, Rule};
 use std::rc::Rc;
-use std::slice::Iter;
+use std::slice::{Iter, IterMut};
 
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
+
+pub trait Composite<'a, U: 'a> {
+    fn foreach<F, T, E>(self, f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut U) -> Result<T, E>;
+}
+
+impl<'a, C, U> Composite<'a, U> for &'a mut C
+where
+    &'a mut C: IntoIterator<Item = &'a mut U>,
+    U: 'a,
+{
+    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a mut U) -> Result<T, E>,
+    {
+        self.into_iter()
+            .map(|e| f(e))
+            .collect::<Result<Vec<_>, _>>()
+            .map(|_| ())
+    }
+}
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Tag {
@@ -69,28 +91,6 @@ impl From<Pair<'_>> for TypedExpr {
     }
 }
 
-pub trait Composite<'a, U: 'a> {
-    fn foreach<F, T, E>(self, f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a mut U) -> Result<T, E>;
-}
-
-impl<'a, C, U> Composite<'a, U> for &'a mut C
-where
-    &'a mut C: IntoIterator<Item = &'a mut U>,
-    U: 'a,
-{
-    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a mut U) -> Result<T, E>,
-    {
-        self.into_iter()
-            .map(|e| f(e))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|_| ())
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Doc {
     pub stmts: Vec<Stmt>,
@@ -109,13 +109,12 @@ impl From<Pair<'_>> for Doc {
     }
 }
 
-impl<'a> Composite<'a, Stmt> for &'a mut Doc {
-    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a mut Stmt) -> Result<T, E>,
-    {
-        let r: Result<Vec<_>, _> = self.stmts.iter_mut().map(|s| f(s)).collect();
-        r.map(|_| ())
+impl<'a> IntoIterator for &'a mut Doc {
+    type Item = &'a mut Stmt;
+    type IntoIter = IterMut<'a, Stmt>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.stmts.iter_mut()
     }
 }
 
@@ -145,7 +144,7 @@ impl From<Pair<'_>> for Stmt {
                 let var = p.nth(1).unwrap().as_str().into();
                 let next_pair = p.next().unwrap();
                 let expr = if next_pair.as_rule() == Rule::type_kw {
-                    // TODO: parse the type annotation into a type tag
+                    // TODO: parse the type annotation
                     let _ann = next_pair;
                     p.next().unwrap()
                 } else {
@@ -309,13 +308,12 @@ impl Block {
     }
 }
 
-impl<'a> Composite<'a, TypedExpr> for &'a mut Block {
-    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
-    {
-        let r: Result<Vec<_>, _> = self.props.iter_mut().map(|p| f(&mut p.val)).collect();
-        r.map(|_| ())
+impl<'a> IntoIterator for &'a mut Block {
+    type Item = &'a mut TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.props.iter_mut().map(|p| &mut p.val))
     }
 }
 
@@ -354,13 +352,12 @@ impl VariadicOp {
     }
 }
 
-impl<'a> Composite<'a, TypedExpr> for &'a mut VariadicOp {
-    fn foreach<F, T, E>(self, mut f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
-    {
-        let r: Result<Vec<_>, _> = self.exprs.iter_mut().map(|p| f(p)).collect();
-        r.map(|_| ())
+impl<'a> IntoIterator for &'a mut VariadicOp {
+    type Item = &'a mut TypedExpr;
+    type IntoIter = IterMut<'a, TypedExpr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.exprs.iter_mut()
     }
 }
 

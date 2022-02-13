@@ -94,11 +94,64 @@ impl TypeConstraint {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct TagSeq(usize);
+
+impl TagSeq {
+    pub fn new() -> Self {
+        TagSeq(0)
+    }
+
+    pub fn next(&mut self) -> usize {
+        let n = self.0;
+        self.0 += 1;
+        n
+    }
+}
+
 pub trait TypeConstrained {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()>;
     fn constrain(&self, c: &mut TypeConstraint);
+    fn substitute(&mut self, subst: &Subst);
 }
 
 impl TypeConstrained for TypedExpr {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
+        match &mut self.expr {
+            Expr::Prim(_) => {
+                self.tag = Some(Tag::Primitive);
+                Ok(())
+            }
+            Expr::Rel(rel) => {
+                self.tag = Some(Tag::Relation);
+                rel.foreach(|c| c.tag_type(n, e))
+            }
+            Expr::Uri(uri) => {
+                self.tag = Some(Tag::Uri);
+                uri.foreach(|c| c.tag_type(n, e))
+            }
+            Expr::Block(block) => {
+                self.tag = Some(Tag::Object);
+                block.foreach(|c| c.tag_type(n, e))
+            }
+            Expr::Op(operation) => {
+                self.tag = Some(match operation.op {
+                    Operator::Join => Tag::Object,
+                    Operator::Any => Tag::Any,
+                    Operator::Sum => Tag::Var(n.next()),
+                });
+                operation.foreach(|c| c.tag_type(n, e))
+            }
+            Expr::Var(var) => match e.lookup(var) {
+                None => Err(Error::new("identifier not in scope")),
+                Some(expr) => {
+                    self.tag = expr.tag;
+                    Ok(())
+                }
+            },
+        }
+    }
+
     fn constrain(&self, c: &mut TypeConstraint) {
         match &self.expr {
             Expr::Prim(_) => c.push(self.tag.unwrap(), Tag::Primitive),
@@ -145,123 +198,83 @@ impl TypeConstrained for TypedExpr {
             Expr::Var(_) => {}
         }
     }
+
+    fn substitute(&mut self, subst: &Subst) {
+        self.tag = Some(subst.substitute(self.tag.unwrap()))
+    }
 }
 
 impl TypeConstrained for Decl {
-    fn constrain(&self, c: &mut TypeConstraint) {
-        self.body.constrain(c);
-    }
-}
-
-impl TypeConstrained for Res {
-    fn constrain(&self, c: &mut TypeConstraint) {
-        self.rel.constrain(c)
-    }
-}
-
-impl TypeConstrained for Stmt {
-    fn constrain(&self, c: &mut TypeConstraint) {
-        match self {
-            Stmt::Decl(d) => d.constrain(c),
-            Stmt::Res(r) => r.constrain(c),
-        }
-    }
-}
-
-impl TypeConstrained for Doc {
-    fn constrain(&self, c: &mut TypeConstraint) {
-        for s in self.stmts.iter() {
-            s.constrain(c);
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct TagSeq(usize);
-
-impl TagSeq {
-    pub fn new() -> Self {
-        TagSeq(0)
-    }
-
-    pub fn next(&mut self) -> usize {
-        let n = self.0;
-        self.0 += 1;
-        n
-    }
-}
-
-pub trait TypeTagged {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()>;
-}
-
-impl TypeTagged for TypedExpr {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
-        match &mut self.expr {
-            Expr::Prim(_) => {
-                self.tag = Some(Tag::Primitive);
-                Ok(())
-            }
-            Expr::Rel(rel) => {
-                self.tag = Some(Tag::Relation);
-                rel.foreach(|c| c.tag_type(n, e))
-            }
-            Expr::Uri(uri) => {
-                self.tag = Some(Tag::Uri);
-                uri.foreach(|c| c.tag_type(n, e))
-            }
-            Expr::Block(block) => {
-                self.tag = Some(Tag::Object);
-                block.foreach(|c| c.tag_type(n, e))
-            }
-            Expr::Op(operation) => {
-                self.tag = Some(match operation.op {
-                    Operator::Join => Tag::Object,
-                    Operator::Any => Tag::Any,
-                    Operator::Sum => Tag::Var(n.next()),
-                });
-                operation.foreach(|c| c.tag_type(n, e))
-            }
-            Expr::Var(var) => match e.lookup(var) {
-                None => Err(Error::new("identifier not in scope")),
-                Some(expr) => {
-                    self.tag = expr.tag;
-                    Ok(())
-                }
-            },
-        }
-    }
-}
-
-impl TypeTagged for Decl {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         self.body.tag_type(n, e).and_then(|_| {
             e.declare(&self.var, &self.body);
             Ok(())
         })
     }
-}
 
-impl TypeTagged for Res {
-    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
-        self.rel.tag_type(n, e)
+    fn constrain(&self, c: &mut TypeConstraint) {
+        self.body.constrain(c);
+    }
+
+    fn substitute(&mut self, subst: &Subst) {
+        self.body.substitute(subst)
     }
 }
 
-impl TypeTagged for Stmt {
+impl TypeConstrained for Res {
+    fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
+        self.rel.tag_type(n, e)
+    }
+
+    fn constrain(&self, c: &mut TypeConstraint) {
+        self.rel.constrain(c)
+    }
+
+    fn substitute(&mut self, subst: &Subst) {
+        self.rel.substitute(subst)
+    }
+}
+
+impl TypeConstrained for Stmt {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         match self {
             Stmt::Decl(d) => d.tag_type(n, e),
             Stmt::Res(r) => r.tag_type(n, e),
         }
     }
+
+    fn constrain(&self, c: &mut TypeConstraint) {
+        match self {
+            Stmt::Decl(d) => d.constrain(c),
+            Stmt::Res(r) => r.constrain(c),
+        }
+    }
+
+    fn substitute(&mut self, subst: &Subst) {
+        match self {
+            Stmt::Decl(d) => d.substitute(subst),
+            Stmt::Res(r) => r.substitute(subst),
+        }
+    }
 }
 
-impl TypeTagged for Doc {
+impl TypeConstrained for Doc {
     fn tag_type(&mut self, n: &mut TagSeq, e: &mut Env) -> Result<()> {
         e.open();
         let r = self.foreach(|s| s.tag_type(n, e));
         e.close();
         r
+    }
+
+    fn constrain(&self, c: &mut TypeConstraint) {
+        for s in self.stmts.iter() {
+            s.constrain(c);
+        }
+    }
+
+    fn substitute(&mut self, subst: &Subst) {
+        for s in self.stmts.iter_mut() {
+            s.substitute(subst)
+        }
     }
 }
