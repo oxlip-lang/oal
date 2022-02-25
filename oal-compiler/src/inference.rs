@@ -1,6 +1,7 @@
 use crate::errors::{Error, Result};
 use crate::Env;
-use oal_syntax::ast::{Decl, Doc, Expr, Operator, Res, Stmt, Tag, TryEach, TypedExpr, UriSegment};
+use oal_syntax::ast::{Decl, Doc, Expr, Operator, Res, Stmt, Tag, TypedExpr};
+use oal_syntax::try_each::TryEach;
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -81,14 +82,14 @@ impl TypeConstraint {
         self.0.push(TypeEquation { left, right });
     }
 
-    pub fn unify(&self) -> Option<Subst> {
+    pub fn unify(&self) -> Result<Subst> {
         let mut s = Subst::new();
         for eq in self.0.iter() {
             if !eq.unify(&mut s) {
-                return None;
+                return Err(Error::new("cannot unify"));
             }
         }
-        Some(s)
+        Ok(s)
     }
 }
 

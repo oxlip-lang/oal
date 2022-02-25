@@ -151,7 +151,7 @@ impl Builder {
                 Operator::Sum => self.sum_schema(&operation.exprs),
                 Operator::Any => todo!(),
             },
-            _ => panic!("unexpected type expression"),
+            _ => panic!("unexpected type expression: {:?}", e),
         }
     }
 

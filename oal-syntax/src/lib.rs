@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod errors;
 mod parser;
+pub mod try_each;
 
 #[cfg(test)]
 mod ast_tests;
