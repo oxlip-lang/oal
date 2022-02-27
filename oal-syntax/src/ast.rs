@@ -195,7 +195,20 @@ impl From<Pair<'_>> for Rel {
     }
 }
 
-impl<'a> TryEach<'a, &'a mut TypedExpr> for &'a mut Rel {
+impl<'a> TryEach for &'a Rel {
+    type Item = &'a TypedExpr;
+
+    fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&'a TypedExpr) -> Result<T, E>,
+    {
+        f(&self.range).and_then(|_| f(&self.uri)).map(|_| ())
+    }
+}
+
+impl<'a> TryEach for &'a mut Rel {
+    type Item = &'a mut TypedExpr;
+
     fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
     where
         F: FnMut(&'a mut TypedExpr) -> Result<T, E>,

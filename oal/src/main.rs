@@ -1,26 +1,23 @@
 use oal_codegen::Builder;
-use oal_compiler::{compile, Env, TagSeq, Transform, TypeConstrained, TypeConstraint};
+use oal_compiler::{
+    compile, constrain, substitute, tag_type, Env, Scan, TagSeq, Transform, TypeConstraint,
+};
 use oal_syntax::ast::{Doc, Expr, Rel, Res, Stmt, TypedExpr};
 use oal_syntax::parse;
 use std::env;
 
 fn relations(mut doc: Doc) -> oal_compiler::Result<Vec<Rel>> {
-    let seq = &mut TagSeq::new();
-    let env = &mut Env::new();
+    doc.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)?;
 
-    doc.tag_type(seq, env)?;
+    let constraint = &mut TypeConstraint::new();
 
-    let cnt = &mut TypeConstraint::new();
+    doc.scan(constraint, &mut Env::new(), constrain)?;
 
-    doc.constrain(cnt);
+    let subst = &mut constraint.unify()?;
 
-    let subst = &cnt.unify()?;
+    doc.transform(subst, &mut Env::new(), substitute)?;
 
-    doc.substitute(subst);
-
-    let env = &mut Env::new();
-
-    let doc = doc.transform(env, compile)?;
+    doc.transform(&mut (), &mut Env::new(), compile)?;
 
     doc.stmts
         .into_iter()

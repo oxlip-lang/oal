@@ -1,16 +1,16 @@
-let id1:num = num
+let id1 = num
 
-let uri0:uri = /a
-let uri1:uri = /a/{ id id1 }/c%40
-let uri2:uri = uri1
+let uri0 = /a
+let uri1 = /a/{ id id1 }/c%40
+let uri2 = uri1
 
-let obj3:any = {} ~ uri ~ bool
+let obj3 = {} ~ uri ~ bool
 
-let obj2:obj = {
+let obj2 = {
   prop1 obj3
 }
 
-let obj1:obj = {
+let obj1 = {
   prop1 bool # todo: something
   prop2 /b:get,put -> obj2
   prop3 uri1:get -> { prop str } & obj2
@@ -21,7 +21,7 @@ let obj1:obj = {
   prop6 num ~ str
 }
 
-let obj4:obj = ( ( {} | {} ) & {} )
+let obj4 = ( ( {} | {} ) & {} )
 
 /*
  * Blahblah

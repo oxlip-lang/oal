@@ -1,5 +1,6 @@
-use crate::inference::{TagSeq, TypeConstrained, TypeConstraint};
+use crate::inference::{TagSeq, TypeConstraint};
 use crate::scope::Env;
+use crate::{constrain, substitute, tag_type, Scan, Transform};
 use oal_syntax::ast::{Stmt, Tag};
 use oal_syntax::parse;
 
@@ -16,7 +17,7 @@ fn tag_decl() {
     let seq = &mut TagSeq::new();
     let env = &mut Env::new();
 
-    d.tag_type(seq, env).expect("tagging failed");
+    d.transform(seq, env, tag_type).expect("tagging failed");
 
     println!("{:#?}", d);
 
@@ -39,20 +40,19 @@ fn constraint() {
 
     assert_eq!(d.stmts.len(), 2);
 
-    let seq = &mut TagSeq::new();
-    let env = &mut Env::new();
-
-    d.tag_type(seq, env).expect("tagging failed");
+    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+        .expect("tagging failed");
 
     println!("{:#?}", d);
 
     let cnt = &mut TypeConstraint::new();
 
-    d.constrain(cnt);
+    d.scan(cnt, &mut Env::new(), constrain)
+        .expect("constraining failed");
 
     println!("{:#?}", cnt);
 
-    let subst = cnt.unify().expect("unification failed");
+    let subst = &mut cnt.unify().expect("unification failed");
 
     println!("{:#?}", subst);
 
@@ -60,7 +60,8 @@ fn constraint() {
 
     assert_eq!(t, Tag::Object);
 
-    d.substitute(&subst);
+    d.transform(subst, &mut Env::new(), substitute)
+        .expect("substitution failed");
 
     println!("{:#?}", d);
 }

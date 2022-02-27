@@ -3,19 +3,19 @@ use crate::transform::Transform;
 use crate::Env;
 use oal_syntax::ast::*;
 
-pub fn compile(env: &mut Env, expr: &Expr) -> Result<Expr> {
-    match expr {
-        Expr::Prim(_) => Ok(expr.clone()),
-        Expr::Rel(rel) => rel.transform(env, compile).map(Expr::Rel),
-        Expr::Uri(uri) => uri.transform(env, compile).map(Expr::Uri),
-        Expr::Block(block) => block.transform(env, compile).map(Expr::Block),
-        Expr::Var(var) => {
-            if let Some(e) = env.lookup(var) {
-                Ok(e.expr.clone())
-            } else {
-                Err(Error::new("unknown variable"))
+pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+    match &mut e.expr {
+        Expr::Prim(_) => Ok(()),
+        Expr::Rel(rel) => rel.transform(acc, env, compile),
+        Expr::Uri(uri) => uri.transform(acc, env, compile),
+        Expr::Block(block) => block.transform(acc, env, compile),
+        Expr::Op(operation) => operation.transform(acc, env, compile),
+        Expr::Var(var) => match env.lookup(var) {
+            None => Err(Error::new("identifier not in scope")),
+            Some(val) => {
+                *e = val.clone();
+                Ok(())
             }
-        }
-        Expr::Op(op) => op.transform(env, compile).map(Expr::Op),
+        },
     }
 }

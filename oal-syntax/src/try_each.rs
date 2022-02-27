@@ -1,16 +1,20 @@
-pub trait TryEach<'a, U: 'a> {
+pub trait TryEach {
+    type Item;
+
     fn try_each<F, T, E>(self, f: F) -> Result<(), E>
     where
-        F: FnMut(U) -> Result<T, E>;
+        F: FnMut(Self::Item) -> Result<T, E>;
 }
 
-impl<'a, C, U> TryEach<'a, &'a mut U> for &'a mut C
+impl<C, U> TryEach for C
 where
-    &'a mut C: IntoIterator<Item = &'a mut U>,
+    C: IntoIterator<Item = U>,
 {
+    type Item = U;
+
     fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&'a mut U) -> Result<T, E>,
+        F: FnMut(Self::Item) -> Result<T, E>,
     {
         self.into_iter()
             .map(|e| f(e))

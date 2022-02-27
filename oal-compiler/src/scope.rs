@@ -3,23 +3,27 @@ use std::collections::HashMap;
 
 pub type Scope = HashMap<Ident, TypedExpr>;
 
-pub struct Env(Vec<Scope>);
+pub struct Env {
+    scopes: Vec<Scope>,
+}
 
 impl Env {
     pub fn new() -> Env {
-        Env(vec![Scope::new()])
+        Env {
+            scopes: vec![Scope::new()],
+        }
     }
     pub fn head(&self) -> &Scope {
-        self.0.last().unwrap()
+        self.scopes.last().unwrap()
     }
     pub fn open(&mut self) {
-        self.0.push(Scope::new());
+        self.scopes.push(Scope::new());
     }
     pub fn declare(&mut self, n: &Ident, e: &TypedExpr) {
-        self.0.last_mut().unwrap().insert(n.clone(), e.clone());
+        self.scopes.last_mut().unwrap().insert(n.clone(), e.clone());
     }
     pub fn lookup(&self, n: &Ident) -> Option<&TypedExpr> {
-        self.0
+        self.scopes
             .iter()
             .rev()
             .map(|s| s.get(n))
@@ -28,9 +32,9 @@ impl Env {
             .next()
     }
     pub fn exists(&self, n: &Ident) -> bool {
-        self.0.last().unwrap().contains_key(n)
+        self.scopes.last().unwrap().contains_key(n)
     }
     pub fn close(&mut self) {
-        self.0.pop();
+        self.scopes.pop();
     }
 }
