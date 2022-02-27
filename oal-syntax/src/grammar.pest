@@ -47,7 +47,9 @@ join_type = { term_type ~ ( "&" ~ term_type )* }
 any_type = { join_type ~ ( "~" ~ join_type )* }
 sum_type = { any_type ~ ( "|" ~ any_type )* }
 
-decl = { let_kw ~ ident ~ ( ":" ~ type_kw )? ~ "=" ~ sum_type }
+args = { ident* }
+hint = { ( ":" ~ type_kw )? }
+decl = { let_kw ~ ident ~ args ~ hint ~ "=" ~ sum_type }
 
 res = { res_kw ~ ( rel_type | ident ) }
 

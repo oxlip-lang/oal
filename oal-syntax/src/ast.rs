@@ -34,6 +34,8 @@ pub enum Expr {
     Block(Block),
     Var(Ident),
     Op(VariadicOp),
+    Lambda(Lambda),
+    App(Application),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -108,8 +110,8 @@ impl<'a> IntoIterator for &'a mut Doc {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decl {
-    pub var: Ident,
-    pub body: TypedExpr,
+    pub name: Ident,
+    pub expr: TypedExpr,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -129,17 +131,25 @@ impl From<Pair<'_>> for Stmt {
         match p.as_rule() {
             Rule::decl => {
                 let mut p = p.into_inner();
-                let var = p.nth(1).unwrap().as_str().into();
-                let next_pair = p.next().unwrap();
-                let expr = if next_pair.as_rule() == Rule::type_kw {
-                    // TODO: parse the type annotation
-                    let _ann = next_pair;
-                    p.next().unwrap()
+                let name = p.nth(1).unwrap().as_str().into();
+                let args: Vec<Ident> = p
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .map(|p| p.as_str().into())
+                    .collect();
+                let _hint = p.next().unwrap();
+                let expr = p.next().unwrap().into();
+                let expr = if args.is_empty() {
+                    expr
                 } else {
-                    next_pair
+                    Expr::Lambda(Lambda {
+                        args,
+                        body: Box::new(expr),
+                    })
+                    .into()
                 };
-                let expr = expr.into();
-                Stmt::Decl(Decl { var, body: expr })
+                Stmt::Decl(Decl { name, expr })
             }
             Rule::res => Stmt::Res(Res {
                 rel: p.into_inner().nth(1).unwrap().into(),
@@ -412,4 +422,16 @@ impl From<Pair<'_>> for Prim {
             _ => unreachable!(),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Lambda {
+    pub args: Vec<Ident>,
+    pub body: Box<TypedExpr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Application {
+    pub name: Ident,
+    pub args: Vec<TypedExpr>,
 }

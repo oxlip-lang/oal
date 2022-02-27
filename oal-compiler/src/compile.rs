@@ -17,5 +17,6 @@ pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
                 Ok(())
             }
         },
+        _ => unreachable!(),
     }
 }

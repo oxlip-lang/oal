@@ -15,8 +15,8 @@ impl Transform for Decl {
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
     {
-        f(acc, env, &mut self.body)?;
-        env.declare(&self.var, &self.body);
+        f(acc, env, &mut self.expr)?;
+        env.declare(&self.name, &self.expr);
         Ok(())
     }
 }

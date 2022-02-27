@@ -22,7 +22,7 @@ fn tag_decl() {
     println!("{:#?}", d);
 
     if let Stmt::Decl(decl) = d.stmts.first().unwrap() {
-        if Some(Tag::Primitive) != decl.body.tag {
+        if Some(Tag::Primitive) != decl.expr.tag {
             panic!("expected primitive type tag");
         }
     } else {

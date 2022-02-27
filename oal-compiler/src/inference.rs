@@ -51,6 +51,7 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
                 Ok(())
             }
         },
+        _ => unreachable!(),
     }
 }
 
@@ -185,6 +186,7 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
             }
         }
         Expr::Var(_) => {}
+        _ => unreachable!(),
     }
     Ok(())
 }

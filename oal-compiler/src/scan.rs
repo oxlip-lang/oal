@@ -15,8 +15,8 @@ impl Scan for Decl {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        f(acc, env, &self.body)?;
-        env.declare(&self.var, &self.body);
+        f(acc, env, &self.expr)?;
+        env.declare(&self.name, &self.expr);
         Ok(())
     }
 }
