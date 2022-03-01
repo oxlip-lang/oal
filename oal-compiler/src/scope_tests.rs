@@ -7,11 +7,11 @@ fn environment_scopes() {
     let id = Ident::from("a");
     let bool_expr = TypedExpr {
         tag: Some(Tag::Primitive),
-        expr: Expr::Prim(Prim::Bool),
+        inner: Expr::Prim(Prim::Bool),
     };
     let num_expr = TypedExpr {
         tag: Some(Tag::Primitive),
-        expr: Expr::Prim(Prim::Num),
+        inner: Expr::Prim(Prim::Num),
     };
 
     assert!(!e.exists(&id));

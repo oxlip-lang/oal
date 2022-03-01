@@ -1,29 +1,55 @@
 use crate::inference::{TagSeq, TypeConstraint};
 use crate::scope::Env;
 use crate::{constrain, substitute, tag_type, Scan, Transform};
-use oal_syntax::ast::{Stmt, Tag};
+use oal_syntax::ast::{Expr, Lambda, Stmt, Tag};
 use oal_syntax::parse;
 
 #[test]
-fn tag_decl() {
+fn tag_var_decl() {
     let code = r#"
         let id1 = num
-        let id2 = id1 | {}
     "#;
     let mut d = parse(code.into()).expect("parsing failed");
 
-    assert_eq!(d.stmts.len(), 2);
+    assert_eq!(d.stmts.len(), 1);
 
-    let seq = &mut TagSeq::new();
-    let env = &mut Env::new();
-
-    d.transform(seq, env, tag_type).expect("tagging failed");
-
-    println!("{:#?}", d);
+    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+        .expect("tagging failed");
 
     if let Stmt::Decl(decl) = d.stmts.first().unwrap() {
         if Some(Tag::Primitive) != decl.expr.tag {
             panic!("expected primitive type tag");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn tag_lambda_decl() {
+    let mut d = parse("let f x y z = num".into()).expect("parsing failed");
+
+    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+        .expect("tagging failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Stmt::Decl(decl) = s {
+        assert_eq!(decl.name.as_ref(), "f");
+        assert_eq!(decl.expr.tag, Some(Tag::Var(0)));
+        if let Expr::Lambda(Lambda { bindings, .. }) = &decl.expr.inner {
+            let tags: Vec<_> = bindings
+                .iter()
+                .filter_map(|a| match a.tag {
+                    Some(Tag::Var(n)) => Some(n),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(tags, vec![1, 2, 3]);
+        } else {
+            panic!("expected lambda expression");
         }
     } else {
         panic!("expected declaration");
@@ -43,18 +69,12 @@ fn constraint() {
     d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
         .expect("tagging failed");
 
-    println!("{:#?}", d);
-
     let cnt = &mut TypeConstraint::new();
 
     d.scan(cnt, &mut Env::new(), constrain)
         .expect("constraining failed");
 
-    println!("{:#?}", cnt);
-
     let subst = &mut cnt.unify().expect("unification failed");
-
-    println!("{:#?}", subst);
 
     let t = subst.substitute(Tag::Var(0));
 
@@ -62,8 +82,6 @@ fn constraint() {
 
     d.transform(subst, &mut Env::new(), substitute)
         .expect("substitution failed");
-
-    println!("{:#?}", d);
 }
 
 #[test]
@@ -75,8 +93,6 @@ fn unify() {
     c.push(Tag::Var(1), Tag::Var(0));
 
     let u = c.unify().expect("unification failed");
-
-    println!("{:#?}", u);
 
     let t = u.substitute(Tag::Var(2));
 

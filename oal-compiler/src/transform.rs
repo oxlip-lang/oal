@@ -89,3 +89,29 @@ impl Transform for VariadicOp {
         self.try_each(|e| f(acc, env, e))
     }
 }
+
+impl Transform for Lambda {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+    {
+        env.open();
+
+        let r = (&mut self.bindings).try_each(|binding| {
+            f(acc, env, binding).and_then(|_| {
+                if let Expr::Binding(name) = &binding.inner {
+                    env.declare(name, binding);
+                    Ok(())
+                } else {
+                    unreachable!()
+                }
+            })
+        });
+
+        let r = r.and_then(|_| f(acc, env, &mut self.body));
+
+        env.close();
+
+        r
+    }
+}

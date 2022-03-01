@@ -26,6 +26,9 @@ method_kw = { get_kw | put_kw }
 
 keyword = { type_kw | method_kw }
 
+var = { ident }
+binding = { ident }
+
 uri_seg = @{ ( ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" )+ }
 uri_lit = { "/" ~ uri_seg }
 uri_tpl = { "/{" ~ prop ~ "}" }
@@ -35,21 +38,21 @@ uri_type = { uri_kw | uri_spec }
 
 methods = { method_kw ~ ( "," ~ method_kw )* }
 
-rel_type = { ( uri_type | ident ) ~ ":" ~ methods ~ "->" ~ sum_type }
+rel_type = { ( uri_type | var ) ~ ":" ~ methods ~ "->" ~ sum_type }
 
 prim_type = { num_kw | str_kw | bool_kw  }
 
 prop = { ident ~ sum_type }
 block_type = { "{" ~ prop* ~ "}" }
 paren_type = { "(" ~ sum_type ~ ")" }
-term_type = { prim_type | rel_type | uri_type | block_type | paren_type | ident }
+term_type = { prim_type | rel_type | uri_type | block_type | paren_type | var }
 join_type = { term_type ~ ( "&" ~ term_type )* }
 any_type = { join_type ~ ( "~" ~ join_type )* }
 sum_type = { any_type ~ ( "|" ~ any_type )* }
 
-args = { ident* }
+bindings = { binding* }
 hint = { ( ":" ~ type_kw )? }
-decl = { let_kw ~ ident ~ args ~ hint ~ "=" ~ sum_type }
+decl = { let_kw ~ ident ~ bindings ~ hint ~ "=" ~ sum_type }
 
 res = { res_kw ~ ( rel_type | ident ) }
 

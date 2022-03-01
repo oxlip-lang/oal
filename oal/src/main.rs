@@ -25,7 +25,7 @@ fn relations(mut doc: Doc) -> oal_compiler::Result<Vec<Rel>> {
             Stmt::Res(Res {
                 rel:
                     TypedExpr {
-                        expr: Expr::Rel(r),
+                        inner: Expr::Rel(r),
                         tag: _,
                     },
             }) => Some(Ok(r)),

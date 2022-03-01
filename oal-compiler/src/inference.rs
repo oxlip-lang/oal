@@ -19,7 +19,7 @@ impl TagSeq {
 }
 
 pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    match &mut e.expr {
+    match &mut e.inner {
         Expr::Prim(_) => {
             e.tag = Some(Tag::Primitive);
             Ok(())
@@ -51,6 +51,14 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
                 Ok(())
             }
         },
+        Expr::Lambda(lambda) => {
+            e.tag = Some(Tag::Var(seq.next()));
+            lambda.transform(seq, env, tag_type)
+        }
+        Expr::Binding(_) => {
+            e.tag = Some(Tag::Var(seq.next()));
+            Ok(())
+        }
         _ => unreachable!(),
     }
 }
@@ -150,7 +158,7 @@ impl TypeConstraint {
 }
 
 pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
-    match &e.expr {
+    match &e.inner {
         Expr::Prim(_) => c.push(e.tag.unwrap(), Tag::Primitive),
         Expr::Rel(rel) => {
             rel.scan(c, env, constrain)?;

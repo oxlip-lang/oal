@@ -36,19 +36,26 @@ pub enum Expr {
     Op(VariadicOp),
     Lambda(Lambda),
     App(Application),
+    Binding(Ident),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TypedExpr {
+pub struct Typed<T> {
     pub tag: Option<Tag>,
-    pub expr: Expr,
+    pub inner: T,
 }
 
-impl From<Expr> for TypedExpr {
-    fn from(e: Expr) -> Self {
-        TypedExpr { tag: None, expr: e }
+impl<T> From<T> for Typed<T> {
+    fn from(e: T) -> Self {
+        Typed {
+            tag: None,
+            inner: e,
+        }
     }
 }
+
+pub type TypedIdent = Typed<Ident>;
+pub type TypedExpr = Typed<Expr>;
 
 impl From<Pair<'_>> for TypedExpr {
     fn from(p: Pair<'_>) -> Self {
@@ -58,7 +65,8 @@ impl From<Pair<'_>> for TypedExpr {
             Rule::uri_type => Expr::Uri(p.into()).into(),
             Rule::block_type => Expr::Block(p.into()).into(),
             Rule::paren_type => p.into_inner().next().unwrap().into(),
-            Rule::ident => Expr::Var(p.as_str().into()).into(),
+            Rule::var => Expr::Var(p.as_str().into()).into(),
+            Rule::binding => Expr::Binding(p.as_str().into()).into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
                 let op = VariadicOp::from(p);
                 if op.exprs.len() == 1 {
@@ -132,19 +140,15 @@ impl From<Pair<'_>> for Stmt {
             Rule::decl => {
                 let mut p = p.into_inner();
                 let name = p.nth(1).unwrap().as_str().into();
-                let args: Vec<Ident> = p
-                    .next()
-                    .unwrap()
-                    .into_inner()
-                    .map(|p| p.as_str().into())
-                    .collect();
+                let bindings: Vec<TypedExpr> =
+                    p.next().unwrap().into_inner().map(|p| p.into()).collect();
                 let _hint = p.next().unwrap();
                 let expr = p.next().unwrap().into();
-                let expr = if args.is_empty() {
+                let expr = if bindings.is_empty() {
                     expr
                 } else {
                     Expr::Lambda(Lambda {
-                        args,
+                        bindings,
                         body: Box::new(expr),
                     })
                     .into()
@@ -426,7 +430,7 @@ impl From<Pair<'_>> for Prim {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Lambda {
-    pub args: Vec<Ident>,
+    pub bindings: Vec<TypedExpr>,
     pub body: Box<TypedExpr>,
 }
 

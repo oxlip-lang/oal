@@ -48,7 +48,7 @@ impl Builder {
     }
 
     fn rel_pattern(&self, rel: &ast::Rel) -> String {
-        match &rel.uri.expr {
+        match &rel.uri.inner {
             ast::Expr::Uri(uri) => self.uri_pattern(&uri),
             _ => panic!("expected uri type expression"),
         }
@@ -70,7 +70,7 @@ impl Builder {
     }
 
     fn rel_schema(&self, rel: &ast::Rel) -> Schema {
-        let uri = match &rel.uri.expr {
+        let uri = match &rel.uri.inner {
             Expr::Uri(uri) => uri,
             _ => panic!("expected uri type"),
         };
@@ -101,7 +101,7 @@ impl Builder {
             schema_kind: SchemaKind::AllOf {
                 all_of: exprs
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.expr)))
+                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.inner)))
                     .collect(),
             },
         }
@@ -113,7 +113,7 @@ impl Builder {
                 .iter()
                 .map(|e| {
                     let ident = e.key.as_ref().into();
-                    let expr = ReferenceOr::Item(self.expr_schema(&e.val.expr).into());
+                    let expr = ReferenceOr::Item(self.expr_schema(&e.val.inner).into());
                     (ident, expr)
                 })
                 .collect(),
@@ -134,7 +134,7 @@ impl Builder {
             schema_kind: SchemaKind::OneOf {
                 one_of: exprs
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.expr)))
+                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.inner)))
                     .collect(),
             },
         }
@@ -163,7 +163,7 @@ impl Builder {
                 required: true,
                 deprecated: None,
                 format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(
-                    self.expr_schema(&prop.val.expr),
+                    self.expr_schema(&prop.val.inner),
                 )),
                 example: None,
                 examples: Default::default(),
@@ -175,7 +175,7 @@ impl Builder {
     }
 
     fn rel_params(&self, rel: &ast::Rel) -> Vec<Parameter> {
-        match &rel.uri.expr {
+        match &rel.uri.inner {
             ast::Expr::Uri(uri) => uri
                 .iter()
                 .flat_map(|s| match s {
@@ -201,7 +201,7 @@ impl Builder {
             responses: Responses {
                 default: Some(ReferenceOr::Item(Response {
                     content: indexmap! { self.media_type() => MediaType {
-                        schema: Some(ReferenceOr::Item(self.expr_schema(&r.range.expr))),
+                        schema: Some(ReferenceOr::Item(self.expr_schema(&r.range.inner))),
                         ..Default::default()
                     }},
                     ..Default::default()
