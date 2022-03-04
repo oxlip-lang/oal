@@ -1,6 +1,6 @@
 use crate::inference::{TagSeq, TypeConstraint};
 use crate::scope::Env;
-use crate::{constrain, substitute, tag_type, Scan, Transform};
+use crate::{constrain, tag_type, Scan, Transform};
 use oal_syntax::ast::{Expr, Lambda, Stmt, Tag};
 use oal_syntax::parse;
 
@@ -57,14 +57,12 @@ fn tag_lambda_decl() {
 }
 
 #[test]
-fn constraint() {
+fn constraint_var() {
     let code = r#"
         let id1 = {} & {}
         let id2 = id1 | {}
     "#;
     let mut d = parse(code.into()).expect("parsing failed");
-
-    assert_eq!(d.stmts.len(), 2);
 
     d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
         .expect("tagging failed");
@@ -74,27 +72,35 @@ fn constraint() {
     d.scan(cnt, &mut Env::new(), constrain)
         .expect("constraining failed");
 
-    let subst = &mut cnt.unify().expect("unification failed");
-
-    let t = subst.substitute(Tag::Var(0));
-
-    assert_eq!(t, Tag::Object);
-
-    d.transform(subst, &mut Env::new(), substitute)
-        .expect("substitution failed");
+    assert_eq!(cnt.len(), 8);
 }
 
 #[test]
-fn unify() {
+fn constraint_lambda() {
+    let mut d = parse("let f x y z = num".into()).expect("parsing failed");
+
+    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+        .expect("tagging failed");
+
+    let cnt = &mut TypeConstraint::new();
+
+    d.scan(cnt, &mut Env::new(), constrain)
+        .expect("constraining failed");
+
+    assert_eq!(cnt.len(), 8);
+}
+
+#[test]
+fn unify_simple() {
     let mut c = TypeConstraint::new();
 
-    c.push(Tag::Var(0), Tag::Primitive);
-    c.push(Tag::Var(2), Tag::Var(1));
-    c.push(Tag::Var(1), Tag::Var(0));
+    c.push(&Tag::Var(0), &Tag::Primitive);
+    c.push(&Tag::Var(2), &Tag::Var(1));
+    c.push(&Tag::Var(1), &Tag::Var(0));
 
     let u = c.unify().expect("unification failed");
 
-    let t = u.substitute(Tag::Var(2));
+    let t = u.substitute(&Tag::Var(2));
 
     assert_eq!(t, Tag::Primitive);
 }

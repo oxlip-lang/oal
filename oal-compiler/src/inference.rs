@@ -47,7 +47,7 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
         Expr::Var(var) => match env.lookup(var) {
             None => Err(Error::new("identifier not in scope")),
             Some(val) => {
-                e.tag = val.tag;
+                e.tag = val.tag.clone();
                 Ok(())
             }
         },
@@ -75,8 +75,8 @@ impl Subst {
         self.0.insert(v, t);
     }
 
-    pub fn substitute(&self, t: Tag) -> Tag {
-        let mut tag = &t;
+    pub fn substitute(&self, t: &Tag) -> Tag {
+        let mut tag = t;
         loop {
             if let Tag::Var(v) = tag {
                 if let Some(t) = self.0.get(v) {
@@ -86,22 +86,22 @@ impl Subst {
             }
             break;
         }
-        *tag
+        tag.clone()
     }
 }
 
 pub fn substitute(subst: &mut Subst, _: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.tag = Some(subst.substitute(e.tag.unwrap()));
+    e.tag = Some(subst.substitute(e.tag.as_ref().unwrap()));
     Ok(())
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypeEquation {
     pub left: Tag,
     pub right: Tag,
 }
 
-fn occurs(a: Tag, b: Tag) -> bool {
+fn occurs(a: &Tag, b: &Tag) -> bool {
     assert!(a.is_variable());
     // Trivial as we don't have function types yet and therefore Tag is not a recursive type.
     a == b
@@ -109,20 +109,20 @@ fn occurs(a: Tag, b: Tag) -> bool {
 
 impl TypeEquation {
     pub fn unify(&self, s: &mut Subst) -> bool {
-        let left = s.substitute(self.left);
-        let right = s.substitute(self.right);
+        let left = s.substitute(&self.left);
+        let right = s.substitute(&self.right);
 
         if left == right {
             true
         } else if let Tag::Var(v) = left {
-            if occurs(left, right) {
+            if occurs(&left, &right) {
                 false
             } else {
                 s.extend(v, right);
                 true
             }
         } else if let Tag::Var(v) = right {
-            if occurs(right, left) {
+            if occurs(&right, &left) {
                 false
             } else {
                 s.extend(v, left);
@@ -142,7 +142,9 @@ impl TypeConstraint {
         Default::default()
     }
 
-    pub fn push(&mut self, left: Tag, right: Tag) {
+    pub fn push(&mut self, left: &Tag, right: &Tag) {
+        let left = left.clone();
+        let right = right.clone();
         self.0.push(TypeEquation { left, right });
     }
 
@@ -155,45 +157,50 @@ impl TypeConstraint {
         }
         Ok(s)
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
     match &e.inner {
-        Expr::Prim(_) => c.push(e.tag.unwrap(), Tag::Primitive),
+        Expr::Prim(_) => c.push(e.tag.as_ref().unwrap(), &Tag::Primitive),
         Expr::Rel(rel) => {
             rel.scan(c, env, constrain)?;
-            c.push(rel.range.tag.unwrap(), Tag::Object);
-            c.push(rel.uri.tag.unwrap(), Tag::Uri);
-            c.push(e.tag.unwrap(), Tag::Relation);
+            c.push(rel.range.tag.as_ref().unwrap(), &Tag::Object);
+            c.push(rel.uri.tag.as_ref().unwrap(), &Tag::Uri);
+            c.push(e.tag.as_ref().unwrap(), &Tag::Relation);
         }
         Expr::Uri(uri) => {
             uri.scan(c, env, constrain)?;
             for seg in uri.into_iter() {
-                c.push(seg.tag.unwrap(), Tag::Primitive);
+                c.push(seg.tag.as_ref().unwrap(), &Tag::Primitive);
             }
-            c.push(e.tag.unwrap(), Tag::Uri);
+            c.push(e.tag.as_ref().unwrap(), &Tag::Uri);
         }
         Expr::Block(block) => {
             block.scan(c, env, constrain)?;
-            c.push(e.tag.unwrap(), Tag::Object);
+            c.push(e.tag.as_ref().unwrap(), &Tag::Object);
         }
         Expr::Op(operation) => {
             operation.scan(c, env, constrain)?;
             let operator = operation.op;
             for op in operation.into_iter() {
                 match operator {
-                    Operator::Join => c.push(op.tag.unwrap(), Tag::Object),
-                    Operator::Sum => c.push(e.tag.unwrap(), op.tag.unwrap()),
+                    Operator::Join => c.push(op.tag.as_ref().unwrap(), &Tag::Object),
+                    Operator::Sum => c.push(e.tag.as_ref().unwrap(), op.tag.as_ref().unwrap()),
                     _ => {}
                 }
             }
             match operator {
-                Operator::Join => c.push(e.tag.unwrap(), Tag::Object),
-                Operator::Any => c.push(e.tag.unwrap(), Tag::Any),
+                Operator::Join => c.push(e.tag.as_ref().unwrap(), &Tag::Object),
+                Operator::Any => c.push(e.tag.as_ref().unwrap(), &Tag::Any),
                 _ => {}
             }
         }
         Expr::Var(_) => {}
+        Expr::Lambda(_) => {}
         _ => unreachable!(),
     }
     Ok(())

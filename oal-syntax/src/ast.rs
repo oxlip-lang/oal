@@ -6,13 +6,20 @@ use std::slice::{Iter, IterMut};
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Debug)]
+pub struct FuncTag {
+    pub bindings: Vec<Tag>,
+    pub range: Box<Tag>,
+}
+
+#[derive(PartialEq, Clone, Debug)]
 pub enum Tag {
     Primitive,
     Relation,
     Object,
     Uri,
     Any,
+    Func(FuncTag),
     Var(usize),
 }
 
