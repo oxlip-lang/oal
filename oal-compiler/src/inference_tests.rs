@@ -87,7 +87,7 @@ fn constraint_lambda() {
     d.scan(cnt, &mut Env::new(), constrain)
         .expect("constraining failed");
 
-    assert_eq!(cnt.len(), 8);
+    assert_eq!(cnt.len(), 2);
 }
 
 #[test]
@@ -103,4 +103,21 @@ fn unify_simple() {
     let t = u.substitute(&Tag::Var(2));
 
     assert_eq!(t, Tag::Primitive);
+}
+
+#[test]
+fn unify_lambda() {
+    let code = r#"
+        let f x y z = num
+        let a = f(num,{},uri)
+    "#;
+    let mut d = parse(code.into()).expect("parsing failed");
+
+    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+        .expect("tagging failed");
+
+    let cnt = &mut TypeConstraint::new();
+
+    d.scan(cnt, &mut Env::new(), constrain)
+        .expect("constraining failed");
 }

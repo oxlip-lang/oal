@@ -1,6 +1,6 @@
 use crate::errors::{Error, Result};
 use crate::{Env, Scan, Transform};
-use oal_syntax::ast::{Expr, Operator, Tag, TypedExpr};
+use oal_syntax::ast::{Expr, FuncTag, Operator, Tag, TypedExpr};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -91,7 +91,7 @@ impl Subst {
 }
 
 pub fn substitute(subst: &mut Subst, _: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.tag = Some(subst.substitute(e.tag.as_ref().unwrap()));
+    e.tag = Some(subst.substitute(e.unwrap_tag()));
     Ok(())
 }
 
@@ -165,42 +165,52 @@ impl TypeConstraint {
 
 pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
     match &e.inner {
-        Expr::Prim(_) => c.push(e.tag.as_ref().unwrap(), &Tag::Primitive),
+        Expr::Prim(_) => c.push(e.unwrap_tag(), &Tag::Primitive),
         Expr::Rel(rel) => {
             rel.scan(c, env, constrain)?;
-            c.push(rel.range.tag.as_ref().unwrap(), &Tag::Object);
-            c.push(rel.uri.tag.as_ref().unwrap(), &Tag::Uri);
-            c.push(e.tag.as_ref().unwrap(), &Tag::Relation);
+            c.push(rel.range.unwrap_tag(), &Tag::Object);
+            c.push(rel.uri.unwrap_tag(), &Tag::Uri);
+            c.push(e.unwrap_tag(), &Tag::Relation);
         }
         Expr::Uri(uri) => {
             uri.scan(c, env, constrain)?;
             for seg in uri.into_iter() {
-                c.push(seg.tag.as_ref().unwrap(), &Tag::Primitive);
+                c.push(seg.unwrap_tag(), &Tag::Primitive);
             }
-            c.push(e.tag.as_ref().unwrap(), &Tag::Uri);
+            c.push(e.unwrap_tag(), &Tag::Uri);
         }
         Expr::Block(block) => {
             block.scan(c, env, constrain)?;
-            c.push(e.tag.as_ref().unwrap(), &Tag::Object);
+            c.push(e.unwrap_tag(), &Tag::Object);
         }
         Expr::Op(operation) => {
             operation.scan(c, env, constrain)?;
             let operator = operation.op;
             for op in operation.into_iter() {
                 match operator {
-                    Operator::Join => c.push(op.tag.as_ref().unwrap(), &Tag::Object),
-                    Operator::Sum => c.push(e.tag.as_ref().unwrap(), op.tag.as_ref().unwrap()),
+                    Operator::Join => c.push(op.unwrap_tag(), &Tag::Object),
+                    Operator::Sum => c.push(e.unwrap_tag(), op.unwrap_tag()),
                     _ => {}
                 }
             }
             match operator {
-                Operator::Join => c.push(e.tag.as_ref().unwrap(), &Tag::Object),
-                Operator::Any => c.push(e.tag.as_ref().unwrap(), &Tag::Any),
+                Operator::Join => c.push(e.unwrap_tag(), &Tag::Object),
+                Operator::Any => c.push(e.unwrap_tag(), &Tag::Any),
                 _ => {}
             }
         }
+        Expr::Lambda(lambda) => {
+            lambda.scan(c, env, constrain)?;
+            let bindings = lambda
+                .bindings
+                .iter()
+                .map(|b| b.unwrap_tag().clone())
+                .collect();
+            let range = lambda.body.unwrap_tag().clone().into();
+            c.push(e.unwrap_tag(), &Tag::Func(FuncTag { bindings, range }));
+        }
         Expr::Var(_) => {}
-        Expr::Lambda(_) => {}
+        Expr::Binding(_) => {}
         _ => unreachable!(),
     }
     Ok(())

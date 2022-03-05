@@ -26,6 +26,13 @@ fn parse_any_type() {
 }
 
 #[test]
+fn parse_application() {
+    let d = parse("let a = f num {} uri".into()).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+}
+
+#[test]
 fn parse_lambda_decl() {
     let d = parse("let f x y z = num".into()).expect("parsing failed");
 

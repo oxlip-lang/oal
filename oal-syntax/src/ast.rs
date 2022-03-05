@@ -52,6 +52,12 @@ pub struct Typed<T> {
     pub inner: T,
 }
 
+impl<T> Typed<T> {
+    pub fn unwrap_tag(&self) -> &Tag {
+        self.tag.as_ref().unwrap()
+    }
+}
+
 impl<T> From<T> for Typed<T> {
     fn from(e: T) -> Self {
         Typed {
@@ -67,11 +73,11 @@ pub type TypedExpr = Typed<Expr>;
 impl From<Pair<'_>> for TypedExpr {
     fn from(p: Pair<'_>) -> Self {
         match p.as_rule() {
+            Rule::expr_type | Rule::paren_type => p.into_inner().next().unwrap().into(),
             Rule::prim_type => Expr::Prim(p.into()).into(),
             Rule::rel_type => Expr::Rel(p.into()).into(),
             Rule::uri_type => Expr::Uri(p.into()).into(),
             Rule::block_type => Expr::Block(p.into()).into(),
-            Rule::paren_type => p.into_inner().next().unwrap().into(),
             Rule::var => Expr::Var(p.as_str().into()).into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
