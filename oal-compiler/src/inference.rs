@@ -59,7 +59,17 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
             e.tag = Some(Tag::Var(seq.next()));
             Ok(())
         }
-        _ => unreachable!(),
+        Expr::App(application) => match env.lookup(&application.name) {
+            None => Err(Error::new("identifier not in scope")),
+            Some(val) => {
+                if let Expr::Lambda(l) = &val.inner {
+                    e.tag = l.body.tag.clone();
+                    application.transform(seq, env, tag_type)
+                } else {
+                    Err(Error::new("identifier not a function"))
+                }
+            }
+        },
     }
 }
 
@@ -91,7 +101,7 @@ impl Subst {
 }
 
 pub fn substitute(subst: &mut Subst, _: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.tag = Some(subst.substitute(e.unwrap_tag()));
+    e.tag = Some(subst.substitute(e.tag.as_ref().unwrap()));
     Ok(())
 }
 
@@ -142,9 +152,7 @@ impl TypeConstraint {
         Default::default()
     }
 
-    pub fn push(&mut self, left: &Tag, right: &Tag) {
-        let left = left.clone();
-        let right = right.clone();
+    pub fn push(&mut self, left: Tag, right: Tag) {
         self.0.push(TypeEquation { left, right });
     }
 
@@ -165,39 +173,46 @@ impl TypeConstraint {
 
 pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
     match &e.inner {
-        Expr::Prim(_) => c.push(e.unwrap_tag(), &Tag::Primitive),
+        Expr::Prim(_) => {
+            c.push(e.unwrap_tag(), Tag::Primitive);
+            Ok(())
+        }
         Expr::Rel(rel) => {
             rel.scan(c, env, constrain)?;
-            c.push(rel.range.unwrap_tag(), &Tag::Object);
-            c.push(rel.uri.unwrap_tag(), &Tag::Uri);
-            c.push(e.unwrap_tag(), &Tag::Relation);
+            c.push(rel.range.unwrap_tag(), Tag::Object);
+            c.push(rel.uri.unwrap_tag(), Tag::Uri);
+            c.push(e.unwrap_tag(), Tag::Relation);
+            Ok(())
         }
         Expr::Uri(uri) => {
             uri.scan(c, env, constrain)?;
             for seg in uri.into_iter() {
-                c.push(seg.unwrap_tag(), &Tag::Primitive);
+                c.push(seg.unwrap_tag(), Tag::Primitive);
             }
-            c.push(e.unwrap_tag(), &Tag::Uri);
+            c.push(e.unwrap_tag(), Tag::Uri);
+            Ok(())
         }
         Expr::Block(block) => {
             block.scan(c, env, constrain)?;
-            c.push(e.unwrap_tag(), &Tag::Object);
+            c.push(e.unwrap_tag(), Tag::Object);
+            Ok(())
         }
         Expr::Op(operation) => {
             operation.scan(c, env, constrain)?;
             let operator = operation.op;
             for op in operation.into_iter() {
                 match operator {
-                    Operator::Join => c.push(op.unwrap_tag(), &Tag::Object),
+                    Operator::Join => c.push(op.unwrap_tag(), Tag::Object),
                     Operator::Sum => c.push(e.unwrap_tag(), op.unwrap_tag()),
                     _ => {}
                 }
             }
             match operator {
-                Operator::Join => c.push(e.unwrap_tag(), &Tag::Object),
-                Operator::Any => c.push(e.unwrap_tag(), &Tag::Any),
+                Operator::Join => c.push(e.unwrap_tag(), Tag::Object),
+                Operator::Any => c.push(e.unwrap_tag(), Tag::Any),
                 _ => {}
             }
+            Ok(())
         }
         Expr::Lambda(lambda) => {
             lambda.scan(c, env, constrain)?;
@@ -207,11 +222,26 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
                 .map(|b| b.unwrap_tag().clone())
                 .collect();
             let range = lambda.body.unwrap_tag().clone().into();
-            c.push(e.unwrap_tag(), &Tag::Func(FuncTag { bindings, range }));
+            c.push(e.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+            Ok(())
         }
-        Expr::Var(_) => {}
-        Expr::Binding(_) => {}
-        _ => unreachable!(),
+        Expr::App(application) => {
+            application.scan(c, env, constrain)?;
+            match env.lookup(&application.name) {
+                None => Err(Error::new("identifier not in scope")),
+                Some(val) => {
+                    let bindings = application
+                        .args
+                        .iter()
+                        .map(|a| a.unwrap_tag().clone())
+                        .collect();
+                    let range = e.unwrap_tag().clone().into();
+                    c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+                    Ok(())
+                }
+            }
+        }
+        Expr::Var(_) => Ok(()),
+        Expr::Binding(_) => Ok(()),
     }
-    Ok(())
 }

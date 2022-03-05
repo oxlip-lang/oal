@@ -94,9 +94,9 @@ fn constraint_lambda() {
 fn unify_simple() {
     let mut c = TypeConstraint::new();
 
-    c.push(&Tag::Var(0), &Tag::Primitive);
-    c.push(&Tag::Var(2), &Tag::Var(1));
-    c.push(&Tag::Var(1), &Tag::Var(0));
+    c.push(Tag::Var(0), Tag::Primitive);
+    c.push(Tag::Var(2), Tag::Var(1));
+    c.push(Tag::Var(1), Tag::Var(0));
 
     let u = c.unify().expect("unification failed");
 
@@ -109,15 +109,19 @@ fn unify_simple() {
 fn unify_lambda() {
     let code = r#"
         let f x y z = num
-        let a = f(num,{},uri)
+        let a = f num {} uri
     "#;
     let mut d = parse(code.into()).expect("parsing failed");
 
     d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
         .expect("tagging failed");
 
+    println!("{:#?}", d);
+
     let cnt = &mut TypeConstraint::new();
 
     d.scan(cnt, &mut Env::new(), constrain)
         .expect("constraining failed");
+
+    println!("{:#?}", cnt);
 }

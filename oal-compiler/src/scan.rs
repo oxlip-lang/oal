@@ -95,7 +95,15 @@ impl Scan for Lambda {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        (&self.bindings).try_each(|e| f(acc, env, e))?;
-        f(acc, env, self.body.as_ref())
+        self.try_each(|e| f(acc, env, e))
+    }
+}
+
+impl Scan for Application {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
+    {
+        self.try_each(|e| f(acc, env, e))
     }
 }

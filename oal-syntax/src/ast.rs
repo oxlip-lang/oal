@@ -1,5 +1,6 @@
 use crate::try_each::TryEach;
 use crate::{Pair, Rule};
+use std::iter::once;
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
@@ -53,8 +54,8 @@ pub struct Typed<T> {
 }
 
 impl<T> Typed<T> {
-    pub fn unwrap_tag(&self) -> &Tag {
-        self.tag.as_ref().unwrap()
+    pub fn unwrap_tag(&self) -> Tag {
+        self.tag.as_ref().unwrap().clone()
     }
 }
 
@@ -88,6 +89,7 @@ impl From<Pair<'_>> for TypedExpr {
                     Expr::Op(op).into()
                 }
             }
+            Rule::apply => Expr::App(p.into()).into(),
             _ => unreachable!(),
         }
     }
@@ -447,8 +449,53 @@ pub struct Lambda {
     pub body: Box<TypedExpr>,
 }
 
+impl<'a> IntoIterator for &'a Lambda {
+    type Item = &'a TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.bindings.iter().chain(once(self.body.as_ref())))
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Lambda {
+    type Item = &'a mut TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(self.bindings.iter_mut().chain(once(self.body.as_mut())))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Application {
     pub name: Ident,
     pub args: Vec<TypedExpr>,
+}
+
+impl From<Pair<'_>> for Application {
+    fn from(p: Pair) -> Self {
+        let mut inner = p.into_inner();
+        let name = inner.next().unwrap().as_str().into();
+        let args = inner.into_iter().map(|p| p.into()).collect();
+        Application { name, args }
+    }
+}
+
+impl<'a> IntoIterator for &'a Application {
+    type Item = &'a TypedExpr;
+    type IntoIter = Iter<'a, TypedExpr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.args.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Application {
+    type Item = &'a mut TypedExpr;
+    type IntoIter = IterMut<'a, TypedExpr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.args.iter_mut()
+    }
 }

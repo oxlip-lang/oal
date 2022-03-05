@@ -115,3 +115,12 @@ impl Transform for Lambda {
         r
     }
 }
+
+impl Transform for Application {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+    {
+        self.try_each(|e| f(acc, env, e))
+    }
+}
