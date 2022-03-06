@@ -6,6 +6,8 @@ mod scope;
 mod transform;
 
 #[cfg(test)]
+mod compile_tests;
+#[cfg(test)]
 mod inference_tests;
 #[cfg(test)]
 mod scope_tests;

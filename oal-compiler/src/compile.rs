@@ -4,12 +4,8 @@ use crate::Env;
 use oal_syntax::ast::*;
 
 pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+    e.inner.transform(acc, env, compile)?;
     match &mut e.inner {
-        Expr::Prim(_) => Ok(()),
-        Expr::Rel(rel) => rel.transform(acc, env, compile),
-        Expr::Uri(uri) => uri.transform(acc, env, compile),
-        Expr::Block(block) => block.transform(acc, env, compile),
-        Expr::Op(operation) => operation.transform(acc, env, compile),
         Expr::Var(var) => match env.lookup(var) {
             None => Err(Error::new("identifier not in scope")
                 .with_expr(&e.inner)
@@ -19,6 +15,7 @@ pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
                 Ok(())
             }
         },
-        _ => unreachable!(),
+        Expr::App(_) => todo!(),
+        _ => Ok(()),
     }
 }
