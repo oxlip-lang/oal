@@ -11,7 +11,9 @@ pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
         Expr::Block(block) => block.transform(acc, env, compile),
         Expr::Op(operation) => operation.transform(acc, env, compile),
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope")),
+            None => Err(Error::new("identifier not in scope")
+                .with_expr(&e.inner)
+                .with_tag(&e.tag)),
             Some(val) => {
                 *e = val.clone();
                 Ok(())

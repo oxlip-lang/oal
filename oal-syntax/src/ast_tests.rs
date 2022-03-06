@@ -3,14 +3,14 @@ use crate::parse;
 
 #[test]
 fn parse_variable_decl() {
-    let d = parse("let id1 = num".into()).expect("parsing failed");
+    let d = parse("let a = num;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        assert_eq!(decl.name.as_ref(), "id1");
+        assert_eq!(decl.name.as_ref(), "a");
         if Expr::Prim(Prim::Num) != decl.expr.inner {
             panic!("expected numeric type expression");
         }
@@ -20,21 +20,26 @@ fn parse_variable_decl() {
 }
 
 #[test]
+fn parse_assignment() {
+    let d = parse("let a = b;".into()).expect("parsing failed");
+    assert_eq!(d.stmts.len(), 1);
+}
+
+#[test]
 fn parse_any_type() {
-    let d = parse("let id1 = num ~ {}".into()).expect("parsing failed");
+    let d = parse("let a = {} ~ uri ~ bool;".into()).expect("parsing failed");
     assert_eq!(d.stmts.len(), 1);
 }
 
 #[test]
 fn parse_application() {
-    let d = parse("let a = f num {} uri".into()).expect("parsing failed");
-
+    let d = parse("let a = f num {} uri;".into()).expect("parsing failed");
     assert_eq!(d.stmts.len(), 1);
 }
 
 #[test]
 fn parse_lambda_decl() {
-    let d = parse("let f x y z = num".into()).expect("parsing failed");
+    let d = parse("let f x y z = num;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 

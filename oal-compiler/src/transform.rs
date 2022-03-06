@@ -47,10 +47,7 @@ impl Transform for Doc {
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
     {
-        env.open();
-        let r = self.try_each(|s| s.transform(acc, env, |a, v, e| f(a, v, e)));
-        env.close();
-        r
+        env.within(|env| self.try_each(|s| s.transform(acc, env, |a, v, e| f(a, v, e))))
     }
 }
 
@@ -95,24 +92,20 @@ impl Transform for Lambda {
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
     {
-        env.open();
-
-        let r = (&mut self.bindings).try_each(|binding| {
-            f(acc, env, binding).and_then(|_| {
-                if let Expr::Binding(name) = &binding.inner {
-                    env.declare(name, binding);
-                    Ok(())
-                } else {
-                    unreachable!()
-                }
-            })
-        });
-
-        let r = r.and_then(|_| f(acc, env, &mut self.body));
-
-        env.close();
-
-        r
+        env.within(|env| {
+            (&mut self.bindings)
+                .try_each(|binding| {
+                    f(acc, env, binding).and_then(|_| {
+                        if let Expr::Binding(name) = &binding.inner {
+                            env.declare(name, binding);
+                            Ok(())
+                        } else {
+                            unreachable!()
+                        }
+                    })
+                })
+                .and_then(|_| f(acc, env, &mut self.body))
+        })
     }
 }
 
@@ -122,5 +115,22 @@ impl Transform for Application {
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
     {
         self.try_each(|e| f(acc, env, e))
+    }
+}
+
+impl Transform for Expr {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+    {
+        match self {
+            Expr::Rel(rel) => rel.transform(acc, env, f),
+            Expr::Uri(uri) => uri.transform(acc, env, f),
+            Expr::Block(block) => block.transform(acc, env, f),
+            Expr::Op(operation) => operation.transform(acc, env, f),
+            Expr::Lambda(lambda) => lambda.transform(acc, env, f),
+            Expr::App(application) => application.transform(acc, env, f),
+            Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
+        }
     }
 }

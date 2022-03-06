@@ -6,6 +6,11 @@
 
 ident = @{ !keyword ~ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
+let_kw  = @{ "let"  ~ !ASCII_ALPHANUMERIC }
+res_kw  = @{ "res"  ~ !ASCII_ALPHANUMERIC }
+
+stmt_kw = { let_kw | res_kw }
+
 any_kw  = @{ "any"  ~ !ASCII_ALPHANUMERIC }
 obj_kw  = @{ "obj"  ~ !ASCII_ALPHANUMERIC }
 rel_kw  = @{ "rel"  ~ !ASCII_ALPHANUMERIC }
@@ -13,8 +18,6 @@ num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
 str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
 uri_kw  = @{ "uri"  ~ !ASCII_ALPHANUMERIC }
 bool_kw = @{ "bool" ~ !ASCII_ALPHANUMERIC }
-let_kw  = @{ "let"  ~ !ASCII_ALPHANUMERIC }
-res_kw  = @{ "res"  ~ !ASCII_ALPHANUMERIC }
 
 type_kw = { any_kw | obj_kw | rel_kw | num_kw | str_kw | uri_kw | bool_kw }
 
@@ -24,7 +27,7 @@ put_kw = @{ "put" ~ !ASCII_ALPHANUMERIC }
 
 method_kw = { get_kw | put_kw }
 
-keyword = { type_kw | method_kw }
+keyword = { stmt_kw | type_kw | method_kw }
 
 var = { ident }
 
@@ -39,8 +42,8 @@ methods = { method_kw ~ ( "," ~ method_kw )* }
 
 prim_type = { num_kw | str_kw | bool_kw  }
 
-prop = { ident ~ sum_type }
-block_type = { "{" ~ prop* ~ "}" }
+prop = { ident ~ expr_type }
+block_type = { "{" ~ ( prop ~ ( "," ~ prop )* )? ~ "}" }
 paren_type = { "(" ~ expr_type ~ ")" }
 apply = { ident ~ expr_type+ }
 term_type = { prim_type | uri_type | block_type | paren_type | apply | var }
@@ -59,10 +62,10 @@ res = { res_kw ~ expr_type }
 
 stmt = { decl | res }
 
-doc = { SOI ~ stmt* ~ EOI }
+doc = { SOI ~ ( stmt ~ ";" )* ~ EOI }
 
 block_comment = _{ "/*" ~ ( block_comment | !"*/" ~ ANY )* ~ "*/" }
-line_comment = _{ "#" ~ ( !NEWLINE ~ ANY )* }
+line_comment = _{ "//" ~ ( !NEWLINE ~ ANY )* }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 COMMENT = _{ line_comment | block_comment }

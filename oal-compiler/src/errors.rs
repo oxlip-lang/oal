@@ -1,17 +1,35 @@
-#[derive(Debug, Clone)]
+use crate::inference::TypeEquation;
+use oal_syntax::ast::{Expr, Tag};
+
+#[derive(Debug, Clone, Default)]
 pub struct Error {
     msg: String,
+    expr: Option<Expr>,
+    tag: Option<Tag>,
+    eq: Option<TypeEquation>,
 }
 
 impl Error {
     pub fn new(msg: &str) -> Error {
-        Error { msg: msg.into() }
+        Error {
+            msg: msg.into(),
+            ..Default::default()
+        }
     }
-}
 
-impl From<&str> for Error {
-    fn from(msg: &str) -> Self {
-        Self::new(msg)
+    pub fn with_expr(mut self, e: &Expr) -> Self {
+        self.expr = Some(e.clone());
+        self
+    }
+
+    pub fn with_tag(mut self, t: &Option<Tag>) -> Self {
+        self.tag = t.clone();
+        self
+    }
+
+    pub fn with_eq(mut self, eq: &TypeEquation) -> Self {
+        self.eq = Some(eq.clone());
+        self
     }
 }
 

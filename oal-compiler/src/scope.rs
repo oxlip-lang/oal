@@ -13,15 +13,15 @@ impl Env {
             scopes: vec![Scope::new()],
         }
     }
+
     pub fn head(&self) -> &Scope {
         self.scopes.last().unwrap()
     }
-    pub fn open(&mut self) {
-        self.scopes.push(Scope::new());
-    }
+
     pub fn declare(&mut self, n: &Ident, e: &TypedExpr) {
         self.scopes.last_mut().unwrap().insert(n.clone(), e.clone());
     }
+
     pub fn lookup(&self, n: &Ident) -> Option<&TypedExpr> {
         self.scopes
             .iter()
@@ -31,10 +31,25 @@ impl Env {
             .map(|s| s.unwrap())
             .next()
     }
+
     pub fn exists(&self, n: &Ident) -> bool {
         self.scopes.last().unwrap().contains_key(n)
     }
-    pub fn close(&mut self) {
+
+    pub fn within<F, R>(&mut self, mut f: F) -> R
+    where
+        F: FnMut(&mut Self) -> R,
+    {
+        self.open();
+        let r = f(self);
+        self.close();
+        r
+    }
+
+    fn open(&mut self) {
+        self.scopes.push(Scope::new());
+    }
+    fn close(&mut self) {
         self.scopes.pop();
     }
 }

@@ -22,19 +22,17 @@ fn environment_scopes() {
     assert!(e.exists(&id));
     assert_eq!(*e.lookup(&id).expect("lookup failed"), bool_expr);
 
-    e.open();
+    e.within(|e| {
+        assert!(e.head().is_empty());
+        assert!(!e.exists(&id));
+        assert_eq!(*e.lookup(&id).expect("lookup failed"), bool_expr);
 
-    assert!(e.head().is_empty());
-    assert!(!e.exists(&id));
-    assert_eq!(*e.lookup(&id).expect("lookup failed"), bool_expr);
+        e.declare(&id, &num_expr);
 
-    e.declare(&id, &num_expr);
-
-    assert_eq!(e.head().len(), 1);
-    assert!(e.exists(&id));
-    assert_eq!(*e.lookup(&id).expect("lookup failed"), num_expr);
-
-    e.close();
+        assert_eq!(e.head().len(), 1);
+        assert!(e.exists(&id));
+        assert_eq!(*e.lookup(&id).expect("lookup failed"), num_expr);
+    });
 
     assert!(e.exists(&id));
     assert_eq!(*e.lookup(&id).expect("lookup failed"), bool_expr);

@@ -47,10 +47,7 @@ impl Scan for Doc {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        env.open();
-        let r = self.try_each(|s| s.scan(acc, env, |a, v, e| f(a, v, e)));
-        env.close();
-        r
+        env.within(|env| self.try_each(|s| s.scan(acc, env, |a, v, e| f(a, v, e))))
     }
 }
 
@@ -105,5 +102,22 @@ impl Scan for Application {
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
         self.try_each(|e| f(acc, env, e))
+    }
+}
+
+impl Scan for Expr {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
+    {
+        match self {
+            Expr::Rel(rel) => rel.scan(acc, env, f),
+            Expr::Uri(uri) => uri.scan(acc, env, f),
+            Expr::Block(block) => block.scan(acc, env, f),
+            Expr::Op(operation) => operation.scan(acc, env, f),
+            Expr::Lambda(lambda) => lambda.scan(acc, env, f),
+            Expr::App(application) => application.scan(acc, env, f),
+            Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
+        }
     }
 }

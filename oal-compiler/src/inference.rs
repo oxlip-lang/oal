@@ -19,22 +19,23 @@ impl TagSeq {
 }
 
 pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+    e.inner.transform(seq, env, tag_type)?;
     match &mut e.inner {
         Expr::Prim(_) => {
             e.tag = Some(Tag::Primitive);
             Ok(())
         }
-        Expr::Rel(rel) => {
+        Expr::Rel(_) => {
             e.tag = Some(Tag::Relation);
-            rel.transform(seq, env, tag_type)
+            Ok(())
         }
-        Expr::Uri(uri) => {
+        Expr::Uri(_) => {
             e.tag = Some(Tag::Uri);
-            uri.transform(seq, env, tag_type)
+            Ok(())
         }
-        Expr::Block(block) => {
+        Expr::Block(_) => {
             e.tag = Some(Tag::Object);
-            block.transform(seq, env, tag_type)
+            Ok(())
         }
         Expr::Op(operation) => {
             e.tag = Some(match operation.op {
@@ -42,31 +43,27 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
                 Operator::Any => Tag::Any,
                 Operator::Sum => Tag::Var(seq.next()),
             });
-            operation.transform(seq, env, tag_type)
+            Ok(())
         }
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope")),
+            None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
             Some(val) => {
                 e.tag = val.tag.clone();
                 Ok(())
             }
         },
-        Expr::Lambda(lambda) => {
-            e.tag = Some(Tag::Var(seq.next()));
-            lambda.transform(seq, env, tag_type)
-        }
-        Expr::Binding(_) => {
+        Expr::Lambda(_) | Expr::Binding(_) => {
             e.tag = Some(Tag::Var(seq.next()));
             Ok(())
         }
         Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new("identifier not in scope")),
+            None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
             Some(val) => {
                 if let Expr::Lambda(l) = &val.inner {
                     e.tag = l.body.tag.clone();
-                    application.transform(seq, env, tag_type)
+                    Ok(())
                 } else {
-                    Err(Error::new("identifier not a function"))
+                    Err(Error::new("identifier not a function").with_expr(&e.inner))
                 }
             }
         },
@@ -85,24 +82,82 @@ impl Subst {
         self.0.insert(v, t);
     }
 
-    pub fn substitute(&self, t: &Tag) -> Tag {
-        let mut tag = t;
-        loop {
-            if let Tag::Var(v) = tag {
-                if let Some(t) = self.0.get(v) {
-                    tag = t;
-                    continue;
-                }
+    pub fn substitute(&self, tag: &Tag) -> Tag {
+        if let Tag::Var(v) = tag {
+            if let Some(t) = self.0.get(v) {
+                self.substitute(t)
+            } else {
+                tag.clone()
             }
-            break;
+        } else if let Tag::Func(FuncTag { bindings, range }) = tag {
+            let bindings = bindings.iter().map(|b| self.substitute(b)).collect();
+            let range = self.substitute(range).into();
+            Tag::Func(FuncTag { bindings, range })
+        } else {
+            tag.clone()
         }
-        tag.clone()
     }
 }
 
-pub fn substitute(subst: &mut Subst, _: &mut Env, e: &mut TypedExpr) -> Result<()> {
+pub fn substitute(subst: &mut Subst, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
     e.tag = Some(subst.substitute(e.tag.as_ref().unwrap()));
-    Ok(())
+    e.inner.transform(subst, env, substitute)
+}
+
+fn occurs(a: &Tag, b: &Tag) -> bool {
+    assert!(a.is_variable());
+    if a == b {
+        true
+    } else if let Tag::Func(FuncTag { bindings, range }) = b {
+        occurs(a, range) || bindings.iter().any(|binding| occurs(a, binding))
+    } else {
+        false
+    }
+}
+
+fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> bool {
+    let left = s.substitute(left);
+    let right = s.substitute(right);
+
+    if left == right {
+        true
+    } else if let Tag::Var(v) = left {
+        if occurs(&left, &right) {
+            false
+        } else {
+            s.extend(v, right);
+            true
+        }
+    } else if let Tag::Var(v) = right {
+        if occurs(&right, &left) {
+            false
+        } else {
+            s.extend(v, left);
+            true
+        }
+    } else if let (
+        Tag::Func(FuncTag {
+            bindings: left_bindings,
+            range: left_range,
+        }),
+        Tag::Func(FuncTag {
+            bindings: right_bindings,
+            range: right_range,
+        }),
+    ) = (left, right)
+    {
+        if left_bindings.len() != right_bindings.len() {
+            false
+        } else {
+            unify(s, &left_range, &right_range)
+                && left_bindings
+                    .iter()
+                    .zip(right_bindings.iter())
+                    .all(|(l, r)| unify(s, l, r))
+        }
+    } else {
+        false
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -111,36 +166,9 @@ pub struct TypeEquation {
     pub right: Tag,
 }
 
-fn occurs(a: &Tag, b: &Tag) -> bool {
-    assert!(a.is_variable());
-    // Trivial as we don't have function types yet and therefore Tag is not a recursive type.
-    a == b
-}
-
 impl TypeEquation {
     pub fn unify(&self, s: &mut Subst) -> bool {
-        let left = s.substitute(&self.left);
-        let right = s.substitute(&self.right);
-
-        if left == right {
-            true
-        } else if let Tag::Var(v) = left {
-            if occurs(&left, &right) {
-                false
-            } else {
-                s.extend(v, right);
-                true
-            }
-        } else if let Tag::Var(v) = right {
-            if occurs(&right, &left) {
-                false
-            } else {
-                s.extend(v, left);
-                true
-            }
-        } else {
-            false
-        }
+        unify(s, &self.left, &self.right)
     }
 }
 
@@ -160,7 +188,7 @@ impl TypeConstraint {
         let mut s = Subst::new();
         for eq in self.0.iter() {
             if !eq.unify(&mut s) {
-                return Err(Error::new("cannot unify"));
+                return Err(Error::new("cannot unify").with_eq(eq));
             }
         }
         Ok(s)
@@ -172,33 +200,30 @@ impl TypeConstraint {
 }
 
 pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
+    e.inner.scan(c, env, constrain)?;
     match &e.inner {
         Expr::Prim(_) => {
             c.push(e.unwrap_tag(), Tag::Primitive);
             Ok(())
         }
         Expr::Rel(rel) => {
-            rel.scan(c, env, constrain)?;
             c.push(rel.range.unwrap_tag(), Tag::Object);
             c.push(rel.uri.unwrap_tag(), Tag::Uri);
             c.push(e.unwrap_tag(), Tag::Relation);
             Ok(())
         }
         Expr::Uri(uri) => {
-            uri.scan(c, env, constrain)?;
             for seg in uri.into_iter() {
                 c.push(seg.unwrap_tag(), Tag::Primitive);
             }
             c.push(e.unwrap_tag(), Tag::Uri);
             Ok(())
         }
-        Expr::Block(block) => {
-            block.scan(c, env, constrain)?;
+        Expr::Block(_) => {
             c.push(e.unwrap_tag(), Tag::Object);
             Ok(())
         }
         Expr::Op(operation) => {
-            operation.scan(c, env, constrain)?;
             let operator = operation.op;
             for op in operation.into_iter() {
                 match operator {
@@ -215,7 +240,6 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
             Ok(())
         }
         Expr::Lambda(lambda) => {
-            lambda.scan(c, env, constrain)?;
             let bindings = lambda
                 .bindings
                 .iter()
@@ -225,22 +249,21 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
             c.push(e.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
             Ok(())
         }
-        Expr::App(application) => {
-            application.scan(c, env, constrain)?;
-            match env.lookup(&application.name) {
-                None => Err(Error::new("identifier not in scope")),
-                Some(val) => {
-                    let bindings = application
-                        .args
-                        .iter()
-                        .map(|a| a.unwrap_tag().clone())
-                        .collect();
-                    let range = e.unwrap_tag().clone().into();
-                    c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
-                    Ok(())
-                }
+        Expr::App(application) => match env.lookup(&application.name) {
+            None => Err(Error::new("identifier not in scope")
+                .with_expr(&e.inner)
+                .with_tag(&e.tag)),
+            Some(val) => {
+                let bindings = application
+                    .args
+                    .iter()
+                    .map(|a| a.unwrap_tag().clone())
+                    .collect();
+                let range = e.unwrap_tag().clone().into();
+                c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+                Ok(())
             }
-        }
+        },
         Expr::Var(_) => Ok(()),
         Expr::Binding(_) => Ok(()),
     }
