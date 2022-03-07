@@ -92,7 +92,20 @@ impl Scan for Lambda {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        env.within(|env| {
+            (&self.bindings)
+                .try_each(|binding| {
+                    f(acc, env, binding).and_then(|_| {
+                        if let Expr::Binding(name) = &binding.inner {
+                            env.declare(name, binding);
+                            Ok(())
+                        } else {
+                            unreachable!()
+                        }
+                    })
+                })
+                .and_then(|_| f(acc, env, &self.body))
+        })
     }
 }
 

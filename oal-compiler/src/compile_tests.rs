@@ -1,10 +1,25 @@
+use crate::errors::Error;
 use crate::{
     compile, constrain, substitute, tag_type, Env, Scan, TagSeq, Transform, TypeConstraint,
 };
+use oal_syntax::ast::{Expr, TypedExpr};
 use oal_syntax::parse;
 
+fn check_vars(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
+    e.inner.scan(acc, env, check_vars)?;
+    match &e.inner {
+        Expr::Var(var) => match env.lookup(var) {
+            None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
+            Some(val) => match val.inner {
+                Expr::Binding(_) => Ok(()),
+                _ => Err(Error::new("remaining free variable").with_expr(&e.inner)),
+            },
+        },
+        _ => Ok(()),
+    }
+}
+
 #[test]
-#[ignore]
 fn compile_application() {
     let code = r#"
         let f x = x | num;
@@ -27,4 +42,7 @@ fn compile_application() {
 
     doc.transform(&mut (), &mut Env::new(), compile)
         .expect("compilation failed");
+
+    doc.scan(&mut (), &mut Env::new(), check_vars)
+        .expect("compilation incomplete");
 }
