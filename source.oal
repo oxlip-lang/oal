@@ -1,35 +1,41 @@
+// Primitive types
 let id1 = num;
 
-let uri0 = /a;
-let uri1 = /a/{ id id1 }/c%40;
-let uri2 = uri1;
-
-let obj3 = {} ~ uri ~ bool;
-
-let obj2 = {
-  prop1 obj3
+// Records
+let rec1 = {
+  firstName str,
+  lastName str
 };
 
-let obj1 = {
-  prop1 bool, // todo: something
-  prop2 /b:get,put -> obj2,
-  prop3 uri1:get -> { prop str } & obj2,
-  prop4 uri:get -> {},
-  prop5 {
-    prop str
-  },
-  prop6 num ~ str
-};
+// Templated URIs
+let uri1 = /some/path/{ id id1 }/template;
 
-let obj4 = ( ( {} | {} ) & {} );
+// Undefined URIs
+let uri2 = uri;
+
+// Relations
+let rel1 = uri1:get,put -> rec1;
+
+// Record merge operator
+let rec2 = rec1 & { age num };
+
+// Typed alternative operator
+let id2 = id1 | str;
+
+// Untyped alternative operator
+let any1 = id2 ~ rec2 ~ uri1;
+
+// Function declaration
+let f x y = rec2 & ( x | y );
+
+// Function application
+let rec3 = f { height num } { stuff any1 };
+
+// Resources
+res rel1;
+res /something:get -> rec3;
 
 /*
- * Blahblah
- *
+ * Block
+ * comments
 */
-
-res uri1:get,put      -> obj1;
-res /c:get            -> { prop num };
-res /d/{id id1}/e:get -> { prop num } | {} & obj4;
-
-// note: blahblahblah

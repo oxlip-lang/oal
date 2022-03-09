@@ -74,7 +74,9 @@ pub type TypedExpr = Typed<Expr>;
 impl From<Pair<'_>> for TypedExpr {
     fn from(p: Pair<'_>) -> Self {
         match p.as_rule() {
-            Rule::expr_type | Rule::paren_type => p.into_inner().next().unwrap().into(),
+            Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::term_type => {
+                p.into_inner().next().unwrap().into()
+            }
             Rule::prim_type => Expr::Prim(p.into()).into(),
             Rule::rel_type => Expr::Rel(p.into()).into(),
             Rule::uri_type => Expr::Uri(p.into()).into(),
@@ -393,10 +395,7 @@ impl From<Pair<'_>> for VariadicOp {
             Rule::sum_type => Operator::Sum,
             _ => unreachable!(),
         };
-        let exprs = p
-            .into_inner()
-            .map(|p| p.into_inner().next().unwrap().into())
-            .collect();
+        let exprs = p.into_inner().map(|p| p.into()).collect();
         VariadicOp { op, exprs }
     }
 }

@@ -148,8 +148,7 @@ impl Builder {
             ast::Expr::Block(block) => self.block_schema(block),
             ast::Expr::Op(operation) => match operation.op {
                 Operator::Join => self.join_schema(&operation.exprs),
-                Operator::Sum => self.sum_schema(&operation.exprs),
-                Operator::Any => todo!(),
+                Operator::Sum | Operator::Any => self.sum_schema(&operation.exprs),
             },
             _ => panic!("unexpected type expression: {:?}", e),
         }
