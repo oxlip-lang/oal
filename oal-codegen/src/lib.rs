@@ -140,6 +140,18 @@ impl Builder {
         }
     }
 
+    fn any_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::AnyOf {
+                any_of: exprs
+                    .iter()
+                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.inner)))
+                    .collect(),
+            },
+        }
+    }
+
     fn expr_schema(&self, e: &ast::Expr) -> Schema {
         match e {
             ast::Expr::Prim(prim) => self.prim_schema(prim),
@@ -148,7 +160,8 @@ impl Builder {
             ast::Expr::Block(block) => self.block_schema(block),
             ast::Expr::Op(operation) => match operation.op {
                 Operator::Join => self.join_schema(&operation.exprs),
-                Operator::Sum | Operator::Any => self.sum_schema(&operation.exprs),
+                Operator::Sum => self.sum_schema(&operation.exprs),
+                Operator::Any => self.any_schema(&operation.exprs),
             },
             _ => panic!("unexpected type expression: {:?}", e),
         }
@@ -182,7 +195,7 @@ impl Builder {
                     _ => None,
                 })
                 .collect(),
-            _ => panic!("expected type expression"),
+            _ => panic!("expected uri expression"),
         }
     }
 
