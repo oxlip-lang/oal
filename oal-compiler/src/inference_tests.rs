@@ -24,6 +24,24 @@ fn tag_var_decl() {
 }
 
 #[test]
+fn tag_array_decl() {
+    let mut d = parse("let id1 = [num];".into()).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+        .expect("tagging failed");
+
+    if let Stmt::Decl(decl) = d.stmts.first().unwrap() {
+        if Some(Tag::Array) != decl.expr.tag {
+            panic!("expected array type tag");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
 fn tag_lambda_decl() {
     let mut d = parse("let f x y z = num;".into()).expect("parsing failed");
 

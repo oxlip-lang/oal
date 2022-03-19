@@ -26,6 +26,27 @@ fn parse_assignment() {
 }
 
 #[test]
+fn parse_array() {
+    let d = parse("let a = [str];".into()).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Stmt::Decl(decl) = s {
+        if let Expr::Array(array) = &decl.expr.inner {
+            if Expr::Prim(Prim::Str) != array.item.inner {
+                panic!("expected string type expression");
+            }
+        } else {
+            panic!("expected array expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
 fn parse_any_type() {
     let d = parse("let a = {} ~ uri ~ bool;".into()).expect("parsing failed");
     assert_eq!(d.stmts.len(), 1);

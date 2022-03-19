@@ -78,6 +78,15 @@ impl Scan for Block {
     }
 }
 
+impl Scan for Array {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
+    {
+        self.try_each(|e| f(acc, env, e))
+    }
+}
+
 impl Scan for VariadicOp {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
@@ -127,6 +136,7 @@ impl Scan for Expr {
             Expr::Rel(rel) => rel.scan(acc, env, f),
             Expr::Uri(uri) => uri.scan(acc, env, f),
             Expr::Block(block) => block.scan(acc, env, f),
+            Expr::Array(array) => array.scan(acc, env, f),
             Expr::Op(operation) => operation.scan(acc, env, f),
             Expr::Lambda(lambda) => lambda.scan(acc, env, f),
             Expr::App(application) => application.scan(acc, env, f),

@@ -1,6 +1,6 @@
 use crate::try_each::TryEach;
 use crate::{Pair, Rule};
-use std::iter::once;
+use std::iter::{once, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
@@ -18,6 +18,7 @@ pub enum Tag {
     Primitive,
     Relation,
     Object,
+    Array,
     Uri,
     Any,
     Func(FuncTag),
@@ -39,6 +40,7 @@ pub enum Expr {
     Prim(Prim),
     Rel(Rel),
     Uri(Uri),
+    Array(Array),
     Block(Block),
     Var(Ident),
     Op(VariadicOp),
@@ -80,6 +82,7 @@ impl From<Pair<'_>> for TypedExpr {
             Rule::prim_type => Expr::Prim(p.into()).into(),
             Rule::rel_type => Expr::Rel(p.into()).into(),
             Rule::uri_type => Expr::Uri(p.into()).into(),
+            Rule::array_type => Expr::Array(p.into()).into(),
             Rule::block_type => Expr::Block(p.into()).into(),
             Rule::var => Expr::Var(p.as_str().into()).into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into(),
@@ -330,6 +333,36 @@ impl From<Pair<'_>> for Uri {
             _ => Default::default(),
         };
         Uri { spec }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Array {
+    pub item: Box<TypedExpr>,
+}
+
+impl From<Pair<'_>> for Array {
+    fn from(p: Pair) -> Self {
+        let item = Box::new(p.into_inner().next().unwrap().into());
+        Array { item }
+    }
+}
+
+impl<'a> IntoIterator for &'a Array {
+    type Item = &'a TypedExpr;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(self.item.as_ref())
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Array {
+    type Item = &'a mut TypedExpr;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(self.item.as_mut())
     }
 }
 

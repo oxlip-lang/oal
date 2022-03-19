@@ -4,7 +4,8 @@ let id1 = num;
 // Records
 let rec1 = {
   firstName str,
-  lastName str
+  lastName str,
+  middleNames [str]
 };
 
 // Templated URIs

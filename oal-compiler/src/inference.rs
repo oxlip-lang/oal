@@ -37,6 +37,10 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
             e.tag = Some(Tag::Object);
             Ok(())
         }
+        Expr::Array(_) => {
+            e.tag = Some(Tag::Array);
+            Ok(())
+        }
         Expr::Op(operation) => {
             e.tag = Some(match operation.op {
                 Operator::Join => Tag::Object,
@@ -221,6 +225,10 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
         }
         Expr::Block(_) => {
             c.push(e.unwrap_tag(), Tag::Object);
+            Ok(())
+        }
+        Expr::Array(_) => {
+            c.push(e.unwrap_tag(), Tag::Array);
             Ok(())
         }
         Expr::Op(operation) => {

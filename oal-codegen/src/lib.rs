@@ -1,7 +1,7 @@
 use indexmap::indexmap;
 use oal_syntax::ast;
 use openapiv3::{
-    Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
+    ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
     SchemaData, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
 };
@@ -127,6 +127,20 @@ impl Builder {
         }
     }
 
+    fn array_schema(&self, array: &ast::Array) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::Type(Type::Array(ArrayType {
+                items: Some(ReferenceOr::Item(
+                    self.expr_schema(&array.item.inner).into(),
+                )),
+                min_items: None,
+                max_items: None,
+                unique_items: false,
+            })),
+        }
+    }
+
     fn sum_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
         Schema {
             schema_data: Default::default(),
@@ -157,6 +171,7 @@ impl Builder {
             ast::Expr::Rel(rel) => self.rel_schema(rel),
             ast::Expr::Uri(uri) => self.uri_schema(uri),
             ast::Expr::Block(block) => self.block_schema(block),
+            ast::Expr::Array(array) => self.array_schema(array),
             ast::Expr::Op(operation) => match operation.op {
                 ast::Operator::Join => self.join_schema(&operation.exprs),
                 ast::Operator::Sum => self.sum_schema(&operation.exprs),

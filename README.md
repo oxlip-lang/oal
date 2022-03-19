@@ -21,7 +21,8 @@ let id1 = num;
 // Records
 let rec1 = {
   firstName str,
-  lastName str
+  lastName str,
+  middleNames [str]
 };
 ```
 ```
@@ -93,6 +94,10 @@ paths:
                     type: string
                   lastName:
                     type: string
+                  middleNames:
+                    type: array
+                    items:
+                      type: string
     put:
       responses:
         default:
@@ -106,6 +111,10 @@ paths:
                     type: string
                   lastName:
                     type: string
+                  middleNames:
+                    type: array
+                    items:
+                      type: string
     parameters:
       - in: path
         name: id
@@ -129,6 +138,10 @@ paths:
                             type: string
                           lastName:
                             type: string
+                          middleNames:
+                            type: array
+                            items:
+                              type: string
                       - type: object
                         properties:
                           age:
@@ -152,6 +165,10 @@ paths:
                                         type: string
                                       lastName:
                                         type: string
+                                      middleNames:
+                                        type: array
+                                        items:
+                                          type: string
                                   - type: object
                                     properties:
                                       age:

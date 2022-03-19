@@ -78,6 +78,15 @@ impl Transform for Block {
     }
 }
 
+impl Transform for Array {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+    {
+        self.try_each(|e| f(acc, env, e))
+    }
+}
+
 impl Transform for VariadicOp {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
@@ -127,6 +136,7 @@ impl Transform for Expr {
             Expr::Rel(rel) => rel.transform(acc, env, f),
             Expr::Uri(uri) => uri.transform(acc, env, f),
             Expr::Block(block) => block.transform(acc, env, f),
+            Expr::Array(array) => array.transform(acc, env, f),
             Expr::Op(operation) => operation.transform(acc, env, f),
             Expr::Lambda(lambda) => lambda.transform(acc, env, f),
             Expr::App(application) => application.transform(acc, env, f),
