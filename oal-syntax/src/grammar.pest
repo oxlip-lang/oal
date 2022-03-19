@@ -21,11 +21,15 @@ bool_kw = @{ "bool" ~ !ASCII_ALPHANUMERIC }
 
 type_kw = { any_kw | obj_kw | rel_kw | num_kw | str_kw | uri_kw | bool_kw }
 
-get_kw = @{ "get" ~ !ASCII_ALPHANUMERIC }
-put_kw = @{ "put" ~ !ASCII_ALPHANUMERIC }
-/// TODO: add remaining HTTP methods
+get_kw     = @{ "get"     ~ !ASCII_ALPHANUMERIC }
+put_kw     = @{ "put"     ~ !ASCII_ALPHANUMERIC }
+post_kw    = @{ "post"    ~ !ASCII_ALPHANUMERIC }
+patch_kw   = @{ "patch"   ~ !ASCII_ALPHANUMERIC }
+delete_kw  = @{ "delete"  ~ !ASCII_ALPHANUMERIC }
+options_kw = @{ "options" ~ !ASCII_ALPHANUMERIC }
+head_kw    = @{ "head"    ~ !ASCII_ALPHANUMERIC }
 
-method_kw = { get_kw | put_kw }
+method_kw = { get_kw | put_kw | post_kw | patch_kw | delete_kw | options_kw | head_kw }
 
 keyword = { stmt_kw | type_kw | method_kw }
 

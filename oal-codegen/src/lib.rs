@@ -1,6 +1,5 @@
 use indexmap::indexmap;
 use oal_syntax::ast;
-use oal_syntax::ast::{Expr, Operator};
 use openapiv3::{
     Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
@@ -71,7 +70,7 @@ impl Builder {
 
     fn rel_schema(&self, rel: &ast::Rel) -> Schema {
         let uri = match &rel.uri.inner {
-            Expr::Uri(uri) => uri,
+            ast::Expr::Uri(uri) => uri,
             _ => panic!("expected uri type"),
         };
         self.uri_schema(uri)
@@ -159,9 +158,9 @@ impl Builder {
             ast::Expr::Uri(uri) => self.uri_schema(uri),
             ast::Expr::Block(block) => self.block_schema(block),
             ast::Expr::Op(operation) => match operation.op {
-                Operator::Join => self.join_schema(&operation.exprs),
-                Operator::Sum => self.sum_schema(&operation.exprs),
-                Operator::Any => self.any_schema(&operation.exprs),
+                ast::Operator::Join => self.join_schema(&operation.exprs),
+                ast::Operator::Sum => self.sum_schema(&operation.exprs),
+                ast::Operator::Any => self.any_schema(&operation.exprs),
             },
             _ => panic!("unexpected type expression: {:?}", e),
         }
@@ -226,6 +225,11 @@ impl Builder {
             match m {
                 ast::Method::Get => path_item.get = Some(op.clone()),
                 ast::Method::Put => path_item.put = Some(op.clone()),
+                ast::Method::Post => path_item.post = Some(op.clone()),
+                ast::Method::Patch => path_item.patch = Some(op.clone()),
+                ast::Method::Delete => path_item.delete = Some(op.clone()),
+                ast::Method::Options => path_item.options = Some(op.clone()),
+                ast::Method::Head => path_item.head = Some(op.clone()),
             }
         }
         path_item

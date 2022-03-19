@@ -184,6 +184,11 @@ impl From<Pair<'_>> for Stmt {
 pub enum Method {
     Get,
     Put,
+    Post,
+    Patch,
+    Delete,
+    Options,
+    Head,
 }
 
 impl From<Pair<'_>> for Method {
@@ -191,6 +196,11 @@ impl From<Pair<'_>> for Method {
         match p.into_inner().next().unwrap().as_rule() {
             Rule::get_kw => Method::Get,
             Rule::put_kw => Method::Put,
+            Rule::post_kw => Method::Post,
+            Rule::patch_kw => Method::Patch,
+            Rule::delete_kw => Method::Delete,
+            Rule::options_kw => Method::Options,
+            Rule::head_kw => Method::Head,
             _ => unreachable!(),
         }
     }
