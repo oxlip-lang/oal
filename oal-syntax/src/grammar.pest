@@ -35,12 +35,12 @@ keyword = { stmt_kw | type_kw | method_kw }
 
 var = { ident }
 
-uri_seg = @{ ( ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" )+ }
-uri_lit = { "/" ~ uri_seg }
-uri_tpl = { "/{" ~ prop ~ "}" }
-uri_spec = { ( uri_tpl | uri_lit )+ }
+uri_lit = @{ ( ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" )+ }
+uri_var = { "{" ~ prop ~ "}" }
+uri_tpl = { ( "/" ~ ( uri_lit | uri_var ) )+ ~ "/"? }
+uri_root = @{ "/" }
 
-uri_type = { uri_kw | uri_spec }
+uri_type = { uri_kw | uri_tpl | uri_root }
 
 methods = { method_kw ~ ( "," ~ method_kw )* }
 

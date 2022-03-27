@@ -266,7 +266,13 @@ impl<'a> TryEach for &'a mut Rel {
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(Literal),
-    Template(Prop),
+    Variable(Prop),
+}
+
+impl Default for UriSegment {
+    fn default() -> Self {
+        UriSegment::Literal("/".into())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -290,7 +296,7 @@ impl<'a> IntoIterator for &'a Uri {
 
     fn into_iter(self) -> Self::IntoIter {
         let it = self.spec.iter().filter_map(|s| {
-            if let UriSegment::Template(t) = s {
+            if let UriSegment::Variable(t) = s {
                 Some(&t.val)
             } else {
                 None
@@ -306,7 +312,7 @@ impl<'a> IntoIterator for &'a mut Uri {
 
     fn into_iter(self) -> Self::IntoIter {
         let it = self.spec.iter_mut().filter_map(|s| {
-            if let UriSegment::Template(t) = s {
+            if let UriSegment::Variable(t) = s {
                 Some(&mut t.val)
             } else {
                 None
@@ -320,17 +326,17 @@ impl From<Pair<'_>> for Uri {
     fn from(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         let spec: Vec<_> = match p.as_rule() {
-            Rule::uri_spec => p
+            Rule::uri_kw => Default::default(),
+            Rule::uri_root => vec![Default::default()],
+            Rule::uri_tpl => p
                 .into_inner()
                 .map(|p| match p.as_rule() {
-                    Rule::uri_tpl => UriSegment::Template(p.into_inner().next().unwrap().into()),
-                    Rule::uri_lit => {
-                        UriSegment::Literal(p.into_inner().next().unwrap().as_str().into())
-                    }
+                    Rule::uri_var => UriSegment::Variable(p.into_inner().next().unwrap().into()),
+                    Rule::uri_lit => UriSegment::Literal(p.as_str().into()),
                     _ => unreachable!(),
                 })
                 .collect(),
-            _ => Default::default(),
+            _ => unreachable!(),
         };
         Uri { spec }
     }

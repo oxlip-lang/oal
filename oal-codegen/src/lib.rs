@@ -41,7 +41,7 @@ impl Builder {
         uri.iter()
             .map(|s| match s {
                 ast::UriSegment::Literal(l) => format!("/{}", l),
-                ast::UriSegment::Template(t) => format!("/{{{}}}", t.key),
+                ast::UriSegment::Variable(t) => format!("/{{{}}}", t.key),
             })
             .collect()
     }
@@ -205,7 +205,7 @@ impl Builder {
             ast::Expr::Uri(uri) => uri
                 .iter()
                 .flat_map(|s| match s {
-                    ast::UriSegment::Template(p) => Some(self.prop_param(p)),
+                    ast::UriSegment::Variable(p) => Some(self.prop_param(p)),
                     _ => None,
                 })
                 .collect(),
