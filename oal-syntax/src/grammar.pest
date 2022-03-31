@@ -42,21 +42,29 @@ uri_root = @{ "/" }
 
 uri_type = { uri_kw | uri_tpl | uri_root }
 
-methods = { method_kw ~ ( "," ~ method_kw )* }
-
 prim_type = { num_kw | str_kw | bool_kw  }
 
 prop = { ident ~ expr_type }
 block_type = { "{" ~ ( prop ~ ( "," ~ prop )* )? ~ "}" }
+
 array_type = { "[" ~ expr_type ~ "]" }
+
 paren_type = { "(" ~ expr_type ~ ")" }
+
 term_type = { prim_type | uri_type | array_type | block_type | paren_type | var }
 apply = { ident ~ term_type+ }
 app_type = { apply | term_type }
+
 join_type = { app_type ~ ( "&" ~ app_type )* }
+
 any_type = { join_type ~ ( "~" ~ join_type )* }
+
 sum_type = { any_type ~ ( "|" ~ any_type )* }
-rel_type = { sum_type ~ ":" ~ methods ~ "->" ~ sum_type }
+
+methods = { method_kw ~ ( "," ~ method_kw )* }
+domain = { ( ":" ~ sum_type )? }
+rel_type = { sum_type ~ ":" ~ methods ~ domain ~ "->" ~ sum_type }
+
 expr_type = { rel_type | sum_type }
 
 binding = { ident }

@@ -2,8 +2,8 @@ use indexmap::indexmap;
 use oal_syntax::ast;
 use openapiv3::{
     ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
-    ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, Response, Responses, Schema,
-    SchemaData, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
+    ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
+    Schema, SchemaData, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
 pub struct Builder {
@@ -224,6 +224,15 @@ impl Builder {
             ..Default::default()
         };
         let op = Operation {
+            request_body: r.domain.as_ref().map(|domain| {
+                ReferenceOr::Item(RequestBody {
+                    content: indexmap! { self.media_type() => MediaType {
+                        schema: Some(ReferenceOr::Item(self.expr_schema(&domain.inner))),
+                        ..Default::default()
+                    }},
+                    ..Default::default()
+                })
+            }),
             responses: Responses {
                 default: Some(ReferenceOr::Item(Response {
                     content: indexmap! { self.media_type() => MediaType {

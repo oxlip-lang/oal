@@ -1,5 +1,5 @@
 use crate::ast::{
-    Block, Expr, Lambda, Method, Operator, Prim, Prop, Stmt, Uri, UriSegment, VariadicOp,
+    Application, Expr, Lambda, Method, Operator, Prim, Prop, Stmt, Uri, UriSegment, VariadicOp,
 };
 use crate::parse;
 
@@ -93,7 +93,7 @@ fn parse_template_uri() {
 
 #[test]
 fn parse_relation() {
-    let d = parse("let a = /:put -> {};".into()).expect("parsing failed");
+    let d = parse("let a = /:put:{} -> {};".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -108,7 +108,12 @@ fn parse_relation() {
                 })
             );
             assert_eq!(rel.methods, vec![Method::Put]);
-            assert_eq!(rel.range.inner, Expr::Block(Block { props: vec![] }));
+            if let Some(domain) = &rel.domain {
+                assert_eq!(domain.inner, Expr::Block(Default::default()));
+            } else {
+                panic!("expected domain expression");
+            }
+            assert_eq!(rel.range.inner, Expr::Block(Default::default()));
         } else {
             panic!("expected relation expression");
         }
@@ -143,7 +148,19 @@ fn parse_any_type() {
 #[test]
 fn parse_application() {
     let d = parse("let a = f num {} uri;".into()).expect("parsing failed");
+
     assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Stmt::Decl(decl) = s {
+        if let Expr::App(Application { name, args }) = &decl.expr.inner {
+            assert_eq!(name.as_ref(), "f");
+            assert_eq!(args.len(), 3);
+        } else {
+            panic!("expected function application");
+        }
+    }
 }
 
 #[test]

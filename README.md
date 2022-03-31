@@ -35,7 +35,7 @@ let uri2 = uri;
 ```
 ```
 // Relations
-let rel1 = uri1:get,put -> rec1;
+let rel1 = uri1:patch,put:rec1 -> rec1;
 ```
 ```
 // Merging records
@@ -81,7 +81,21 @@ info:
   version: 0.1.0
 paths:
   "/some/path/{id}/template":
-    get:
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                middleNames:
+                  type: array
+                  items:
+                    type: string
       responses:
         default:
           description: ""
@@ -98,7 +112,21 @@ paths:
                     type: array
                     items:
                       type: string
-    put:
+    patch:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                middleNames:
+                  type: array
+                  items:
+                    type: string
       responses:
         default:
           description: ""

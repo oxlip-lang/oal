@@ -212,6 +212,9 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
         }
         Expr::Rel(rel) => {
             c.push(rel.range.unwrap_tag(), Tag::Object);
+            if let Some(domain) = &rel.domain {
+                c.push(domain.unwrap_tag(), Tag::Object);
+            }
             c.push(rel.uri.unwrap_tag(), Tag::Uri);
             c.push(e.unwrap_tag(), Tag::Relation);
             Ok(())

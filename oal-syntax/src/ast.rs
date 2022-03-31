@@ -213,6 +213,7 @@ impl From<Pair<'_>> for Method {
 pub struct Rel {
     pub uri: Box<TypedExpr>,
     pub methods: Vec<Method>,
+    pub domain: Option<Box<TypedExpr>>,
     pub range: Box<TypedExpr>,
 }
 
@@ -229,11 +230,19 @@ impl From<Pair<'_>> for Rel {
             .map(|p| p.into())
             .collect();
 
+        let domain = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .next()
+            .map(|p| Box::new(p.into()));
+
         let range: Box<_> = TypedExpr::from(inner.next().unwrap()).into();
 
         Rel {
             uri,
             methods,
+            domain,
             range,
         }
     }
@@ -246,7 +255,16 @@ impl<'a> TryEach for &'a Rel {
     where
         F: FnMut(&'a TypedExpr) -> Result<T, E>,
     {
-        f(&self.range).and_then(|_| f(&self.uri)).map(|_| ())
+        f(&self.range)
+            .map(|_| ())
+            .and_then(|_| f(&self.uri).map(|_| ()))
+            .and_then(|_| {
+                if let Some(d) = &self.domain {
+                    f(d.as_ref()).map(|_| ())
+                } else {
+                    Ok(())
+                }
+            })
     }
 }
 
@@ -258,8 +276,15 @@ impl<'a> TryEach for &'a mut Rel {
         F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
     {
         f(&mut self.range)
-            .and_then(|_| f(&mut self.uri))
             .map(|_| ())
+            .and_then(|_| f(&mut self.uri).map(|_| ()))
+            .and_then(|_| {
+                if let Some(d) = &mut self.domain {
+                    f(d.as_mut()).map(|_| ())
+                } else {
+                    Ok(())
+                }
+            })
     }
 }
 
@@ -387,7 +412,7 @@ impl From<Pair<'_>> for Prop {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Block {
     pub props: Vec<Prop>,
 }

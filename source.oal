@@ -15,7 +15,7 @@ let uri1 = /some/path/{ id id1 }/template;
 let uri2 = uri;
 
 // Relations
-let rel1 = uri1:get,put -> rec1;
+let rel1 = uri1:patch,put:rec1 -> rec1;
 
 // Record merge operator
 let rec2 = rec1 & { age num };
