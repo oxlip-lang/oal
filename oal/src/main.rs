@@ -1,5 +1,5 @@
 use oal_codegen::Builder;
-use oal_compiler::eval;
+use oal_compiler::evaluate;
 use oal_syntax::parse;
 use std::env;
 
@@ -17,9 +17,9 @@ fn main() {
 
     let doc = parse(input).expect("parsing failed");
 
-    let rels = eval(doc).expect("compilation failed");
+    let spec = evaluate(doc).expect("compilation failed");
 
-    let api = Builder::new().expose_all(rels.iter()).open_api();
+    let api = Builder::new(spec).open_api();
 
     let output = serde_yaml::to_string(&api).unwrap();
 

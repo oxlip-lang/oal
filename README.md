@@ -38,7 +38,7 @@ let uri2 = uri;
 let rel1 = uri1:patch,put:rec1 -> rec1;
 ```
 ```
-// Merging records
+// Joining records
 let rec2 = rec1 & { age num };
 ```
 ```

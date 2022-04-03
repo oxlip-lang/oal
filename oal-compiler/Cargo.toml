@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 oal-syntax = { path = "../oal-syntax" }
+indexmap = "1.8.1"

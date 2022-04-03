@@ -183,7 +183,7 @@ impl From<Pair<'_>> for Stmt {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Method {
     Get,
     Put,
@@ -296,7 +296,7 @@ pub enum UriSegment {
 
 impl Default for UriSegment {
     fn default() -> Self {
-        UriSegment::Literal("/".into())
+        UriSegment::Literal("".into())
     }
 }
 
@@ -312,6 +312,15 @@ impl Uri {
 
     pub fn iter(&self) -> Iter<UriSegment> {
         self.spec.iter()
+    }
+
+    pub fn pattern(&self) -> String {
+        self.iter()
+            .map(|s| match s {
+                UriSegment::Literal(l) => format!("/{}", l),
+                UriSegment::Variable(t) => format!("/{{{}}}", t.key),
+            })
+            .collect()
     }
 }
 

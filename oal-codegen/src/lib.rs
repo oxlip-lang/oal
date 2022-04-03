@@ -1,4 +1,5 @@
 use indexmap::indexmap;
+use oal_compiler::eval;
 use oal_syntax::ast;
 use openapiv3::{
     ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
@@ -7,17 +8,12 @@ use openapiv3::{
 };
 
 pub struct Builder {
-    rels: Vec<ast::Rel>,
+    spec: eval::Spec,
 }
 
 impl Builder {
-    pub fn new() -> Builder {
-        Builder { rels: Vec::new() }
-    }
-
-    pub fn expose_all<'a, I: Iterator<Item = &'a ast::Rel>>(&mut self, rels: I) -> &Self {
-        self.rels = rels.cloned().collect();
-        self
+    pub fn new(s: eval::Spec) -> Builder {
+        Builder { spec: s }
     }
 
     pub fn open_api(&self) -> OpenAPI {
@@ -38,19 +34,7 @@ impl Builder {
     }
 
     fn uri_pattern(&self, uri: &ast::Uri) -> String {
-        uri.iter()
-            .map(|s| match s {
-                ast::UriSegment::Literal(l) => format!("/{}", l),
-                ast::UriSegment::Variable(t) => format!("/{{{}}}", t.key),
-            })
-            .collect()
-    }
-
-    fn rel_pattern(&self, rel: &ast::Rel) -> String {
-        match &rel.uri.inner {
-            ast::Expr::Uri(uri) => self.uri_pattern(&uri),
-            _ => panic!("expected uri type expression"),
-        }
+        uri.pattern()
     }
 
     fn prim_type(&self, prim: &ast::Prim) -> Type {
@@ -200,76 +184,72 @@ impl Builder {
         }
     }
 
-    fn rel_params(&self, rel: &ast::Rel) -> Vec<Parameter> {
-        match &rel.uri.inner {
-            ast::Expr::Uri(uri) => uri
-                .iter()
-                .flat_map(|s| match s {
-                    ast::UriSegment::Variable(p) => Some(self.prop_param(p)),
-                    _ => None,
-                })
-                .collect(),
-            _ => panic!("expected uri expression"),
-        }
+    fn uri_params(&self, uri: &ast::Uri) -> Vec<Parameter> {
+        uri.iter()
+            .flat_map(|s| match s {
+                ast::UriSegment::Variable(p) => Some(self.prop_param(p)),
+                _ => None,
+            })
+            .collect()
     }
 
-    fn rel_path_item(&self, r: &ast::Rel) -> PathItem {
-        let params = self
-            .rel_params(r)
+    fn path_item(&self, r: &eval::PathItem) -> PathItem {
+        let parameters = self
+            .uri_params(&r.uri)
             .into_iter()
             .map(ReferenceOr::Item)
             .collect();
+
         let mut path_item = PathItem {
-            parameters: params,
+            parameters,
             ..Default::default()
         };
-        let op = Operation {
-            request_body: r.domain.as_ref().map(|domain| {
-                ReferenceOr::Item(RequestBody {
-                    content: indexmap! { self.media_type() => MediaType {
-                        schema: Some(ReferenceOr::Item(self.expr_schema(&domain.inner))),
+
+        for (method, operation) in r.ops.iter() {
+            let op = Operation {
+                request_body: operation.domain.as_ref().map(|domain| {
+                    ReferenceOr::Item(RequestBody {
+                        content: indexmap! { self.media_type() => MediaType {
+                            schema: Some(ReferenceOr::Item(self.block_schema(&domain))),
+                            ..Default::default()
+                        }},
                         ..Default::default()
-                    }},
-                    ..Default::default()
-                })
-            }),
-            responses: Responses {
-                default: Some(ReferenceOr::Item(Response {
-                    content: indexmap! { self.media_type() => MediaType {
-                        schema: Some(ReferenceOr::Item(self.expr_schema(&r.range.inner))),
+                    })
+                }),
+                responses: Responses {
+                    default: Some(ReferenceOr::Item(Response {
+                        content: indexmap! { self.media_type() => MediaType {
+                            schema: Some(ReferenceOr::Item(self.block_schema(&operation.range))),
+                            ..Default::default()
+                        }},
                         ..Default::default()
-                    }},
+                    })),
                     ..Default::default()
-                })),
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        };
-        for m in &r.methods {
-            match m {
-                ast::Method::Get => path_item.get = Some(op.clone()),
-                ast::Method::Put => path_item.put = Some(op.clone()),
-                ast::Method::Post => path_item.post = Some(op.clone()),
-                ast::Method::Patch => path_item.patch = Some(op.clone()),
-                ast::Method::Delete => path_item.delete = Some(op.clone()),
-                ast::Method::Options => path_item.options = Some(op.clone()),
-                ast::Method::Head => path_item.head = Some(op.clone()),
+            };
+
+            match method {
+                ast::Method::Get => path_item.get = Some(op),
+                ast::Method::Put => path_item.put = Some(op),
+                ast::Method::Post => path_item.post = Some(op),
+                ast::Method::Patch => path_item.patch = Some(op),
+                ast::Method::Delete => path_item.delete = Some(op),
+                ast::Method::Options => path_item.options = Some(op),
+                ast::Method::Head => path_item.head = Some(op),
             }
         }
+
         path_item
     }
 
     fn all_paths(&self) -> Paths {
         Paths {
             paths: self
-                .rels
+                .spec
+                .paths
                 .iter()
-                .map(|r| {
-                    (
-                        self.rel_pattern(r),
-                        ReferenceOr::Item(self.rel_path_item(r)),
-                    )
-                })
+                .map(|(pattern, item)| (pattern.clone(), ReferenceOr::Item(self.path_item(item))))
                 .collect(),
             extensions: Default::default(),
         }

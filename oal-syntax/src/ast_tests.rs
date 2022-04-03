@@ -4,6 +4,15 @@ use crate::ast::{
 use crate::parse;
 
 #[test]
+fn uri_pattern() {
+    let uri = Uri {
+        spec: vec![Default::default()],
+    };
+
+    assert_eq!(uri.pattern(), "/");
+}
+
+#[test]
 fn parse_variable_decl() {
     let d = parse("let a = num;".into()).expect("parsing failed");
 
