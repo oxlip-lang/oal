@@ -1,5 +1,7 @@
 use crate::errors::{Error, Result};
-use crate::{Env, Scan, Transform};
+use crate::scan::Scan;
+use crate::scope::Env;
+use crate::transform::Transform;
 use oal_syntax::ast::{Expr, FuncTag, Operator, Tag, TypedExpr};
 use std::collections::HashMap;
 
@@ -198,6 +200,7 @@ impl TypeConstraint {
         Ok(s)
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.0.len()
     }

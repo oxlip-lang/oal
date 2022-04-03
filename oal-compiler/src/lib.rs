@@ -1,5 +1,6 @@
 mod compile;
 mod errors;
+mod eval;
 mod inference;
 mod scan;
 mod scope;
@@ -14,7 +15,4 @@ mod scope_tests;
 
 pub use crate::compile::compile;
 pub use crate::errors::Result;
-pub use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
-pub use crate::scan::Scan;
-pub use crate::scope::Env;
-pub use crate::transform::Transform;
+pub use crate::eval::eval;

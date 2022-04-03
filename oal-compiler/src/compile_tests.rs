@@ -1,7 +1,9 @@
+use crate::compile;
 use crate::errors::Error;
-use crate::{
-    compile, constrain, substitute, tag_type, Env, Scan, TagSeq, Transform, TypeConstraint,
-};
+use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
+use crate::scan::Scan;
+use crate::scope::Env;
+use crate::transform::Transform;
 use oal_syntax::ast::{Expr, Operator, Prim, Stmt, TypedExpr};
 use oal_syntax::parse;
 

@@ -1,4 +1,4 @@
-use crate::Env;
+use crate::scope::Env;
 use oal_syntax::ast::*;
 use oal_syntax::try_each::TryEach;
 

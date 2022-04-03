@@ -1,6 +1,6 @@
 use crate::errors::{Error, Result};
+use crate::scope::Env;
 use crate::transform::Transform;
-use crate::Env;
 use oal_syntax::ast::*;
 
 pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {

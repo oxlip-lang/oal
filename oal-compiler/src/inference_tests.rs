@@ -1,7 +1,8 @@
 use crate::errors::Error;
-use crate::inference::{TagSeq, TypeConstraint};
+use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
+use crate::scan::Scan;
 use crate::scope::Env;
-use crate::{constrain, substitute, tag_type, Scan, Transform};
+use crate::transform::Transform;
 use oal_syntax::ast::{Expr, Lambda, Stmt, Tag, TypedExpr};
 use oal_syntax::parse;
 
