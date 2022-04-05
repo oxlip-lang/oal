@@ -1,6 +1,6 @@
-use crate::compile;
 use crate::errors::{Error, Result};
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
+use crate::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
@@ -40,7 +40,7 @@ pub fn evaluate(mut doc: Doc) -> Result<Spec> {
 
     doc.transform(subst, &mut Env::new(), substitute)?;
 
-    doc.transform(&mut (), &mut Env::new(), compile)?;
+    doc.transform(&mut (), &mut Env::new(), reduce)?;
 
     let mut paths: Paths = HashMap::new();
 

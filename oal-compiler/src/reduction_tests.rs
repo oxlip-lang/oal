@@ -1,6 +1,6 @@
-use crate::compile;
 use crate::errors::Error;
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
+use crate::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
@@ -45,7 +45,7 @@ fn compile_application() {
     doc.transform(subst, &mut Env::new(), substitute)
         .expect("substitution failed");
 
-    doc.transform(&mut (), &mut Env::new(), compile)
+    doc.transform(&mut (), &mut Env::new(), reduce)
         .expect("compilation failed");
 
     doc.scan(&mut (), &mut Env::new(), check_vars)

@@ -3,8 +3,8 @@ use crate::scope::Env;
 use crate::transform::Transform;
 use oal_syntax::ast::*;
 
-pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.inner.transform(acc, env, compile)?;
+pub fn reduce(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+    e.inner.transform(acc, env, reduce)?;
     match &mut e.inner {
         Expr::Var(var) => match env.lookup(var) {
             None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
@@ -29,7 +29,7 @@ pub fn compile(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
                         }
                     }
                     let mut app = lambda.body.as_ref().clone();
-                    app.inner.transform(&mut (), app_env, compile)?;
+                    app.inner.transform(&mut (), app_env, reduce)?;
                     *e = app;
                     Ok(())
                 } else {
