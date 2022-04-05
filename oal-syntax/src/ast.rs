@@ -281,8 +281,8 @@ pub enum UriSegment {
     Variable(Prop),
 }
 
-impl Default for UriSegment {
-    fn default() -> Self {
+impl UriSegment {
+    pub fn root() -> Self {
         UriSegment::Literal("".into())
     }
 }
@@ -290,25 +290,6 @@ impl Default for UriSegment {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Uri {
     pub spec: Vec<UriSegment>,
-}
-
-impl Uri {
-    pub fn is_empty(&self) -> bool {
-        self.spec.is_empty()
-    }
-
-    pub fn iter(&self) -> Iter<UriSegment> {
-        self.spec.iter()
-    }
-
-    pub fn pattern(&self) -> String {
-        self.iter()
-            .map(|s| match s {
-                UriSegment::Literal(l) => format!("/{}", l),
-                UriSegment::Variable(t) => format!("/{{{}}}", t.key),
-            })
-            .collect()
-    }
 }
 
 impl<'a> IntoIterator for &'a Uri {
@@ -348,7 +329,7 @@ impl From<Pair<'_>> for Uri {
         let p = p.into_inner().next().unwrap();
         let spec: Vec<_> = match p.as_rule() {
             Rule::uri_kw => Default::default(),
-            Rule::uri_root => vec![Default::default()],
+            Rule::uri_root => vec![UriSegment::root()],
             Rule::uri_tpl => p
                 .into_inner()
                 .map(|p| match p.as_rule() {

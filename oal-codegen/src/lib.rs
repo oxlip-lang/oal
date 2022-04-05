@@ -33,7 +33,7 @@ impl Builder {
         "application/json".into()
     }
 
-    fn uri_pattern(&self, uri: &ast::Uri) -> String {
+    fn uri_pattern(&self, uri: &eval::Uri) -> String {
         uri.pattern()
     }
 
@@ -52,16 +52,12 @@ impl Builder {
         }
     }
 
-    fn rel_schema(&self, rel: &ast::Rel) -> Schema {
-        let uri = match &rel.uri.inner {
-            ast::Expr::Uri(uri) => uri,
-            _ => panic!("expected uri type"),
-        };
-        self.uri_schema(uri)
+    fn rel_schema(&self, rel: &eval::Relation) -> Schema {
+        self.uri_schema(&rel.uri)
     }
 
-    fn uri_schema(&self, uri: &ast::Uri) -> Schema {
-        let pattern = if uri.is_empty() {
+    fn uri_schema(&self, uri: &eval::Uri) -> Schema {
+        let pattern = if uri.spec.is_empty() {
             None
         } else {
             Some(self.uri_pattern(uri).into())
@@ -78,25 +74,26 @@ impl Builder {
         }
     }
 
-    fn join_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
+    fn join_schema(&self, schemas: &Vec<eval::Schema>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AllOf {
-                all_of: exprs
+                all_of: schemas
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.inner)))
+                    .map(|s| ReferenceOr::Item(self.schema(s)))
                     .collect(),
             },
         }
     }
 
-    fn block_type(&self, block: &ast::Block) -> Type {
+    fn object_type(&self, obj: &eval::Object) -> Type {
         Type::Object(ObjectType {
-            properties: block
+            properties: obj
+                .props
                 .iter()
-                .map(|e| {
-                    let ident = e.key.as_ref().into();
-                    let expr = ReferenceOr::Item(self.expr_schema(&e.val.inner).into());
+                .map(|p| {
+                    let ident = p.name.as_ref().into();
+                    let expr = ReferenceOr::Item(self.schema(&p.schema).into());
                     (ident, expr)
                 })
                 .collect(),
@@ -104,20 +101,18 @@ impl Builder {
         })
     }
 
-    fn block_schema(&self, block: &ast::Block) -> Schema {
+    fn object_schema(&self, obj: &eval::Object) -> Schema {
         Schema {
             schema_data: Default::default(),
-            schema_kind: SchemaKind::Type(self.block_type(block)),
+            schema_kind: SchemaKind::Type(self.object_type(obj)),
         }
     }
 
-    fn array_schema(&self, array: &ast::Array) -> Schema {
+    fn array_schema(&self, array: &eval::Array) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(Type::Array(ArrayType {
-                items: Some(ReferenceOr::Item(
-                    self.expr_schema(&array.item.inner).into(),
-                )),
+                items: Some(ReferenceOr::Item(self.schema(array.item.as_ref()).into())),
                 min_items: None,
                 max_items: None,
                 unique_items: false,
@@ -125,55 +120,54 @@ impl Builder {
         }
     }
 
-    fn sum_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
+    fn sum_schema(&self, schemas: &Vec<eval::Schema>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::OneOf {
-                one_of: exprs
+                one_of: schemas
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.inner)))
+                    .map(|s| ReferenceOr::Item(self.schema(s)))
                     .collect(),
             },
         }
     }
 
-    fn any_schema(&self, exprs: &Vec<ast::TypedExpr>) -> Schema {
+    fn any_schema(&self, schemas: &Vec<eval::Schema>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AnyOf {
-                any_of: exprs
+                any_of: schemas
                     .iter()
-                    .map(|e| ReferenceOr::Item(self.expr_schema(&e.inner)))
+                    .map(|s| ReferenceOr::Item(self.schema(s)))
                     .collect(),
             },
         }
     }
 
-    fn expr_schema(&self, e: &ast::Expr) -> Schema {
+    fn schema(&self, e: &eval::Schema) -> Schema {
         match e {
-            ast::Expr::Prim(prim) => self.prim_schema(prim),
-            ast::Expr::Rel(rel) => self.rel_schema(rel),
-            ast::Expr::Uri(uri) => self.uri_schema(uri),
-            ast::Expr::Block(block) => self.block_schema(block),
-            ast::Expr::Array(array) => self.array_schema(array),
-            ast::Expr::Op(operation) => match operation.op {
-                ast::Operator::Join => self.join_schema(&operation.exprs),
-                ast::Operator::Sum => self.sum_schema(&operation.exprs),
-                ast::Operator::Any => self.any_schema(&operation.exprs),
+            eval::Schema::Prim(prim) => self.prim_schema(prim),
+            eval::Schema::Rel(rel) => self.rel_schema(rel),
+            eval::Schema::Uri(uri) => self.uri_schema(uri),
+            eval::Schema::Object(obj) => self.object_schema(obj),
+            eval::Schema::Array(array) => self.array_schema(array),
+            eval::Schema::Op(operation) => match operation.op {
+                ast::Operator::Join => self.join_schema(&operation.schemas),
+                ast::Operator::Sum => self.sum_schema(&operation.schemas),
+                ast::Operator::Any => self.any_schema(&operation.schemas),
             },
-            _ => panic!("unexpected type expression: {:?}", e),
         }
     }
 
-    fn prop_param(&self, prop: &ast::Prop) -> Parameter {
+    fn prop_param(&self, prop: &eval::Prop) -> Parameter {
         Parameter::Path {
             parameter_data: ParameterData {
-                name: prop.key.as_ref().into(),
+                name: prop.name.as_ref().into(),
                 description: None,
                 required: true,
                 deprecated: None,
                 format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(
-                    self.expr_schema(&prop.val.inner),
+                    self.schema(&prop.schema),
                 )),
                 example: None,
                 examples: Default::default(),
@@ -184,16 +178,17 @@ impl Builder {
         }
     }
 
-    fn uri_params(&self, uri: &ast::Uri) -> Vec<Parameter> {
-        uri.iter()
+    fn uri_params(&self, uri: &eval::Uri) -> Vec<Parameter> {
+        uri.spec
+            .iter()
             .flat_map(|s| match s {
-                ast::UriSegment::Variable(p) => Some(self.prop_param(p)),
+                eval::UriSegment::Variable(p) => Some(self.prop_param(p)),
                 _ => None,
             })
             .collect()
     }
 
-    fn path_item(&self, r: &eval::PathItem) -> PathItem {
+    fn relation_path_item(&self, r: &eval::Relation) -> PathItem {
         let parameters = self
             .uri_params(&r.uri)
             .into_iter()
@@ -210,7 +205,7 @@ impl Builder {
                 request_body: operation.domain.as_ref().map(|domain| {
                     ReferenceOr::Item(RequestBody {
                         content: indexmap! { self.media_type() => MediaType {
-                            schema: Some(ReferenceOr::Item(self.block_schema(&domain))),
+                            schema: Some(ReferenceOr::Item(self.schema(&domain))),
                             ..Default::default()
                         }},
                         ..Default::default()
@@ -219,7 +214,7 @@ impl Builder {
                 responses: Responses {
                     default: Some(ReferenceOr::Item(Response {
                         content: indexmap! { self.media_type() => MediaType {
-                            schema: Some(ReferenceOr::Item(self.block_schema(&operation.range))),
+                            schema: Some(ReferenceOr::Item(self.schema(&operation.range))),
                             ..Default::default()
                         }},
                         ..Default::default()
@@ -247,9 +242,14 @@ impl Builder {
         Paths {
             paths: self
                 .spec
-                .paths
+                .rels
                 .iter()
-                .map(|(pattern, item)| (pattern.clone(), ReferenceOr::Item(self.path_item(item))))
+                .map(|(pattern, rel)| {
+                    (
+                        pattern.clone(),
+                        ReferenceOr::Item(self.relation_path_item(rel)),
+                    )
+                })
                 .collect(),
             extensions: Default::default(),
         }

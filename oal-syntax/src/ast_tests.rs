@@ -4,15 +4,6 @@ use crate::ast::{
 use crate::parse;
 
 #[test]
-fn uri_pattern() {
-    let uri = Uri {
-        spec: vec![Default::default()],
-    };
-
-    assert_eq!(uri.pattern(), "/");
-}
-
-#[test]
 fn parse_variable_decl() {
     let d = parse("let a = num;".into()).expect("parsing failed");
 
@@ -64,7 +55,7 @@ fn parse_root_uri() {
     if let Stmt::Decl(decl) = s {
         if let Expr::Uri(uri) = &decl.expr.inner {
             assert_eq!(uri.spec.len(), 1);
-            assert_eq!(*uri.spec.first().unwrap(), UriSegment::default());
+            assert_eq!(*uri.spec.first().unwrap(), UriSegment::root());
         } else {
             panic!("expected uri expression");
         }
@@ -113,7 +104,7 @@ fn parse_relation() {
             assert_eq!(
                 rel.uri.inner,
                 Expr::Uri(Uri {
-                    spec: vec![Default::default()]
+                    spec: vec![UriSegment::root()]
                 })
             );
             assert_eq!(rel.methods, vec![Method::Put]);

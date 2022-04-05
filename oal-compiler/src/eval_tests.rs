@@ -1,6 +1,15 @@
+use crate::eval::{Object, Schema, Uri, UriSegment};
 use crate::evaluate;
-use oal_syntax::ast::{Block, Method, UriSegment};
-use oal_syntax::parse;
+use oal_syntax::{ast, parse};
+
+#[test]
+fn uri_pattern() {
+    let uri = Uri {
+        spec: vec![UriSegment::Literal("".into())],
+    };
+
+    assert_eq!(uri.pattern(), "/");
+}
 
 #[test]
 fn evaluate_simple() {
@@ -8,19 +17,19 @@ fn evaluate_simple() {
 
     let s = evaluate(doc).expect("evaluation failed");
 
-    assert_eq!(s.paths.len(), 1);
+    assert_eq!(s.rels.len(), 1);
 
-    let (i, p) = s.paths.iter().next().unwrap();
+    let (i, p) = s.rels.iter().next().unwrap();
 
     assert_eq!(i, "/");
     assert_eq!(p.uri.spec.len(), 1);
-    assert_eq!(*p.uri.spec.first().unwrap(), UriSegment::default());
+    assert_eq!(*p.uri.spec.first().unwrap(), UriSegment::Literal("".into()));
 
     assert_eq!(p.ops.len(), 1);
 
     let (m, o) = p.ops.iter().next().unwrap();
 
-    assert_eq!(*m, Method::Put);
-    assert_eq!(o.domain, Some(Block::default()));
-    assert_eq!(o.range, Block::default());
+    assert_eq!(*m, ast::Method::Put);
+    assert_eq!(o.domain, Some(Schema::Object(Object::default())));
+    assert_eq!(o.range, Schema::Object(Object::default()));
 }

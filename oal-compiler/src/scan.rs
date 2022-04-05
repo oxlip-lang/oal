@@ -1,6 +1,5 @@
 use crate::scope::Env;
 use oal_syntax::ast::*;
-use oal_syntax::try_each::TryEach;
 
 pub trait Scan {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
@@ -47,7 +46,10 @@ impl Scan for Doc {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        env.within(|env| self.try_each(|s| s.scan(acc, env, |a, v, e| f(a, v, e))))
+        env.within(|env| {
+            self.into_iter()
+                .try_for_each(|s| s.scan(acc, env, |a, v, e| f(a, v, e)))
+        })
     }
 }
 
@@ -56,7 +58,7 @@ impl Scan for Rel {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
@@ -65,7 +67,7 @@ impl Scan for Uri {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
@@ -74,7 +76,7 @@ impl Scan for Block {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
@@ -83,7 +85,7 @@ impl Scan for Array {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
@@ -92,7 +94,7 @@ impl Scan for VariadicOp {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
@@ -103,7 +105,8 @@ impl Scan for Lambda {
     {
         env.within(|env| {
             (&self.bindings)
-                .try_each(|binding| {
+                .into_iter()
+                .try_for_each(|binding| {
                     f(acc, env, binding).and_then(|_| {
                         if let Expr::Binding(name) = &binding.inner {
                             env.declare(name, binding);
@@ -123,7 +126,7 @@ impl Scan for Application {
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
-        self.try_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
