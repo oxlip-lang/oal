@@ -1,4 +1,3 @@
-use crate::try_each::TryEach;
 use crate::{Pair, Rule};
 use std::iter::{once, Once};
 use std::rc::Rc;
@@ -248,43 +247,31 @@ impl From<Pair<'_>> for Rel {
     }
 }
 
-impl<'a> TryEach for &'a Rel {
+impl<'a> IntoIterator for &'a Rel {
     type Item = &'a TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
-    fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a TypedExpr) -> Result<T, E>,
-    {
-        f(&self.range)
-            .map(|_| ())
-            .and_then(|_| f(&self.uri).map(|_| ()))
-            .and_then(|_| {
-                if let Some(d) = &self.domain {
-                    f(d.as_ref()).map(|_| ())
-                } else {
-                    Ok(())
-                }
-            })
+    fn into_iter(self) -> Self::IntoIter {
+        let it = once(self.range.as_ref()).chain(once(self.uri.as_ref()));
+        if let Some(domain) = &self.domain {
+            Box::new(it.chain(once(domain.as_ref())))
+        } else {
+            Box::new(it)
+        }
     }
 }
 
-impl<'a> TryEach for &'a mut Rel {
+impl<'a> IntoIterator for &'a mut Rel {
     type Item = &'a mut TypedExpr;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
-    fn try_each<F, T, E>(self, mut f: F) -> Result<(), E>
-    where
-        F: FnMut(&'a mut TypedExpr) -> Result<T, E>,
-    {
-        f(&mut self.range)
-            .map(|_| ())
-            .and_then(|_| f(&mut self.uri).map(|_| ()))
-            .and_then(|_| {
-                if let Some(d) = &mut self.domain {
-                    f(d.as_mut()).map(|_| ())
-                } else {
-                    Ok(())
-                }
-            })
+    fn into_iter(self) -> Self::IntoIter {
+        let it = once(self.range.as_mut()).chain(once(self.uri.as_mut()));
+        if let Some(domain) = &mut self.domain {
+            Box::new(it.chain(once(domain.as_mut())))
+        } else {
+            Box::new(it)
+        }
     }
 }
 
