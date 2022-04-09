@@ -112,7 +112,7 @@ impl TryFrom<&ast::Expr> for Schema {
             ast::Expr::Rel(rel) => rel.try_into().map(|r| Schema::Rel(r)),
             ast::Expr::Uri(uri) => uri.try_into().map(|u| Schema::Uri(u)),
             ast::Expr::Array(arr) => arr.try_into().map(|a| Schema::Array(a)),
-            ast::Expr::Block(blk) => blk.try_into().map(|o| Schema::Object(o)),
+            ast::Expr::Object(obj) => obj.try_into().map(|o| Schema::Object(o)),
             ast::Expr::Op(op) => op.try_into().map(|o| Schema::Op(o)),
             ast::Expr::Var(_) => Err(Error::new("unexpected variable expression").with_expr(e)),
             ast::Expr::Lambda(_) => Err(Error::new("unexpected lambda expression").with_expr(e)),
@@ -145,11 +145,11 @@ pub struct Object {
     pub props: Vec<Prop>,
 }
 
-impl TryFrom<&ast::Block> for Object {
+impl TryFrom<&ast::Object> for Object {
     type Error = Error;
 
-    fn try_from(b: &ast::Block) -> Result<Self> {
-        let props: Result<Vec<_>> = b.props.iter().map(|p| p.try_into()).collect();
+    fn try_from(o: &ast::Object) -> Result<Self> {
+        let props: Result<Vec<_>> = o.props.iter().map(|p| p.try_into()).collect();
         props.map(|props| Object { props })
     }
 }

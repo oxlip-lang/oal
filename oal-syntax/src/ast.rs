@@ -40,9 +40,9 @@ pub enum Expr {
     Rel(Rel),
     Uri(Uri),
     Array(Array),
-    Block(Block),
-    Var(Ident),
+    Object(Object),
     Op(VariadicOp),
+    Var(Ident),
     Lambda(Lambda),
     App(Application),
     Binding(Ident),
@@ -82,7 +82,7 @@ impl From<Pair<'_>> for TypedExpr {
             Rule::rel_type => Expr::Rel(p.into()).into(),
             Rule::uri_type => Expr::Uri(p.into()).into(),
             Rule::array_type => Expr::Array(p.into()).into(),
-            Rule::block_type => Expr::Block(p.into()).into(),
+            Rule::object_type => Expr::Object(p.into()).into(),
             Rule::var => Expr::Var(p.as_str().into()).into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
@@ -390,24 +390,24 @@ impl From<Pair<'_>> for Prop {
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct Block {
+pub struct Object {
     pub props: Vec<Prop>,
 }
 
-impl From<Pair<'_>> for Block {
+impl From<Pair<'_>> for Object {
     fn from(p: Pair) -> Self {
         let props = p.into_inner().map(|p| p.into()).collect();
-        Block { props }
+        Object { props }
     }
 }
 
-impl Block {
+impl Object {
     pub fn iter(&self) -> Iter<Prop> {
         self.props.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a Block {
+impl<'a> IntoIterator for &'a Object {
     type Item = &'a TypedExpr;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
@@ -416,7 +416,7 @@ impl<'a> IntoIterator for &'a Block {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Block {
+impl<'a> IntoIterator for &'a mut Object {
     type Item = &'a mut TypedExpr;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 

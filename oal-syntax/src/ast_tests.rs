@@ -109,11 +109,11 @@ fn parse_relation() {
             );
             assert_eq!(rel.methods, vec![Method::Put]);
             if let Some(domain) = &rel.domain {
-                assert_eq!(domain.inner, Expr::Block(Default::default()));
+                assert_eq!(domain.inner, Expr::Object(Default::default()));
             } else {
                 panic!("expected domain expression");
             }
-            assert_eq!(rel.range.inner, Expr::Block(Default::default()));
+            assert_eq!(rel.range.inner, Expr::Object(Default::default()));
         } else {
             panic!("expected relation expression");
         }

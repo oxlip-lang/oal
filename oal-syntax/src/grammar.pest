@@ -45,13 +45,13 @@ uri_type = { uri_kw | uri_tpl | uri_root }
 prim_type = { num_kw | str_kw | bool_kw  }
 
 prop = { ident ~ expr_type }
-block_type = { "{" ~ ( prop ~ ( "," ~ prop )* )? ~ "}" }
+object_type = { "{" ~ ( prop ~ ( "," ~ prop )* )? ~ "}" }
 
 array_type = { "[" ~ expr_type ~ "]" }
 
 paren_type = { "(" ~ expr_type ~ ")" }
 
-term_type = { prim_type | uri_type | array_type | block_type | paren_type | var }
+term_type = { prim_type | uri_type | array_type | object_type | paren_type | var }
 apply = { ident ~ term_type+ }
 app_type = { apply | term_type }
 

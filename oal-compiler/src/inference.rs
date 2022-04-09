@@ -35,7 +35,7 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
             e.tag = Some(Tag::Uri);
             Ok(())
         }
-        Expr::Block(_) => {
+        Expr::Object(_) => {
             e.tag = Some(Tag::Object);
             Ok(())
         }
@@ -229,7 +229,7 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
             c.push(e.unwrap_tag(), Tag::Uri);
             Ok(())
         }
-        Expr::Block(_) => {
+        Expr::Object(_) => {
             c.push(e.unwrap_tag(), Tag::Object);
             Ok(())
         }

@@ -71,7 +71,7 @@ impl Transform for Uri {
     }
 }
 
-impl Transform for Block {
+impl Transform for Object {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
@@ -138,7 +138,7 @@ impl Transform for Expr {
         match self {
             Expr::Rel(rel) => rel.transform(acc, env, f),
             Expr::Uri(uri) => uri.transform(acc, env, f),
-            Expr::Block(block) => block.transform(acc, env, f),
+            Expr::Object(obj) => obj.transform(acc, env, f),
             Expr::Array(array) => array.transform(acc, env, f),
             Expr::Op(operation) => operation.transform(acc, env, f),
             Expr::Lambda(lambda) => lambda.transform(acc, env, f),

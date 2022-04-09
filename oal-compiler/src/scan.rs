@@ -71,7 +71,7 @@ impl Scan for Uri {
     }
 }
 
-impl Scan for Block {
+impl Scan for Object {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
@@ -138,7 +138,7 @@ impl Scan for Expr {
         match self {
             Expr::Rel(rel) => rel.scan(acc, env, f),
             Expr::Uri(uri) => uri.scan(acc, env, f),
-            Expr::Block(block) => block.scan(acc, env, f),
+            Expr::Object(obj) => obj.scan(acc, env, f),
             Expr::Array(array) => array.scan(acc, env, f),
             Expr::Op(operation) => operation.scan(acc, env, f),
             Expr::Lambda(lambda) => lambda.scan(acc, env, f),
