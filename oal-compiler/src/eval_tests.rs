@@ -13,7 +13,7 @@ fn uri_pattern() {
 
 #[test]
 fn evaluate_simple() {
-    let doc = parse("res /:put:{} -> {};".to_owned()).expect("parsing failed");
+    let doc = parse("res / ( put : {} -> {} );".to_owned()).expect("parsing failed");
 
     let s = evaluate(doc).expect("evaluation failed");
 
@@ -25,11 +25,14 @@ fn evaluate_simple() {
     assert_eq!(p.uri.spec.len(), 1);
     assert_eq!(*p.uri.spec.first().unwrap(), UriSegment::Literal("".into()));
 
-    assert_eq!(p.ops.len(), 1);
-
-    let (m, o) = p.ops.iter().next().unwrap();
-
-    assert_eq!(*m, ast::Method::Put);
-    assert_eq!(o.domain, Some(Schema::Object(Object::default())));
-    assert_eq!(o.range, Schema::Object(Object::default()));
+    if let Some(x) = &p.xfers[ast::Method::Put] {
+        if let Some(d) = &x.domain {
+            assert_eq!(*d.as_ref(), Schema::Object(Object::default()));
+        } else {
+            panic!("expected domain");
+        }
+        assert_eq!(*x.range, Schema::Object(Object::default()));
+    } else {
+        panic!("expected transfer on HTTP PUT");
+    }
 }

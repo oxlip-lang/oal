@@ -18,7 +18,7 @@ compiled from the resources defined in the source program.
 let id1 = num;
 ```
 ```
-// Records
+// Objects
 let rec1 = {
   firstName str,
   lastName str,
@@ -35,18 +35,21 @@ let uri2 = uri;
 ```
 ```
 // Relations
-let rel1 = uri1:patch,put:rec1 -> rec1;
+let rel1 = uri1 (
+  patch, put : rec1 -> rec1,
+  get               -> rec1
+);
 ```
 ```
-// Joining records
+// Joining schemas (allOf)
 let rec2 = rec1 & { age num };
 ```
 ```
-// Typed alternative
+// Typed alternative (oneOf)
 let id2 = id1 | str;
 ```
 ```
-// Untyped alternative
+// Untyped alternative (anyOf)
 let any1 = id2 ~ rec2 ~ uri1;
 ```
 ```
@@ -60,7 +63,7 @@ let rec3 = f { height num } { stuff any1 };
 ```
 // Resources
 res rel1;
-res /something:get -> rec3;
+res /something ( get -> rec3 );
 ```
 ```
 /*
@@ -81,6 +84,23 @@ info:
   version: 0.1.0
 paths:
   "/some/path/{id}/template":
+    get:
+      responses:
+        default:
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  firstName:
+                    type: string
+                  lastName:
+                    type: string
+                  middleNames:
+                    type: array
+                    items:
+                      type: string
     put:
       requestBody:
         content:

@@ -4,6 +4,7 @@ use crate::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
+use enum_map::EnumMap;
 use oal_syntax::ast;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -155,15 +156,30 @@ impl TryFrom<&ast::Object> for Object {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Operation {
-    pub domain: Option<Schema>,
-    pub range: Schema,
+pub struct Transfer {
+    pub domain: Option<Box<Schema>>,
+    pub range: Box<Schema>,
 }
+
+impl TryFrom<&ast::Transfer> for Transfer {
+    type Error = Error;
+
+    fn try_from(xfer: &ast::Transfer) -> Result<Self> {
+        let range = (&xfer.range.inner).try_into().map(|r| Box::new(r))?;
+        let domain = match &xfer.domain {
+            Some(d) => (&d.inner).try_into().map(|d| Some(Box::new(d))),
+            None => Ok(None),
+        }?;
+        Ok(Transfer { range, domain })
+    }
+}
+
+pub type Transfers = EnumMap<ast::Method, Option<Transfer>>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Relation {
     pub uri: Uri,
-    pub ops: HashMap<ast::Method, Operation>,
+    pub xfers: Transfers,
 }
 
 impl TryFrom<&ast::Rel> for Relation {
@@ -171,14 +187,15 @@ impl TryFrom<&ast::Rel> for Relation {
 
     fn try_from(r: &ast::Rel) -> Result<Self> {
         let uri: Uri = (&r.uri.inner).try_into()?;
-        let range: Schema = (&r.range.inner).try_into()?;
-        let domain: Option<Schema> = match &r.domain {
-            Some(d) => (&d.inner).try_into().map(|d| Some(d)),
-            None => Ok(None),
-        }?;
-        let op = Operation { range, domain };
-        let ops = r.methods.iter().map(|m| (*m, op.clone())).collect();
-        Ok(Relation { uri, ops })
+        let xfers = r
+            .xfers
+            .iter()
+            .map(|(m, x)| match x.as_ref() {
+                Some(t) => t.try_into().map(|t| (m, Some(t))),
+                None => Ok((m, None)),
+            })
+            .collect::<Result<_>>()?;
+        Ok(Relation { uri, xfers })
     }
 }
 

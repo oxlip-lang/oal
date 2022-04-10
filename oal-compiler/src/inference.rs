@@ -214,9 +214,13 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
             Ok(())
         }
         Expr::Rel(rel) => {
-            c.push(rel.range.unwrap_tag(), Tag::Object);
-            if let Some(domain) = &rel.domain {
-                c.push(domain.unwrap_tag(), Tag::Object);
+            for xfer in rel.xfers.values() {
+                if let Some(x) = xfer.as_ref() {
+                    c.push(x.range.unwrap_tag(), Tag::Object);
+                    if let Some(domain) = &x.domain {
+                        c.push(domain.unwrap_tag(), Tag::Object);
+                    }
+                }
             }
             c.push(rel.uri.unwrap_tag(), Tag::Uri);
             c.push(e.unwrap_tag(), Tag::Relation);

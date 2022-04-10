@@ -1,4 +1,5 @@
 use crate::{Pair, Rule};
+use enum_map::{Enum, EnumMap};
 use std::iter::{once, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
@@ -182,7 +183,7 @@ impl From<Pair<'_>> for Stmt {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Enum)]
 pub enum Method {
     Get,
     Put,
@@ -209,11 +210,17 @@ impl From<Pair<'_>> for Method {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Rel {
-    pub uri: Box<TypedExpr>,
-    pub methods: Vec<Method>,
+pub struct Transfer {
     pub domain: Option<Box<TypedExpr>>,
     pub range: Box<TypedExpr>,
+}
+
+pub type Transfers = EnumMap<Method, Option<Transfer>>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Rel {
+    pub uri: Box<TypedExpr>,
+    pub xfers: Transfers,
 }
 
 impl From<Pair<'_>> for Rel {
@@ -222,28 +229,36 @@ impl From<Pair<'_>> for Rel {
 
         let uri: Box<_> = TypedExpr::from(inner.next().unwrap()).into();
 
-        let methods: Vec<_> = inner
-            .next()
-            .unwrap()
-            .into_inner()
-            .map(|p| p.into())
-            .collect();
+        let mut xfers: Transfers = EnumMap::default();
 
-        let domain = inner
-            .next()
-            .unwrap()
-            .into_inner()
-            .next()
-            .map(|p| Box::new(p.into()));
+        for xfer in inner {
+            let mut xfer = xfer.into_inner();
 
-        let range: Box<_> = TypedExpr::from(inner.next().unwrap()).into();
+            let methods: Vec<_> = xfer
+                .next()
+                .unwrap()
+                .into_inner()
+                .map(|p| p.into())
+                .collect();
 
-        Rel {
-            uri,
-            methods,
-            domain,
-            range,
+            let domain = xfer
+                .next()
+                .unwrap()
+                .into_inner()
+                .next()
+                .map(|p| Box::new(p.into()));
+
+            let range: Box<_> = TypedExpr::from(xfer.next().unwrap()).into();
+
+            for m in methods.iter() {
+                xfers[*m] = Some(Transfer {
+                    domain: domain.clone(),
+                    range: range.clone(),
+                })
+            }
         }
+
+        Rel { uri, xfers }
     }
 }
 
@@ -252,12 +267,20 @@ impl<'a> IntoIterator for &'a Rel {
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = once(self.range.as_ref()).chain(once(self.uri.as_ref()));
-        if let Some(domain) = &self.domain {
-            Box::new(it.chain(once(domain.as_ref())))
-        } else {
-            Box::new(it)
-        }
+        let it = once(self.uri.as_ref()).chain(
+            self.xfers
+                .values()
+                .flatten()
+                .flat_map(|xfer| {
+                    if let Some(domain) = &xfer.domain {
+                        [Some(xfer.range.as_ref()), Some(domain.as_ref())]
+                    } else {
+                        [Some(xfer.range.as_ref()), None]
+                    }
+                })
+                .flatten(),
+        );
+        Box::new(it)
     }
 }
 
@@ -266,12 +289,20 @@ impl<'a> IntoIterator for &'a mut Rel {
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = once(self.range.as_mut()).chain(once(self.uri.as_mut()));
-        if let Some(domain) = &mut self.domain {
-            Box::new(it.chain(once(domain.as_mut())))
-        } else {
-            Box::new(it)
-        }
+        let it = once(self.uri.as_mut()).chain(
+            self.xfers
+                .values_mut()
+                .flatten()
+                .flat_map(|xfer| {
+                    if let Some(domain) = &mut xfer.domain {
+                        [Some(xfer.range.as_mut()), Some(domain.as_mut())]
+                    } else {
+                        [Some(xfer.range.as_mut()), None]
+                    }
+                })
+                .flatten(),
+        );
+        Box::new(it)
     }
 }
 

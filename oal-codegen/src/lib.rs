@@ -144,8 +144,8 @@ impl Builder {
         }
     }
 
-    fn schema(&self, e: &eval::Schema) -> Schema {
-        match e {
+    fn schema(&self, s: &eval::Schema) -> Schema {
+        match s {
             eval::Schema::Prim(prim) => self.prim_schema(prim),
             eval::Schema::Rel(rel) => self.rel_schema(rel),
             eval::Schema::Uri(uri) => self.uri_schema(uri),
@@ -188,9 +188,9 @@ impl Builder {
             .collect()
     }
 
-    fn relation_path_item(&self, r: &eval::Relation) -> PathItem {
+    fn relation_path_item(&self, rel: &eval::Relation) -> PathItem {
         let parameters = self
-            .uri_params(&r.uri)
+            .uri_params(&rel.uri)
             .into_iter()
             .map(ReferenceOr::Item)
             .collect();
@@ -200,12 +200,17 @@ impl Builder {
             ..Default::default()
         };
 
-        for (method, operation) in r.ops.iter() {
+        let xfers = rel
+            .xfers
+            .iter()
+            .filter_map(|(m, x)| x.as_ref().map(|x| (m, x)));
+
+        for (method, xfer) in xfers {
             let op = Operation {
-                request_body: operation.domain.as_ref().map(|domain| {
+                request_body: xfer.domain.as_ref().map(|domain| {
                     ReferenceOr::Item(RequestBody {
                         content: indexmap! { self.media_type() => MediaType {
-                            schema: Some(ReferenceOr::Item(self.schema(&domain))),
+                            schema: Some(ReferenceOr::Item(self.schema(domain))),
                             ..Default::default()
                         }},
                         ..Default::default()
@@ -214,7 +219,7 @@ impl Builder {
                 responses: Responses {
                     default: Some(ReferenceOr::Item(Response {
                         content: indexmap! { self.media_type() => MediaType {
-                            schema: Some(ReferenceOr::Item(self.schema(&operation.range))),
+                            schema: Some(ReferenceOr::Item(self.schema(&xfer.range))),
                             ..Default::default()
                         }},
                         ..Default::default()

@@ -92,8 +92,36 @@ fn parse_template_uri() {
 }
 
 #[test]
-fn parse_relation() {
-    let d = parse("let a = /:put:{} -> {};".into()).expect("parsing failed");
+fn parse_composite_relation() {
+    let code = r#"
+        let a = / (
+            patch, put : {} -> {},
+            get             -> {}
+        );
+    "#;
+    let d = parse(code.into()).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Stmt::Decl(decl) = s {
+        if let Expr::Rel(rel) = &decl.expr.inner {
+            assert!(rel.xfers[Method::Get].is_some());
+            assert!(rel.xfers[Method::Patch].is_some());
+            assert!(rel.xfers[Method::Put].is_some());
+            assert_eq!(rel.xfers.values().filter(|x| x.is_some()).count(), 3);
+        } else {
+            panic!("expected relation expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_simple_relation() {
+    let d = parse("let a = / ( put : {} -> {} );".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -107,13 +135,16 @@ fn parse_relation() {
                     spec: vec![UriSegment::root()]
                 })
             );
-            assert_eq!(rel.methods, vec![Method::Put]);
-            if let Some(domain) = &rel.domain {
-                assert_eq!(domain.inner, Expr::Object(Default::default()));
+            if let Some(xfer) = &rel.xfers[Method::Put] {
+                if let Some(domain) = &xfer.domain {
+                    assert_eq!(domain.inner, Expr::Object(Default::default()));
+                } else {
+                    panic!("expected domain expression");
+                }
+                assert_eq!(xfer.range.inner, Expr::Object(Default::default()));
             } else {
-                panic!("expected domain expression");
+                panic!("expected transfer on HTTP PUT");
             }
-            assert_eq!(rel.range.inner, Expr::Object(Default::default()));
         } else {
             panic!("expected relation expression");
         }
