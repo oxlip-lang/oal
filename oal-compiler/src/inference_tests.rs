@@ -139,21 +139,21 @@ fn unify_lambda() {
         let f x y z = num;
         let a = f num {} uri;
     "#;
-    let mut doc = parse(code.into()).expect("parsing failed");
+    let mut prg = parse(code.into()).expect("parsing failed");
 
-    doc.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
         .expect("tagging failed");
 
     let cnt = &mut TypeConstraint::new();
 
-    doc.scan(cnt, &mut Env::new(), constrain)
+    prg.scan(cnt, &mut Env::new(), constrain)
         .expect("constraining failed");
 
     let subst = &mut cnt.unify().expect("unification failed");
 
-    doc.transform(subst, &mut Env::new(), substitute)
+    prg.transform(subst, &mut Env::new(), substitute)
         .expect("substitution failed");
 
-    doc.scan(&mut (), &mut Env::new(), check_tags)
+    prg.scan(&mut (), &mut Env::new(), check_tags)
         .expect("substitution incomplete");
 }

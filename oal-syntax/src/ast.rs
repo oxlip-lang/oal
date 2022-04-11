@@ -101,11 +101,11 @@ impl From<Pair<'_>> for TypedExpr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Doc {
+pub struct Program {
     pub stmts: Vec<Stmt>,
 }
 
-impl From<Pair<'_>> for Doc {
+impl From<Pair<'_>> for Program {
     fn from(p: Pair) -> Self {
         let stmts = p
             .into_inner()
@@ -114,11 +114,11 @@ impl From<Pair<'_>> for Doc {
                 _ => None,
             })
             .collect();
-        Doc { stmts }
+        Program { stmts }
     }
 }
 
-impl<'a> IntoIterator for &'a Doc {
+impl<'a> IntoIterator for &'a Program {
     type Item = &'a Stmt;
     type IntoIter = Iter<'a, Stmt>;
 
@@ -127,7 +127,7 @@ impl<'a> IntoIterator for &'a Doc {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Doc {
+impl<'a> IntoIterator for &'a mut Program {
     type Item = &'a mut Stmt;
     type IntoIter = IterMut<'a, Stmt>;
 

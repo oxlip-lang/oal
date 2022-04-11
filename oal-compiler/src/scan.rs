@@ -41,7 +41,7 @@ impl Scan for Stmt {
     }
 }
 
-impl Scan for Doc {
+impl Scan for Program {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,

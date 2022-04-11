@@ -77,7 +77,7 @@ res = { res_kw ~ expr_type }
 
 stmt = { decl | res }
 
-doc = { SOI ~ ( stmt ~ ";" )* ~ EOI }
+program = { SOI ~ ( stmt ~ ";" )* ~ EOI }
 
 block_comment = _{ "/*" ~ ( block_comment | !"*/" ~ ANY )* ~ "*/" }
 line_comment = _{ "//" ~ ( !NEWLINE ~ ANY )* }

@@ -15,9 +15,9 @@ fn main() {
 
     let input = std::fs::read_to_string(input_file).expect("reading failed");
 
-    let doc = parse(input).expect("parsing failed");
+    let prg = parse(input).expect("parsing failed");
 
-    let spec = evaluate(doc).expect("compilation failed");
+    let spec = evaluate(prg).expect("compilation failed");
 
     let api = Builder::new(spec).open_api();
 

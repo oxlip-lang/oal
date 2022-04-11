@@ -10,10 +10,10 @@ pub use self::parser::Rule;
 
 pub type Pair<'a> = pest::iterators::Pair<'a, Rule>;
 
-pub fn parse(input: String) -> errors::Result<ast::Doc> {
+pub fn parse(input: String) -> errors::Result<ast::Program> {
     use pest::Parser as PestParser;
 
-    let mut ast = Parser::parse(Rule::doc, &input)?;
+    let mut ast = Parser::parse(Rule::program, &input)?;
 
     Ok(ast.next().unwrap().into())
 }

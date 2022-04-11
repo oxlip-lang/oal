@@ -41,7 +41,7 @@ impl Transform for Stmt {
     }
 }
 
-impl Transform for Doc {
+impl Transform for Program {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,

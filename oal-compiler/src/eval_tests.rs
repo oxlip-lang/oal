@@ -13,9 +13,9 @@ fn uri_pattern() {
 
 #[test]
 fn evaluate_simple() {
-    let doc = parse("res / ( put : {} -> {} );".to_owned()).expect("parsing failed");
+    let prg = parse("res / ( put : {} -> {} );".to_owned()).expect("parsing failed");
 
-    let s = evaluate(doc).expect("evaluation failed");
+    let s = evaluate(prg).expect("evaluation failed");
 
     assert_eq!(s.rels.len(), 1);
 

@@ -30,28 +30,28 @@ fn compile_application() {
         let f x = x | num | g x;
         let a = f bool;
     "#;
-    let mut doc = parse(code.into()).expect("parsing failed");
+    let mut prg = parse(code.into()).expect("parsing failed");
 
-    doc.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
         .expect("tagging failed");
 
     let cnt = &mut TypeConstraint::new();
 
-    doc.scan(cnt, &mut Env::new(), constrain)
+    prg.scan(cnt, &mut Env::new(), constrain)
         .expect("constraining failed");
 
     let subst = &mut cnt.unify().expect("unification failed");
 
-    doc.transform(subst, &mut Env::new(), substitute)
+    prg.transform(subst, &mut Env::new(), substitute)
         .expect("substitution failed");
 
-    doc.transform(&mut (), &mut Env::new(), reduce)
+    prg.transform(&mut (), &mut Env::new(), reduce)
         .expect("compilation failed");
 
-    doc.scan(&mut (), &mut Env::new(), check_vars)
+    prg.scan(&mut (), &mut Env::new(), check_vars)
         .expect("compilation incomplete");
 
-    match doc.stmts.iter().nth(4).unwrap() {
+    match prg.stmts.iter().nth(4).unwrap() {
         Stmt::Decl(d) => {
             assert_eq!(d.name.as_ref(), "a");
             match &d.expr.inner {

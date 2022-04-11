@@ -218,13 +218,13 @@ pub struct Spec {
     pub rels: Relations,
 }
 
-impl TryFrom<&ast::Doc> for Spec {
+impl TryFrom<&ast::Program> for Spec {
     type Error = Error;
 
-    fn try_from(doc: &ast::Doc) -> Result<Self> {
+    fn try_from(prg: &ast::Program) -> Result<Self> {
         let mut rels: Relations = HashMap::new();
 
-        doc.stmts.iter().try_for_each(|stmt| match stmt {
+        prg.stmts.iter().try_for_each(|stmt| match stmt {
             ast::Stmt::Res(res) => Relation::try_from(&res.rel.inner).and_then(|rel| {
                 match rels.entry(rel.uri.pattern()) {
                     Entry::Vacant(v) => {
@@ -241,18 +241,18 @@ impl TryFrom<&ast::Doc> for Spec {
     }
 }
 
-pub fn evaluate(mut doc: ast::Doc) -> Result<Spec> {
-    doc.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)?;
+pub fn evaluate(mut prg: ast::Program) -> Result<Spec> {
+    prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)?;
 
     let constraint = &mut TypeConstraint::new();
 
-    doc.scan(constraint, &mut Env::new(), constrain)?;
+    prg.scan(constraint, &mut Env::new(), constrain)?;
 
     let subst = &mut constraint.unify()?;
 
-    doc.transform(subst, &mut Env::new(), substitute)?;
+    prg.transform(subst, &mut Env::new(), substitute)?;
 
-    doc.transform(&mut (), &mut Env::new(), reduce)?;
+    prg.transform(&mut (), &mut Env::new(), reduce)?;
 
-    Spec::try_from(&doc)
+    Spec::try_from(&prg)
 }
