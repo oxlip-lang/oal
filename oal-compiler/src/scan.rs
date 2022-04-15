@@ -37,6 +37,7 @@ impl Scan for Stmt {
         match self {
             Stmt::Decl(d) => d.scan(acc, env, f),
             Stmt::Res(r) => r.scan(acc, env, f),
+            Stmt::Ann(_) => Ok(()),
         }
     }
 }

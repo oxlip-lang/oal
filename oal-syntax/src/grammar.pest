@@ -71,16 +71,19 @@ expr_type = { rel_type | sum_type }
 binding = { ident }
 bindings = { binding* }
 hint = { ( ":" ~ type_kw )? }
-decl = { let_kw ~ ident ~ bindings ~ hint ~ "=" ~ expr_type }
+decl = { let_kw ~ ident ~ bindings ~ hint ~ "=" ~ expr_type ~ ";" }
 
-res = { res_kw ~ expr_type }
+res = { res_kw ~ expr_type ~ ";" }
 
-stmt = { decl | res }
+line = @{ ( !NEWLINE ~ ANY )* }
+ann = { "#" ~ line }
 
-program = { SOI ~ ( stmt ~ ";" )* ~ EOI }
+stmt = { ann | decl | res }
+
+program = { SOI ~ stmt* ~ EOI }
 
 block_comment = _{ "/*" ~ ( block_comment | !"*/" ~ ANY )* ~ "*/" }
-line_comment = _{ "//" ~ ( !NEWLINE ~ ANY )* }
+line_comment = _{ "//" ~ line }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 COMMENT = _{ line_comment | block_comment }

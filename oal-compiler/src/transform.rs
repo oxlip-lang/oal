@@ -37,6 +37,7 @@ impl Transform for Stmt {
         match self {
             Stmt::Decl(d) => d.transform(acc, env, f),
             Stmt::Res(r) => r.transform(acc, env, f),
+            Stmt::Ann(_) => Ok(()),
         }
     }
 }

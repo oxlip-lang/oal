@@ -148,9 +148,23 @@ pub struct Res {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Annotation {
+    pub ann: String,
+}
+
+impl From<Pair<'_>> for Annotation {
+    fn from(p: Pair) -> Self {
+        Annotation {
+            ann: p.as_str().into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Decl(Decl),
     Res(Res),
+    Ann(Annotation),
 }
 
 impl From<Pair<'_>> for Stmt {
@@ -178,6 +192,7 @@ impl From<Pair<'_>> for Stmt {
             Rule::res => Stmt::Res(Res {
                 rel: p.into_inner().nth(1).unwrap().into(),
             }),
+            Rule::ann => Stmt::Ann(p.into_inner().next().unwrap().into()),
             _ => unreachable!(),
         }
     }

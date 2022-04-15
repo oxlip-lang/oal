@@ -225,3 +225,17 @@ fn parse_lambda_decl() {
         panic!("expected declaration");
     }
 }
+
+#[test]
+fn parse_annotation() {
+    let code = r#"
+        # description: "some identifer", required: true
+        let id = num;
+        # description: "some record"
+        let r = {};
+        let a = /{ n id } ( put : r -> r );
+    "#;
+    let d = parse(code.into()).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 5);
+}
