@@ -70,7 +70,18 @@ impl<T> From<T> for Typed<T> {
     }
 }
 
-pub type TypedIdent = Typed<Ident>;
+impl<T> AsRef<T> for Typed<T> {
+    fn as_ref(&self) -> &T {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<T> for Typed<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
 pub type TypedExpr = Typed<Expr>;
 
 impl From<Pair<'_>> for TypedExpr {

@@ -34,7 +34,7 @@ fn parse_array() {
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        if let Expr::Array(array) = &decl.expr.inner {
+        if let Expr::Array(array) = decl.expr.as_ref() {
             assert_eq!(array.item.inner, Expr::Prim(Prim::Str));
         } else {
             panic!("expected array expression");
@@ -53,7 +53,7 @@ fn parse_root_uri() {
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        if let Expr::Uri(uri) = &decl.expr.inner {
+        if let Expr::Uri(uri) = decl.expr.as_ref() {
             assert_eq!(uri.spec.len(), 1);
             assert_eq!(*uri.spec.first().unwrap(), UriSegment::root());
         } else {
@@ -73,7 +73,7 @@ fn parse_template_uri() {
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        if let Expr::Uri(uri) = &decl.expr.inner {
+        if let Expr::Uri(uri) = decl.expr.as_ref() {
             assert_eq!(uri.spec.len(), 3);
             assert_eq!(*uri.spec.get(0).unwrap(), UriSegment::Literal("x".into()));
             assert_eq!(*uri.spec.get(2).unwrap(), UriSegment::Literal("z".into()));
@@ -106,7 +106,7 @@ fn parse_composite_relation() {
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        if let Expr::Rel(rel) = &decl.expr.inner {
+        if let Expr::Rel(rel) = decl.expr.as_ref() {
             assert!(rel.xfers[Method::Get].is_some());
             assert!(rel.xfers[Method::Patch].is_some());
             assert!(rel.xfers[Method::Put].is_some());
@@ -128,7 +128,7 @@ fn parse_simple_relation() {
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        if let Expr::Rel(rel) = &decl.expr.inner {
+        if let Expr::Rel(rel) = decl.expr.as_ref() {
             assert_eq!(
                 rel.uri.inner,
                 Expr::Uri(Uri {
@@ -165,7 +165,7 @@ fn parse_any_type() {
         if let Expr::Op(VariadicOp {
             op: Operator::Any,
             exprs,
-        }) = &decl.expr.inner
+        }) = decl.expr.as_ref()
         {
             assert_eq!(exprs.len(), 3);
         } else {
@@ -185,7 +185,7 @@ fn parse_application() {
     let s = d.stmts.first().unwrap();
 
     if let Stmt::Decl(decl) = s {
-        if let Expr::App(Application { name, args }) = &decl.expr.inner {
+        if let Expr::App(Application { name, args }) = decl.expr.as_ref() {
             assert_eq!(name.as_ref(), "f");
             assert_eq!(args.len(), 3);
         } else {
@@ -207,11 +207,11 @@ fn parse_lambda_decl() {
         if let Expr::Lambda(Lambda {
             body,
             bindings: args,
-        }) = &decl.expr.inner
+        }) = decl.expr.as_ref()
         {
             let bindings: Vec<_> = args
                 .iter()
-                .filter_map(|a| match &a.inner {
+                .filter_map(|a| match a.as_ref() {
                     Expr::Binding(b) => Some(b.as_ref()),
                     _ => None,
                 })

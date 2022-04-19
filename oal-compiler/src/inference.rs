@@ -21,8 +21,8 @@ impl TagSeq {
 }
 
 pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.inner.transform(seq, env, tag_type)?;
-    match &mut e.inner {
+    e.as_mut().transform(seq, env, tag_type)?;
+    match e.as_mut() {
         Expr::Prim(_) => {
             e.tag = Some(Tag::Primitive);
             Ok(())
@@ -52,7 +52,7 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
             Ok(())
         }
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
+            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
             Some(val) => {
                 e.tag = val.tag.clone();
                 Ok(())
@@ -63,13 +63,13 @@ pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()
             Ok(())
         }
         Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
+            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
             Some(val) => {
-                if let Expr::Lambda(l) = &val.inner {
+                if let Expr::Lambda(l) = val.as_ref() {
                     e.tag = l.body.tag.clone();
                     Ok(())
                 } else {
-                    Err(Error::new("identifier not a function").with_expr(&e.inner))
+                    Err(Error::new("identifier not a function").with_expr(e.as_ref()))
                 }
             }
         },
@@ -107,7 +107,7 @@ impl Subst {
 
 pub fn substitute(subst: &mut Subst, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
     e.tag = Some(subst.substitute(e.tag.as_ref().unwrap()));
-    e.inner.transform(subst, env, substitute)
+    e.as_mut().transform(subst, env, substitute)
 }
 
 fn occurs(a: &Tag, b: &Tag) -> bool {
@@ -207,8 +207,8 @@ impl TypeConstraint {
 }
 
 pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
-    e.inner.scan(c, env, constrain)?;
-    match &e.inner {
+    e.as_ref().scan(c, env, constrain)?;
+    match e.as_ref() {
         Expr::Prim(_) => {
             c.push(e.unwrap_tag(), Tag::Primitive);
             Ok(())
@@ -269,7 +269,7 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
         }
         Expr::App(application) => match env.lookup(&application.name) {
             None => Err(Error::new("identifier not in scope")
-                .with_expr(&e.inner)
+                .with_expr(e.as_ref())
                 .with_tag(&e.tag)),
             Some(val) => {
                 let bindings = application

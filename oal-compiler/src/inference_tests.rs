@@ -56,7 +56,7 @@ fn tag_lambda_decl() {
     if let Stmt::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "f");
         assert_eq!(decl.expr.tag, Some(Tag::Var(3)));
-        if let Expr::Lambda(Lambda { bindings, .. }) = &decl.expr.inner {
+        if let Expr::Lambda(Lambda { bindings, .. }) = decl.expr.as_ref() {
             let tags: Vec<_> = bindings
                 .iter()
                 .filter_map(|a| match a.tag {
@@ -123,11 +123,11 @@ fn unify_simple() {
 }
 
 fn check_tags(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
-    e.inner.scan(acc, env, check_tags)?;
+    e.as_ref().scan(acc, env, check_tags)?;
     match e.tag {
-        None => Err(Error::new("missing tag").with_expr(&e.inner)),
+        None => Err(Error::new("missing tag").with_expr(e.as_ref())),
         Some(Tag::Var(_)) => Err(Error::new("remaining tag variable")
-            .with_expr(&e.inner)
+            .with_expr(e.as_ref())
             .with_tag(&e.tag)),
         Some(_) => Ok(()),
     }

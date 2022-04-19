@@ -109,7 +109,7 @@ impl Transform for Lambda {
                 .into_iter()
                 .try_for_each(|binding| {
                     f(acc, env, binding).and_then(|_| {
-                        if let Expr::Binding(name) = &binding.inner {
+                        if let Expr::Binding(name) = binding.as_ref() {
                             env.declare(name, binding);
                             Ok(())
                         } else {

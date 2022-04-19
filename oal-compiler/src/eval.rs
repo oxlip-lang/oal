@@ -72,8 +72,7 @@ impl TryFrom<&ast::Array> for Array {
     type Error = Error;
 
     fn try_from(a: &ast::Array) -> Result<Self> {
-        let item = &a.item.inner;
-        item.try_into().map(|item| Array {
+        a.item.as_ref().as_ref().try_into().map(|item| Array {
             item: Box::new(item),
         })
     }
@@ -89,7 +88,7 @@ impl TryFrom<&ast::VariadicOp> for VariadicOp {
     type Error = Error;
 
     fn try_from(op: &ast::VariadicOp) -> Result<Self> {
-        let schemas: Result<Vec<_>> = op.exprs.iter().map(|e| (&e.inner).try_into()).collect();
+        let schemas: Result<Vec<_>> = op.exprs.iter().map(|e| e.as_ref().try_into()).collect();
         schemas.map(|schemas| VariadicOp { op: op.op, schemas })
     }
 }
@@ -133,8 +132,7 @@ impl TryFrom<&ast::Prop> for Prop {
     type Error = Error;
 
     fn try_from(p: &ast::Prop) -> Result<Self> {
-        let val = &p.val.inner;
-        val.try_into().map(|s| Prop {
+        p.val.as_ref().try_into().map(|s| Prop {
             name: p.key.clone(),
             schema: s,
         })
@@ -165,9 +163,14 @@ impl TryFrom<&ast::Transfer> for Transfer {
     type Error = Error;
 
     fn try_from(xfer: &ast::Transfer) -> Result<Self> {
-        let range = (&xfer.range.inner).try_into().map(|r| Box::new(r))?;
+        let range = xfer
+            .range
+            .as_ref()
+            .as_ref()
+            .try_into()
+            .map(|r| Box::new(r))?;
         let domain = match &xfer.domain {
-            Some(d) => (&d.inner).try_into().map(|d| Some(Box::new(d))),
+            Some(d) => d.as_ref().as_ref().try_into().map(|d| Some(Box::new(d))),
             None => Ok(None),
         }?;
         Ok(Transfer { range, domain })
@@ -186,7 +189,7 @@ impl TryFrom<&ast::Rel> for Relation {
     type Error = Error;
 
     fn try_from(r: &ast::Rel) -> Result<Self> {
-        let uri: Uri = (&r.uri.inner).try_into()?;
+        let uri: Uri = r.uri.as_ref().as_ref().try_into()?;
         let xfers = r
             .xfers
             .iter()
@@ -225,15 +228,16 @@ impl TryFrom<&ast::Program> for Spec {
         let mut rels: Relations = HashMap::new();
 
         prg.stmts.iter().try_for_each(|stmt| match stmt {
-            ast::Stmt::Res(res) => Relation::try_from(&res.rel.inner).and_then(|rel| {
-                match rels.entry(rel.uri.pattern()) {
+            ast::Stmt::Res(res) => {
+                let rel = Relation::try_from(res.rel.as_ref());
+                rel.and_then(|rel| match rels.entry(rel.uri.pattern()) {
                     Entry::Vacant(v) => {
                         v.insert(rel);
                         Ok(())
                     }
                     Entry::Occupied(_) => Err(Error::new("relation conflict")),
-                }
-            }),
+                })
+            }
             _ => Ok(()),
         })?;
 

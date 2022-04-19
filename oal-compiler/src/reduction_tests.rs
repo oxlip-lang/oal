@@ -8,13 +8,13 @@ use oal_syntax::ast::{Expr, Operator, Prim, Stmt, TypedExpr};
 use oal_syntax::parse;
 
 fn check_vars(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
-    e.inner.scan(acc, env, check_vars)?;
-    match &e.inner {
+    e.as_ref().scan(acc, env, check_vars)?;
+    match e.as_ref() {
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope").with_expr(&e.inner)),
-            Some(val) => match val.inner {
+            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
+            Some(val) => match val.as_ref() {
                 Expr::Binding(_) => Ok(()),
-                _ => Err(Error::new("remaining free variable").with_expr(&e.inner)),
+                _ => Err(Error::new("remaining free variable").with_expr(e.as_ref())),
             },
         },
         _ => Ok(()),
@@ -54,7 +54,7 @@ fn compile_application() {
     match prg.stmts.iter().nth(4).unwrap() {
         Stmt::Decl(d) => {
             assert_eq!(d.name.as_ref(), "a");
-            match &d.expr.inner {
+            match d.expr.as_ref() {
                 Expr::Op(o) => {
                     assert_eq!(o.op, Operator::Sum);
                     let mut i = o.exprs.iter();
