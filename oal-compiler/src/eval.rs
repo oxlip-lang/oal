@@ -95,7 +95,7 @@ impl TryFrom<&ast::VariadicOp> for VariadicOp {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Schema {
-    Prim(ast::Prim),
+    Prim(ast::Primitive),
     Rel(Relation),
     Uri(Uri),
     Array(Array),
@@ -128,10 +128,10 @@ pub struct Prop {
     pub schema: Schema,
 }
 
-impl TryFrom<&ast::Prop> for Prop {
+impl TryFrom<&ast::Property> for Prop {
     type Error = Error;
 
-    fn try_from(p: &ast::Prop) -> Result<Self> {
+    fn try_from(p: &ast::Property) -> Result<Self> {
         p.val.as_ref().try_into().map(|s| Prop {
             name: p.key.clone(),
             schema: s,
@@ -185,10 +185,10 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
-impl TryFrom<&ast::Rel> for Relation {
+impl TryFrom<&ast::Relation> for Relation {
     type Error = Error;
 
-    fn try_from(r: &ast::Rel) -> Result<Self> {
+    fn try_from(r: &ast::Relation) -> Result<Self> {
         let uri: Uri = r.uri.as_ref().as_ref().try_into()?;
         let xfers = r
             .xfers
@@ -228,7 +228,7 @@ impl TryFrom<&ast::Program> for Spec {
         let mut rels: Relations = HashMap::new();
 
         prg.stmts.iter().try_for_each(|stmt| match stmt {
-            ast::Stmt::Res(res) => {
+            ast::Statement::Res(res) => {
                 let rel = Relation::try_from(res.rel.as_ref());
                 rel.and_then(|rel| match rels.entry(rel.uri.pattern()) {
                     Entry::Vacant(v) => {

@@ -9,7 +9,7 @@ pub trait Transform {
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>;
 }
 
-impl Transform for Decl {
+impl Transform for Declaration {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
@@ -20,7 +20,7 @@ impl Transform for Decl {
     }
 }
 
-impl Transform for Res {
+impl Transform for Resource {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
@@ -29,15 +29,15 @@ impl Transform for Res {
     }
 }
 
-impl Transform for Stmt {
+impl Transform for Statement {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
     {
         match self {
-            Stmt::Decl(d) => d.transform(acc, env, f),
-            Stmt::Res(r) => r.transform(acc, env, f),
-            Stmt::Ann(_) => Ok(()),
+            Statement::Decl(d) => d.transform(acc, env, f),
+            Statement::Res(r) => r.transform(acc, env, f),
+            Statement::Ann(_) => Ok(()),
         }
     }
 }
@@ -54,7 +54,7 @@ impl Transform for Program {
     }
 }
 
-impl Transform for Rel {
+impl Transform for Relation {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,

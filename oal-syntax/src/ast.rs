@@ -37,8 +37,8 @@ impl Tag {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    Prim(Prim),
-    Rel(Rel),
+    Prim(Primitive),
+    Rel(Relation),
     Uri(Uri),
     Array(Array),
     Object(Object),
@@ -113,7 +113,7 @@ impl From<Pair<'_>> for TypedExpr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program {
-    pub stmts: Vec<Stmt>,
+    pub stmts: Vec<Statement>,
 }
 
 impl From<Pair<'_>> for Program {
@@ -130,8 +130,8 @@ impl From<Pair<'_>> for Program {
 }
 
 impl<'a> IntoIterator for &'a Program {
-    type Item = &'a Stmt;
-    type IntoIter = Iter<'a, Stmt>;
+    type Item = &'a Statement;
+    type IntoIter = Iter<'a, Statement>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.stmts.iter()
@@ -139,8 +139,8 @@ impl<'a> IntoIterator for &'a Program {
 }
 
 impl<'a> IntoIterator for &'a mut Program {
-    type Item = &'a mut Stmt;
-    type IntoIter = IterMut<'a, Stmt>;
+    type Item = &'a mut Statement;
+    type IntoIter = IterMut<'a, Statement>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.stmts.iter_mut()
@@ -148,13 +148,13 @@ impl<'a> IntoIterator for &'a mut Program {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Decl {
+pub struct Declaration {
     pub name: Ident,
     pub expr: TypedExpr,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Res {
+pub struct Resource {
     pub rel: TypedExpr,
 }
 
@@ -172,13 +172,13 @@ impl From<Pair<'_>> for Annotation {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Stmt {
-    Decl(Decl),
-    Res(Res),
+pub enum Statement {
+    Decl(Declaration),
+    Res(Resource),
     Ann(Annotation),
 }
 
-impl From<Pair<'_>> for Stmt {
+impl From<Pair<'_>> for Statement {
     fn from(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         match p.as_rule() {
@@ -198,12 +198,12 @@ impl From<Pair<'_>> for Stmt {
                     })
                     .into()
                 };
-                Stmt::Decl(Decl { name, expr })
+                Statement::Decl(Declaration { name, expr })
             }
-            Rule::res => Stmt::Res(Res {
+            Rule::res => Statement::Res(Resource {
                 rel: p.into_inner().nth(1).unwrap().into(),
             }),
-            Rule::ann => Stmt::Ann(p.into_inner().next().unwrap().into()),
+            Rule::ann => Statement::Ann(p.into_inner().next().unwrap().into()),
             _ => unreachable!(),
         }
     }
@@ -244,12 +244,12 @@ pub struct Transfer {
 pub type Transfers = EnumMap<Method, Option<Transfer>>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Rel {
+pub struct Relation {
     pub uri: Box<TypedExpr>,
     pub xfers: Transfers,
 }
 
-impl From<Pair<'_>> for Rel {
+impl From<Pair<'_>> for Relation {
     fn from(p: Pair) -> Self {
         let mut inner = p.into_inner();
 
@@ -284,11 +284,11 @@ impl From<Pair<'_>> for Rel {
             }
         }
 
-        Rel { uri, xfers }
+        Relation { uri, xfers }
     }
 }
 
-impl<'a> IntoIterator for &'a Rel {
+impl<'a> IntoIterator for &'a Relation {
     type Item = &'a TypedExpr;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
@@ -310,7 +310,7 @@ impl<'a> IntoIterator for &'a Rel {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Rel {
+impl<'a> IntoIterator for &'a mut Relation {
     type Item = &'a mut TypedExpr;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
@@ -335,7 +335,7 @@ impl<'a> IntoIterator for &'a mut Rel {
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(Literal),
-    Variable(Prop),
+    Variable(Property),
 }
 
 impl UriSegment {
@@ -432,23 +432,23 @@ impl<'a> IntoIterator for &'a mut Array {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Prop {
+pub struct Property {
     pub key: Ident,
     pub val: TypedExpr,
 }
 
-impl From<Pair<'_>> for Prop {
+impl From<Pair<'_>> for Property {
     fn from(p: Pair) -> Self {
         let mut inner = p.into_inner();
         let key = inner.next().unwrap().as_str().into();
         let val = inner.next().unwrap().into();
-        Prop { key, val }
+        Property { key, val }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Object {
-    pub props: Vec<Prop>,
+    pub props: Vec<Property>,
 }
 
 impl From<Pair<'_>> for Object {
@@ -459,7 +459,7 @@ impl From<Pair<'_>> for Object {
 }
 
 impl Object {
-    pub fn iter(&self) -> Iter<Prop> {
+    pub fn iter(&self) -> Iter<Property> {
         self.props.iter()
     }
 }
@@ -533,18 +533,18 @@ impl<'a> IntoIterator for &'a mut VariadicOp {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Prim {
+pub enum Primitive {
     Num,
     Str,
     Bool,
 }
 
-impl From<Pair<'_>> for Prim {
+impl From<Pair<'_>> for Primitive {
     fn from(p: Pair) -> Self {
         match p.into_inner().next().unwrap().as_rule() {
-            Rule::num_kw => Prim::Num,
-            Rule::str_kw => Prim::Str,
-            Rule::bool_kw => Prim::Bool,
+            Rule::num_kw => Primitive::Num,
+            Rule::str_kw => Primitive::Str,
+            Rule::bool_kw => Primitive::Bool,
             _ => unreachable!(),
         }
     }

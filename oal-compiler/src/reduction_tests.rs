@@ -4,7 +4,7 @@ use crate::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, Operator, Prim, Stmt, TypedExpr};
+use oal_syntax::ast::{Expr, Operator, Primitive, Statement, TypedExpr};
 use oal_syntax::parse;
 
 fn check_vars(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
@@ -52,15 +52,15 @@ fn compile_application() {
         .expect("compilation incomplete");
 
     match prg.stmts.iter().nth(4).unwrap() {
-        Stmt::Decl(d) => {
+        Statement::Decl(d) => {
             assert_eq!(d.name.as_ref(), "a");
             match d.expr.as_ref() {
                 Expr::Op(o) => {
                     assert_eq!(o.op, Operator::Sum);
                     let mut i = o.exprs.iter();
-                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Prim::Bool));
-                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Prim::Num));
-                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Prim::Str));
+                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Primitive::Bool));
+                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Primitive::Num));
+                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Primitive::Str));
                 }
                 _ => panic!("expected operation"),
             }

@@ -37,15 +37,15 @@ impl Builder {
         uri.pattern()
     }
 
-    fn prim_type(&self, prim: &ast::Prim) -> Type {
+    fn prim_type(&self, prim: &ast::Primitive) -> Type {
         match prim {
-            ast::Prim::Num => Type::Number(Default::default()),
-            ast::Prim::Str => Type::String(Default::default()),
-            ast::Prim::Bool => Type::Boolean {},
+            ast::Primitive::Num => Type::Number(Default::default()),
+            ast::Primitive::Str => Type::String(Default::default()),
+            ast::Primitive::Bool => Type::Boolean {},
         }
     }
 
-    fn prim_schema(&self, prim: &ast::Prim) -> Schema {
+    fn prim_schema(&self, prim: &ast::Primitive) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(self.prim_type(prim)),

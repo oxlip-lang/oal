@@ -1,5 +1,6 @@
 use crate::ast::{
-    Application, Expr, Lambda, Method, Operator, Prim, Prop, Stmt, Uri, UriSegment, VariadicOp,
+    Application, Expr, Lambda, Method, Operator, Primitive, Property, Statement, Uri, UriSegment,
+    VariadicOp,
 };
 use crate::parse;
 
@@ -11,9 +12,9 @@ fn parse_variable_decl() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "a");
-        assert_eq!(decl.expr.inner, Expr::Prim(Prim::Num));
+        assert_eq!(decl.expr.inner, Expr::Prim(Primitive::Num));
     } else {
         panic!("expected declaration");
     }
@@ -33,9 +34,9 @@ fn parse_array() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::Array(array) = decl.expr.as_ref() {
-            assert_eq!(array.item.inner, Expr::Prim(Prim::Str));
+            assert_eq!(array.item.inner, Expr::Prim(Primitive::Str));
         } else {
             panic!("expected array expression");
         }
@@ -52,7 +53,7 @@ fn parse_root_uri() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::Uri(uri) = decl.expr.as_ref() {
             assert_eq!(uri.spec.len(), 1);
             assert_eq!(*uri.spec.first().unwrap(), UriSegment::root());
@@ -72,14 +73,14 @@ fn parse_template_uri() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::Uri(uri) = decl.expr.as_ref() {
             assert_eq!(uri.spec.len(), 3);
             assert_eq!(*uri.spec.get(0).unwrap(), UriSegment::Literal("x".into()));
             assert_eq!(*uri.spec.get(2).unwrap(), UriSegment::Literal("z".into()));
-            if let UriSegment::Variable(Prop { key, val }) = uri.spec.get(1).unwrap() {
+            if let UriSegment::Variable(Property { key, val }) = uri.spec.get(1).unwrap() {
                 assert_eq!(key.as_ref(), "y");
-                assert_eq!(val.inner, Expr::Prim(Prim::Str));
+                assert_eq!(val.inner, Expr::Prim(Primitive::Str));
             } else {
                 panic!("expected uri segment variable");
             }
@@ -105,7 +106,7 @@ fn parse_composite_relation() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::Rel(rel) = decl.expr.as_ref() {
             assert!(rel.xfers[Method::Get].is_some());
             assert!(rel.xfers[Method::Patch].is_some());
@@ -127,7 +128,7 @@ fn parse_simple_relation() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::Rel(rel) = decl.expr.as_ref() {
             assert_eq!(
                 rel.uri.inner,
@@ -161,7 +162,7 @@ fn parse_any_type() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::Op(VariadicOp {
             op: Operator::Any,
             exprs,
@@ -184,7 +185,7 @@ fn parse_application() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         if let Expr::App(Application { name, args }) = decl.expr.as_ref() {
             assert_eq!(name.as_ref(), "f");
             assert_eq!(args.len(), 3);
@@ -202,7 +203,7 @@ fn parse_lambda_decl() {
 
     let s = d.stmts.first().unwrap();
 
-    if let Stmt::Decl(decl) = s {
+    if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "f");
         if let Expr::Lambda(Lambda {
             body,
@@ -217,7 +218,7 @@ fn parse_lambda_decl() {
                 })
                 .collect();
             assert_eq!(bindings, vec!["x", "y", "z"]);
-            assert_eq!(body.inner, Expr::Prim(Prim::Num));
+            assert_eq!(body.inner, Expr::Prim(Primitive::Num));
         } else {
             panic!("expected lambda expression");
         }

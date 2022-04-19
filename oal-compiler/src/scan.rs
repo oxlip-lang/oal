@@ -9,7 +9,7 @@ pub trait Scan {
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>;
 }
 
-impl Scan for Decl {
+impl Scan for Declaration {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
@@ -20,7 +20,7 @@ impl Scan for Decl {
     }
 }
 
-impl Scan for Res {
+impl Scan for Resource {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
@@ -29,15 +29,15 @@ impl Scan for Res {
     }
 }
 
-impl Scan for Stmt {
+impl Scan for Statement {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
     {
         match self {
-            Stmt::Decl(d) => d.scan(acc, env, f),
-            Stmt::Res(r) => r.scan(acc, env, f),
-            Stmt::Ann(_) => Ok(()),
+            Statement::Decl(d) => d.scan(acc, env, f),
+            Statement::Res(r) => r.scan(acc, env, f),
+            Statement::Ann(_) => Ok(()),
         }
     }
 }
@@ -54,7 +54,7 @@ impl Scan for Program {
     }
 }
 
-impl Scan for Rel {
+impl Scan for Relation {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env, &TypedExpr) -> Result<(), E>,
