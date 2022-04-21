@@ -58,9 +58,9 @@ fn compile_application() {
                 Expr::Op(o) => {
                     assert_eq!(o.op, Operator::Sum);
                     let mut i = o.exprs.iter();
-                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Primitive::Bool));
-                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Primitive::Num));
-                    assert_eq!(i.next().unwrap().inner, Expr::Prim(Primitive::Str));
+                    assert_eq!(*i.next().unwrap().as_ref(), Expr::Prim(Primitive::Bool));
+                    assert_eq!(*i.next().unwrap().as_ref(), Expr::Prim(Primitive::Num));
+                    assert_eq!(*i.next().unwrap().as_ref(), Expr::Prim(Primitive::Str));
                 }
                 _ => panic!("expected operation"),
             }

@@ -14,7 +14,7 @@ fn parse_variable_decl() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "a");
-        assert_eq!(decl.expr.inner, Expr::Prim(Primitive::Num));
+        assert_eq!(*decl.expr.as_ref(), Expr::Prim(Primitive::Num));
     } else {
         panic!("expected declaration");
     }
@@ -36,7 +36,7 @@ fn parse_array() {
 
     if let Statement::Decl(decl) = s {
         if let Expr::Array(array) = decl.expr.as_ref() {
-            assert_eq!(array.item.inner, Expr::Prim(Primitive::Str));
+            assert_eq!(*array.item.as_ref().as_ref(), Expr::Prim(Primitive::Str));
         } else {
             panic!("expected array expression");
         }
@@ -80,7 +80,7 @@ fn parse_template_uri() {
             assert_eq!(*uri.spec.get(2).unwrap(), UriSegment::Literal("z".into()));
             if let UriSegment::Variable(Property { key, val }) = uri.spec.get(1).unwrap() {
                 assert_eq!(key.as_ref(), "y");
-                assert_eq!(val.inner, Expr::Prim(Primitive::Str));
+                assert_eq!(*val.as_ref(), Expr::Prim(Primitive::Str));
             } else {
                 panic!("expected uri segment variable");
             }
@@ -131,18 +131,21 @@ fn parse_simple_relation() {
     if let Statement::Decl(decl) = s {
         if let Expr::Rel(rel) = decl.expr.as_ref() {
             assert_eq!(
-                rel.uri.inner,
+                *rel.uri.as_ref().as_ref(),
                 Expr::Uri(Uri {
                     spec: vec![UriSegment::root()]
                 })
             );
             if let Some(xfer) = &rel.xfers[Method::Put] {
                 if let Some(domain) = &xfer.domain {
-                    assert_eq!(domain.inner, Expr::Object(Default::default()));
+                    assert_eq!(*domain.as_ref().as_ref(), Expr::Object(Default::default()));
                 } else {
                     panic!("expected domain expression");
                 }
-                assert_eq!(xfer.range.inner, Expr::Object(Default::default()));
+                assert_eq!(
+                    *xfer.range.as_ref().as_ref(),
+                    Expr::Object(Default::default())
+                );
             } else {
                 panic!("expected transfer on HTTP PUT");
             }
@@ -218,7 +221,7 @@ fn parse_lambda_decl() {
                 })
                 .collect();
             assert_eq!(bindings, vec!["x", "y", "z"]);
-            assert_eq!(body.inner, Expr::Prim(Primitive::Num));
+            assert_eq!(*body.as_ref().as_ref(), Expr::Prim(Primitive::Num));
         } else {
             panic!("expected lambda expression");
         }

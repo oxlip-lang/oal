@@ -3,7 +3,7 @@ use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, Lambda, Statement, Tag, TypedExpr};
+use oal_syntax::ast::{Expr, Lambda, Statement, Tag, Tagged, TypedExpr};
 use oal_syntax::parse;
 
 #[test]
@@ -16,7 +16,7 @@ fn tag_var_decl() {
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
-        if Some(Tag::Primitive) != decl.expr.tag {
+        if Some(Tag::Primitive) != *decl.expr.tag() {
             panic!("expected primitive type tag");
         }
     } else {
@@ -34,7 +34,7 @@ fn tag_array_decl() {
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
-        if Some(Tag::Array) != decl.expr.tag {
+        if Some(Tag::Array) != *decl.expr.tag() {
             panic!("expected array type tag");
         }
     } else {
@@ -55,12 +55,12 @@ fn tag_lambda_decl() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "f");
-        assert_eq!(decl.expr.tag, Some(Tag::Var(3)));
+        assert_eq!(*decl.expr.tag(), Some(Tag::Var(3)));
         if let Expr::Lambda(Lambda { bindings, .. }) = decl.expr.as_ref() {
             let tags: Vec<_> = bindings
                 .iter()
-                .filter_map(|a| match a.tag {
-                    Some(Tag::Var(n)) => Some(n),
+                .filter_map(|a| match a.tag() {
+                    Some(Tag::Var(n)) => Some(*n),
                     _ => None,
                 })
                 .collect();
@@ -124,11 +124,11 @@ fn unify_simple() {
 
 fn check_tags(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
     e.as_ref().scan(acc, env, check_tags)?;
-    match e.tag {
+    match e.tag() {
         None => Err(Error::new("missing tag").with_expr(e.as_ref())),
         Some(Tag::Var(_)) => Err(Error::new("remaining tag variable")
             .with_expr(e.as_ref())
-            .with_tag(&e.tag)),
+            .with_tag(e.tag())),
         Some(_) => Ok(()),
     }
 }

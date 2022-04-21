@@ -1,18 +1,12 @@
 use crate::scope::Env;
-use oal_syntax::ast::{Expr, Ident, Primitive, Tag, TypedExpr};
+use oal_syntax::ast::{Expr, Ident, Primitive, Tag, Tagged, TypedExpr};
 
 #[test]
 fn environment_scopes() {
     let mut e = Env::new();
     let id = Ident::from("a");
-    let bool_expr = TypedExpr {
-        tag: Some(Tag::Primitive),
-        inner: Expr::Prim(Primitive::Bool),
-    };
-    let num_expr = TypedExpr {
-        tag: Some(Tag::Primitive),
-        inner: Expr::Prim(Primitive::Num),
-    };
+    let bool_expr = TypedExpr::from(Expr::Prim(Primitive::Bool)).with_tag(Tag::Primitive);
+    let num_expr = TypedExpr::from(Expr::Prim(Primitive::Num)).with_tag(Tag::Primitive);
 
     assert!(!e.exists(&id));
 

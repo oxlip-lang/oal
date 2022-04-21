@@ -2,7 +2,7 @@ use crate::errors::{Error, Result};
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, FuncTag, Operator, Tag, TypedExpr};
+use oal_syntax::ast::{Expr, FuncTag, Operator, Tag, Tagged, TypedExpr};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -22,51 +22,52 @@ impl TagSeq {
 
 pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
     e.as_mut().transform(seq, env, tag_type)?;
-    match e.as_mut() {
+    match e.as_ref() {
         Expr::Prim(_) => {
-            e.tag = Some(Tag::Primitive);
+            e.set_tag(Tag::Primitive);
             Ok(())
         }
         Expr::Rel(_) => {
-            e.tag = Some(Tag::Relation);
+            e.set_tag(Tag::Relation);
             Ok(())
         }
         Expr::Uri(_) => {
-            e.tag = Some(Tag::Uri);
+            e.set_tag(Tag::Uri);
             Ok(())
         }
         Expr::Object(_) => {
-            e.tag = Some(Tag::Object);
+            e.set_tag(Tag::Object);
             Ok(())
         }
         Expr::Array(_) => {
-            e.tag = Some(Tag::Array);
+            e.set_tag(Tag::Array);
             Ok(())
         }
         Expr::Op(operation) => {
-            e.tag = Some(match operation.op {
+            let tag = match operation.op {
                 Operator::Join => Tag::Object,
                 Operator::Any => Tag::Any,
                 Operator::Sum => Tag::Var(seq.next()),
-            });
+            };
+            e.set_tag(tag);
             Ok(())
         }
         Expr::Var(var) => match env.lookup(var) {
             None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
             Some(val) => {
-                e.tag = val.tag.clone();
+                e.set_tag(val.unwrap_tag());
                 Ok(())
             }
         },
         Expr::Lambda(_) | Expr::Binding(_) => {
-            e.tag = Some(Tag::Var(seq.next()));
+            e.set_tag(Tag::Var(seq.next()));
             Ok(())
         }
         Expr::App(application) => match env.lookup(&application.name) {
             None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
             Some(val) => {
                 if let Expr::Lambda(l) = val.as_ref() {
-                    e.tag = l.body.tag.clone();
+                    e.set_tag(l.body.unwrap_tag());
                     Ok(())
                 } else {
                     Err(Error::new("identifier not a function").with_expr(e.as_ref()))
@@ -106,7 +107,7 @@ impl Subst {
 }
 
 pub fn substitute(subst: &mut Subst, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.tag = Some(subst.substitute(e.tag.as_ref().unwrap()));
+    e.set_tag(subst.substitute(e.tag().as_ref().unwrap()));
     e.as_mut().transform(subst, env, substitute)
 }
 
@@ -270,7 +271,7 @@ pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result
         Expr::App(application) => match env.lookup(&application.name) {
             None => Err(Error::new("identifier not in scope")
                 .with_expr(e.as_ref())
-                .with_tag(&e.tag)),
+                .with_tag(e.tag())),
             Some(val) => {
                 let bindings = application
                     .args

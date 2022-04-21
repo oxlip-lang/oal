@@ -35,6 +35,13 @@ impl Tag {
     }
 }
 
+pub trait Tagged {
+    fn tag(&self) -> &Option<Tag>;
+    fn set_tag(&mut self, t: Tag);
+    fn unwrap_tag(&self) -> Tag;
+    fn with_tag(self, t: Tag) -> Self;
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Prim(Primitive),
@@ -50,39 +57,50 @@ pub enum Expr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Typed<T> {
-    pub tag: Option<Tag>,
-    pub inner: T,
+pub struct TypedExpr {
+    tag: Option<Tag>,
+    inner: Expr,
 }
 
-impl<T> Typed<T> {
-    pub fn unwrap_tag(&self) -> Tag {
+impl Tagged for TypedExpr {
+    fn tag(&self) -> &Option<Tag> {
+        &self.tag
+    }
+
+    fn set_tag(&mut self, t: Tag) {
+        self.tag = Some(t)
+    }
+
+    fn unwrap_tag(&self) -> Tag {
         self.tag.as_ref().unwrap().clone()
+    }
+
+    fn with_tag(mut self, t: Tag) -> Self {
+        self.set_tag(t);
+        self
     }
 }
 
-impl<T> From<T> for Typed<T> {
-    fn from(e: T) -> Self {
-        Typed {
+impl From<Expr> for TypedExpr {
+    fn from(e: Expr) -> Self {
+        TypedExpr {
             tag: None,
             inner: e,
         }
     }
 }
 
-impl<T> AsRef<T> for Typed<T> {
-    fn as_ref(&self) -> &T {
+impl AsRef<Expr> for TypedExpr {
+    fn as_ref(&self) -> &Expr {
         &self.inner
     }
 }
 
-impl<T> AsMut<T> for Typed<T> {
-    fn as_mut(&mut self) -> &mut T {
+impl AsMut<Expr> for TypedExpr {
+    fn as_mut(&mut self) -> &mut Expr {
         &mut self.inner
     }
 }
-
-pub type TypedExpr = Typed<Expr>;
 
 impl From<Pair<'_>> for TypedExpr {
     fn from(p: Pair<'_>) -> Self {
@@ -98,9 +116,9 @@ impl From<Pair<'_>> for TypedExpr {
             Rule::var => Expr::Var(p.as_str().into()).into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
-                let op = VariadicOp::from(p);
+                let mut op = VariadicOp::from(p);
                 if op.exprs.len() == 1 {
-                    op.exprs.first().unwrap().clone()
+                    op.exprs.remove(0)
                 } else {
                     Expr::Op(op).into()
                 }
