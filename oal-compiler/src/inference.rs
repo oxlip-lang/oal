@@ -107,7 +107,7 @@ impl Subst {
 }
 
 pub fn substitute(subst: &mut Subst, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
-    e.set_tag(subst.substitute(e.tag().as_ref().unwrap()));
+    e.set_tag(subst.substitute(e.tag().unwrap()));
     e.as_mut().transform(subst, env, substitute)
 }
 

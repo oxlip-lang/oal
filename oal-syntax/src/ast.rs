@@ -36,7 +36,7 @@ impl Tag {
 }
 
 pub trait Tagged {
-    fn tag(&self) -> &Option<Tag>;
+    fn tag(&self) -> Option<&Tag>;
     fn set_tag(&mut self, t: Tag);
     fn unwrap_tag(&self) -> Tag;
     fn with_tag(self, t: Tag) -> Self;
@@ -63,8 +63,8 @@ pub struct TypedExpr {
 }
 
 impl Tagged for TypedExpr {
-    fn tag(&self) -> &Option<Tag> {
-        &self.tag
+    fn tag(&self) -> Option<&Tag> {
+        self.tag.as_ref()
     }
 
     fn set_tag(&mut self, t: Tag) {

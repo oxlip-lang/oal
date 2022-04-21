@@ -16,9 +16,7 @@ fn tag_var_decl() {
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
-        if Some(Tag::Primitive) != *decl.expr.tag() {
-            panic!("expected primitive type tag");
-        }
+        assert_eq!(decl.expr.unwrap_tag(), Tag::Primitive);
     } else {
         panic!("expected declaration");
     }
@@ -34,9 +32,7 @@ fn tag_array_decl() {
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
-        if Some(Tag::Array) != *decl.expr.tag() {
-            panic!("expected array type tag");
-        }
+        assert_eq!(decl.expr.unwrap_tag(), Tag::Array);
     } else {
         panic!("expected declaration");
     }
@@ -55,7 +51,7 @@ fn tag_lambda_decl() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "f");
-        assert_eq!(*decl.expr.tag(), Some(Tag::Var(3)));
+        assert_eq!(decl.expr.unwrap_tag(), Tag::Var(3));
         if let Expr::Lambda(Lambda { bindings, .. }) = decl.expr.as_ref() {
             let tags: Vec<_> = bindings
                 .iter()

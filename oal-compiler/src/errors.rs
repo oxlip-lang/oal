@@ -22,8 +22,8 @@ impl Error {
         self
     }
 
-    pub fn with_tag(mut self, t: &Option<Tag>) -> Self {
-        self.tag = t.clone();
+    pub fn with_tag(mut self, t: Option<&Tag>) -> Self {
+        self.tag = t.cloned();
         self
     }
 
