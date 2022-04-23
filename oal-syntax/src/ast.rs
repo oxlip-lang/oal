@@ -171,9 +171,37 @@ pub struct Declaration {
     pub expr: TypedExpr,
 }
 
+impl From<Pair<'_>> for Declaration {
+    fn from(p: Pair) -> Self {
+        let mut p = p.into_inner();
+        let name = p.nth(1).unwrap().as_str().into();
+        let bindings: Vec<TypedExpr> = p.next().unwrap().into_inner().map(|p| p.into()).collect();
+        let _hint = p.next().unwrap();
+        let expr = p.next().unwrap().into();
+        let expr = if bindings.is_empty() {
+            expr
+        } else {
+            Expr::Lambda(Lambda {
+                bindings,
+                body: Box::new(expr),
+            })
+            .into()
+        };
+        Declaration { name, expr }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Resource {
     pub rel: TypedExpr,
+}
+
+impl From<Pair<'_>> for Resource {
+    fn from(p: Pair) -> Self {
+        Resource {
+            rel: p.into_inner().nth(1).unwrap().into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -184,7 +212,7 @@ pub struct Annotation {
 impl From<Pair<'_>> for Annotation {
     fn from(p: Pair) -> Self {
         Annotation {
-            ann: p.as_str().into(),
+            ann: p.into_inner().next().unwrap().as_str().to_owned(),
         }
     }
 }
@@ -200,28 +228,9 @@ impl From<Pair<'_>> for Statement {
     fn from(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         match p.as_rule() {
-            Rule::decl => {
-                let mut p = p.into_inner();
-                let name = p.nth(1).unwrap().as_str().into();
-                let bindings: Vec<TypedExpr> =
-                    p.next().unwrap().into_inner().map(|p| p.into()).collect();
-                let _hint = p.next().unwrap();
-                let expr = p.next().unwrap().into();
-                let expr = if bindings.is_empty() {
-                    expr
-                } else {
-                    Expr::Lambda(Lambda {
-                        bindings,
-                        body: Box::new(expr),
-                    })
-                    .into()
-                };
-                Statement::Decl(Declaration { name, expr })
-            }
-            Rule::res => Statement::Res(Resource {
-                rel: p.into_inner().nth(1).unwrap().into(),
-            }),
-            Rule::ann => Statement::Ann(p.into_inner().next().unwrap().into()),
+            Rule::decl => Statement::Decl(p.into()),
+            Rule::res => Statement::Res(p.into()),
+            Rule::ann => Statement::Ann(p.into()),
             _ => unreachable!(),
         }
     }
