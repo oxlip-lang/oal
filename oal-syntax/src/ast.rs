@@ -102,28 +102,45 @@ impl AsMut<Expr> for TypedExpr {
     }
 }
 
-impl From<Pair<'_>> for TypedExpr {
-    fn from(p: Pair<'_>) -> Self {
+pub trait FromPair: Sized {
+    fn from_pair(_: Pair<'_>) -> Self;
+}
+
+pub trait IntoNode<T>: Sized {
+    fn into_node(self) -> T;
+}
+
+impl<T> IntoNode<T> for Pair<'_>
+where
+    T: FromPair,
+{
+    fn into_node(self) -> T {
+        T::from_pair(self)
+    }
+}
+
+impl FromPair for TypedExpr {
+    fn from_pair(p: Pair) -> Self {
         match p.as_rule() {
             Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::term_type => {
-                p.into_inner().next().unwrap().into()
+                p.into_inner().next().unwrap().into_node()
             }
-            Rule::prim_type => Expr::Prim(p.into()).into(),
-            Rule::rel_type => Expr::Rel(p.into()).into(),
-            Rule::uri_type => Expr::Uri(p.into()).into(),
-            Rule::array_type => Expr::Array(p.into()).into(),
-            Rule::object_type => Expr::Object(p.into()).into(),
+            Rule::prim_type => Expr::Prim(p.into_node()).into(),
+            Rule::rel_type => Expr::Rel(p.into_node()).into(),
+            Rule::uri_type => Expr::Uri(p.into_node()).into(),
+            Rule::array_type => Expr::Array(p.into_node()).into(),
+            Rule::object_type => Expr::Object(p.into_node()).into(),
             Rule::var => Expr::Var(p.as_str().into()).into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
-                let mut op = VariadicOp::from(p);
+                let mut op = VariadicOp::from_pair(p);
                 if op.exprs.len() == 1 {
                     op.exprs.remove(0)
                 } else {
                     Expr::Op(op).into()
                 }
             }
-            Rule::apply => Expr::App(p.into()).into(),
+            Rule::apply => Expr::App(p.into_node()).into(),
             _ => unreachable!(),
         }
     }
@@ -134,12 +151,12 @@ pub struct Program {
     pub stmts: Vec<Statement>,
 }
 
-impl From<Pair<'_>> for Program {
-    fn from(p: Pair) -> Self {
+impl FromPair for Program {
+    fn from_pair(p: Pair) -> Self {
         let stmts = p
             .into_inner()
             .flat_map(|p| match p.as_rule() {
-                Rule::stmt => Some(p.into()),
+                Rule::stmt => Some(p.into_node()),
                 _ => None,
             })
             .collect();
@@ -171,13 +188,18 @@ pub struct Declaration {
     pub expr: TypedExpr,
 }
 
-impl From<Pair<'_>> for Declaration {
-    fn from(p: Pair) -> Self {
+impl FromPair for Declaration {
+    fn from_pair(p: Pair) -> Self {
         let mut p = p.into_inner();
         let name = p.nth(1).unwrap().as_str().into();
-        let bindings: Vec<TypedExpr> = p.next().unwrap().into_inner().map(|p| p.into()).collect();
+        let bindings: Vec<TypedExpr> = p
+            .next()
+            .unwrap()
+            .into_inner()
+            .map(|p| p.into_node())
+            .collect();
         let _hint = p.next().unwrap();
-        let expr = p.next().unwrap().into();
+        let expr = p.next().unwrap().into_node();
         let expr = if bindings.is_empty() {
             expr
         } else {
@@ -196,10 +218,10 @@ pub struct Resource {
     pub rel: TypedExpr,
 }
 
-impl From<Pair<'_>> for Resource {
-    fn from(p: Pair) -> Self {
+impl FromPair for Resource {
+    fn from_pair(p: Pair) -> Self {
         Resource {
-            rel: p.into_inner().nth(1).unwrap().into(),
+            rel: p.into_inner().nth(1).unwrap().into_node(),
         }
     }
 }
@@ -209,8 +231,8 @@ pub struct Annotation {
     pub ann: String,
 }
 
-impl From<Pair<'_>> for Annotation {
-    fn from(p: Pair) -> Self {
+impl FromPair for Annotation {
+    fn from_pair(p: Pair) -> Self {
         Annotation {
             ann: p.into_inner().next().unwrap().as_str().to_owned(),
         }
@@ -224,13 +246,13 @@ pub enum Statement {
     Ann(Annotation),
 }
 
-impl From<Pair<'_>> for Statement {
-    fn from(p: Pair) -> Self {
+impl FromPair for Statement {
+    fn from_pair(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         match p.as_rule() {
-            Rule::decl => Statement::Decl(p.into()),
-            Rule::res => Statement::Res(p.into()),
-            Rule::ann => Statement::Ann(p.into()),
+            Rule::decl => Statement::Decl(p.into_node()),
+            Rule::res => Statement::Res(p.into_node()),
+            Rule::ann => Statement::Ann(p.into_node()),
             _ => unreachable!(),
         }
     }
@@ -247,8 +269,8 @@ pub enum Method {
     Head,
 }
 
-impl From<Pair<'_>> for Method {
-    fn from(p: Pair) -> Self {
+impl FromPair for Method {
+    fn from_pair(p: Pair) -> Self {
         match p.into_inner().next().unwrap().as_rule() {
             Rule::get_kw => Method::Get,
             Rule::put_kw => Method::Put,
@@ -276,11 +298,11 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
-impl From<Pair<'_>> for Relation {
-    fn from(p: Pair) -> Self {
+impl FromPair for Relation {
+    fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
 
-        let uri: Box<_> = TypedExpr::from(inner.next().unwrap()).into();
+        let uri: Box<_> = TypedExpr::from_pair(inner.next().unwrap()).into();
 
         let mut xfers: Transfers = EnumMap::default();
 
@@ -291,7 +313,7 @@ impl From<Pair<'_>> for Relation {
                 .next()
                 .unwrap()
                 .into_inner()
-                .map(|p| p.into())
+                .map(|p| p.into_node())
                 .collect();
 
             let domain = xfer
@@ -299,9 +321,9 @@ impl From<Pair<'_>> for Relation {
                 .unwrap()
                 .into_inner()
                 .next()
-                .map(|p| Box::new(p.into()));
+                .map(|p| Box::new(p.into_node()));
 
-            let range: Box<_> = TypedExpr::from(xfer.next().unwrap()).into();
+            let range: Box<_> = TypedExpr::from_pair(xfer.next().unwrap()).into();
 
             for m in methods.iter() {
                 xfers[*m] = Some(Transfer {
@@ -408,8 +430,8 @@ impl<'a> IntoIterator for &'a mut Uri {
     }
 }
 
-impl From<Pair<'_>> for Uri {
-    fn from(p: Pair) -> Self {
+impl FromPair for Uri {
+    fn from_pair(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         let spec: Vec<_> = match p.as_rule() {
             Rule::uri_kw => Default::default(),
@@ -417,7 +439,9 @@ impl From<Pair<'_>> for Uri {
             Rule::uri_tpl => p
                 .into_inner()
                 .map(|p| match p.as_rule() {
-                    Rule::uri_var => UriSegment::Variable(p.into_inner().next().unwrap().into()),
+                    Rule::uri_var => {
+                        UriSegment::Variable(p.into_inner().next().unwrap().into_node())
+                    }
                     Rule::uri_lit => UriSegment::Literal(p.as_str().into()),
                     _ => unreachable!(),
                 })
@@ -433,9 +457,9 @@ pub struct Array {
     pub item: Box<TypedExpr>,
 }
 
-impl From<Pair<'_>> for Array {
-    fn from(p: Pair) -> Self {
-        let item = Box::new(p.into_inner().next().unwrap().into());
+impl FromPair for Array {
+    fn from_pair(p: Pair) -> Self {
+        let item = Box::new(p.into_inner().next().unwrap().into_node());
         Array { item }
     }
 }
@@ -464,11 +488,11 @@ pub struct Property {
     pub val: TypedExpr,
 }
 
-impl From<Pair<'_>> for Property {
-    fn from(p: Pair) -> Self {
+impl FromPair for Property {
+    fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
         let key = inner.next().unwrap().as_str().into();
-        let val = inner.next().unwrap().into();
+        let val = inner.next().unwrap().into_node();
         Property { key, val }
     }
 }
@@ -478,9 +502,9 @@ pub struct Object {
     pub props: Vec<Property>,
 }
 
-impl From<Pair<'_>> for Object {
-    fn from(p: Pair) -> Self {
-        let props = p.into_inner().map(|p| p.into()).collect();
+impl FromPair for Object {
+    fn from_pair(p: Pair) -> Self {
+        let props = p.into_inner().map(|p| p.into_node()).collect();
         Object { props }
     }
 }
@@ -522,15 +546,15 @@ pub struct VariadicOp {
     pub exprs: Vec<TypedExpr>,
 }
 
-impl From<Pair<'_>> for VariadicOp {
-    fn from(p: Pair) -> Self {
+impl FromPair for VariadicOp {
+    fn from_pair(p: Pair) -> Self {
         let op = match p.as_rule() {
             Rule::join_type => Operator::Join,
             Rule::any_type => Operator::Any,
             Rule::sum_type => Operator::Sum,
             _ => unreachable!(),
         };
-        let exprs = p.into_inner().map(|p| p.into()).collect();
+        let exprs = p.into_inner().map(|p| p.into_node()).collect();
         VariadicOp { op, exprs }
     }
 }
@@ -566,8 +590,8 @@ pub enum Primitive {
     Bool,
 }
 
-impl From<Pair<'_>> for Primitive {
-    fn from(p: Pair) -> Self {
+impl FromPair for Primitive {
+    fn from_pair(p: Pair) -> Self {
         match p.into_inner().next().unwrap().as_rule() {
             Rule::num_kw => Primitive::Num,
             Rule::str_kw => Primitive::Str,
@@ -607,11 +631,11 @@ pub struct Application {
     pub args: Vec<TypedExpr>,
 }
 
-impl From<Pair<'_>> for Application {
-    fn from(p: Pair) -> Self {
+impl FromPair for Application {
+    fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
         let name = inner.next().unwrap().as_str().into();
-        let args = inner.into_iter().map(|p| p.into()).collect();
+        let args = inner.into_iter().map(|p| p.into_node()).collect();
         Application { name, args }
     }
 }
