@@ -7,7 +7,7 @@ use crate::transform::Transform;
 use oal_syntax::ast::{Expr, Operator, Primitive, Statement, TypedExpr};
 use oal_syntax::parse;
 
-fn check_vars(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
+fn check_vars(acc: &mut (), env: &mut Env<TypedExpr>, e: &TypedExpr) -> crate::errors::Result<()> {
     e.as_ref().scan(acc, env, check_vars)?;
     match e.as_ref() {
         Expr::Var(var) => match env.lookup(var) {

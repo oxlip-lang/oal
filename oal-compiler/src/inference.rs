@@ -2,7 +2,7 @@ use crate::errors::{Error, Result};
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, FuncTag, Operator, Tag, Tagged, TypedExpr};
+use oal_syntax::ast::{Expr, FuncTag, Node, Operator, Tag, Tagged};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -20,7 +20,7 @@ impl TagSeq {
     }
 }
 
-pub fn tag_type(seq: &mut TagSeq, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+pub fn tag_type<T: Node + Tagged>(seq: &mut TagSeq, env: &mut Env<T>, e: &mut T) -> Result<()> {
     e.as_mut().transform(seq, env, tag_type)?;
     match e.as_ref() {
         Expr::Prim(_) => {
@@ -106,7 +106,7 @@ impl Subst {
     }
 }
 
-pub fn substitute(subst: &mut Subst, env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+pub fn substitute<T: Node + Tagged>(subst: &mut Subst, env: &mut Env<T>, e: &mut T) -> Result<()> {
     e.set_tag(subst.substitute(e.tag().unwrap()));
     e.as_mut().transform(subst, env, substitute)
 }
@@ -207,7 +207,7 @@ impl TypeConstraint {
     }
 }
 
-pub fn constrain(c: &mut TypeConstraint, env: &mut Env, e: &TypedExpr) -> Result<()> {
+pub fn constrain<T: Node + Tagged>(c: &mut TypeConstraint, env: &mut Env<T>, e: &T) -> Result<()> {
     e.as_ref().scan(c, env, constrain)?;
     match e.as_ref() {
         Expr::Prim(_) => {

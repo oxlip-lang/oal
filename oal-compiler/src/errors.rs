@@ -1,10 +1,11 @@
 use crate::inference::TypeEquation;
-use oal_syntax::ast::{Expr, Tag};
+use oal_syntax::ast::{Expr, Node, Tag};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone, Default)]
 pub struct Error {
     msg: String,
-    expr: Option<Expr>,
+    expr: Option<String>,
     tag: Option<Tag>,
     eq: Option<TypeEquation>,
 }
@@ -17,8 +18,8 @@ impl Error {
         }
     }
 
-    pub fn with_expr(mut self, e: &Expr) -> Self {
-        self.expr = Some(e.clone());
+    pub fn with_expr<T: Node>(mut self, e: &Expr<T>) -> Self {
+        self.expr = Some(format!("{:#?}", e));
         self
     }
 

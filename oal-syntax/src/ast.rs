@@ -1,5 +1,6 @@
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
+use std::fmt::Debug;
 use std::iter::{once, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
@@ -43,23 +44,27 @@ pub trait Tagged {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Expr {
+pub enum Expr<T> {
     Prim(Primitive),
-    Rel(Relation),
-    Uri(Uri),
-    Array(Array),
-    Object(Object),
-    Op(VariadicOp),
+    Rel(Relation<T>),
+    Uri(Uri<T>),
+    Array(Array<T>),
+    Object(Object<T>),
+    Op(VariadicOp<T>),
     Var(Ident),
-    Lambda(Lambda),
-    App(Application),
+    Lambda(Lambda<T>),
+    App(Application<T>),
     Binding(Ident),
 }
+
+pub trait Node: From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug {}
+
+impl<T> Node for T where T: From<Expr<T>> + AsRef<Expr<T>> + AsMut<Expr<T>> + Clone + Debug {}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedExpr {
     tag: Option<Tag>,
-    inner: Expr,
+    inner: Expr<TypedExpr>,
 }
 
 impl Tagged for TypedExpr {
@@ -81,8 +86,8 @@ impl Tagged for TypedExpr {
     }
 }
 
-impl From<Expr> for TypedExpr {
-    fn from(e: Expr) -> Self {
+impl From<Expr<TypedExpr>> for TypedExpr {
+    fn from(e: Expr<TypedExpr>) -> Self {
         TypedExpr {
             tag: None,
             inner: e,
@@ -90,14 +95,14 @@ impl From<Expr> for TypedExpr {
     }
 }
 
-impl AsRef<Expr> for TypedExpr {
-    fn as_ref(&self) -> &Expr {
+impl AsRef<Expr<TypedExpr>> for TypedExpr {
+    fn as_ref(&self) -> &Expr<TypedExpr> {
         &self.inner
     }
 }
 
-impl AsMut<Expr> for TypedExpr {
-    fn as_mut(&mut self) -> &mut Expr {
+impl AsMut<Expr<TypedExpr>> for TypedExpr {
+    fn as_mut(&mut self) -> &mut Expr<TypedExpr> {
         &mut self.inner
     }
 }
@@ -110,17 +115,14 @@ pub trait IntoNode<T>: Sized {
     fn into_node(self) -> T;
 }
 
-impl<T> IntoNode<T> for Pair<'_>
-where
-    T: FromPair,
-{
+impl<T: FromPair> IntoNode<T> for Pair<'_> {
     fn into_node(self) -> T {
         T::from_pair(self)
     }
 }
 
-impl FromPair for TypedExpr {
-    fn from_pair(p: Pair) -> Self {
+impl<T: Node> FromPair for T {
+    fn from_pair(p: Pair) -> T {
         match p.as_rule() {
             Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::term_type => {
                 p.into_inner().next().unwrap().into_node()
@@ -147,11 +149,11 @@ impl FromPair for TypedExpr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Program {
-    pub stmts: Vec<Statement>,
+pub struct Program<T> {
+    pub stmts: Vec<Statement<T>>,
 }
 
-impl FromPair for Program {
+impl<T: Node> FromPair for Program<T> {
     fn from_pair(p: Pair) -> Self {
         let stmts = p
             .into_inner()
@@ -164,18 +166,18 @@ impl FromPair for Program {
     }
 }
 
-impl<'a> IntoIterator for &'a Program {
-    type Item = &'a Statement;
-    type IntoIter = Iter<'a, Statement>;
+impl<'a, T> IntoIterator for &'a Program<T> {
+    type Item = &'a Statement<T>;
+    type IntoIter = Iter<'a, Statement<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.stmts.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut Program {
-    type Item = &'a mut Statement;
-    type IntoIter = IterMut<'a, Statement>;
+impl<'a, T> IntoIterator for &'a mut Program<T> {
+    type Item = &'a mut Statement<T>;
+    type IntoIter = IterMut<'a, Statement<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.stmts.iter_mut()
@@ -183,16 +185,16 @@ impl<'a> IntoIterator for &'a mut Program {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Declaration {
+pub struct Declaration<T> {
     pub name: Ident,
-    pub expr: TypedExpr,
+    pub expr: T,
 }
 
-impl FromPair for Declaration {
+impl<T: Node> FromPair for Declaration<T> {
     fn from_pair(p: Pair) -> Self {
         let mut p = p.into_inner();
         let name = p.nth(1).unwrap().as_str().into();
-        let bindings: Vec<TypedExpr> = p
+        let bindings: Vec<T> = p
             .next()
             .unwrap()
             .into_inner()
@@ -214,11 +216,11 @@ impl FromPair for Declaration {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Resource {
-    pub rel: TypedExpr,
+pub struct Resource<T> {
+    pub rel: T,
 }
 
-impl FromPair for Resource {
+impl<T: Node> FromPair for Resource<T> {
     fn from_pair(p: Pair) -> Self {
         Resource {
             rel: p.into_inner().nth(1).unwrap().into_node(),
@@ -240,13 +242,13 @@ impl FromPair for Annotation {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Statement {
-    Decl(Declaration),
-    Res(Resource),
+pub enum Statement<T> {
+    Decl(Declaration<T>),
+    Res(Resource<T>),
     Ann(Annotation),
 }
 
-impl FromPair for Statement {
+impl<T: Node> FromPair for Statement<T> {
     fn from_pair(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         match p.as_rule() {
@@ -285,26 +287,26 @@ impl FromPair for Method {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Transfer {
-    pub domain: Option<Box<TypedExpr>>,
-    pub range: Box<TypedExpr>,
+pub struct Transfer<T> {
+    pub domain: Option<Box<T>>,
+    pub range: Box<T>,
 }
 
-pub type Transfers = EnumMap<Method, Option<Transfer>>;
+pub type Transfers<T> = EnumMap<Method, Option<Transfer<T>>>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Relation {
-    pub uri: Box<TypedExpr>,
-    pub xfers: Transfers,
+pub struct Relation<T> {
+    pub uri: Box<T>,
+    pub xfers: Transfers<T>,
 }
 
-impl FromPair for Relation {
+impl<T: Node> FromPair for Relation<T> {
     fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
 
-        let uri: Box<_> = TypedExpr::from_pair(inner.next().unwrap()).into();
+        let uri: Box<_> = T::from_pair(inner.next().unwrap()).into();
 
-        let mut xfers: Transfers = EnumMap::default();
+        let mut xfers: Transfers<T> = EnumMap::default();
 
         for xfer in inner {
             let mut xfer = xfer.into_inner();
@@ -323,7 +325,7 @@ impl FromPair for Relation {
                 .next()
                 .map(|p| Box::new(p.into_node()));
 
-            let range: Box<_> = TypedExpr::from_pair(xfer.next().unwrap()).into();
+            let range: Box<_> = T::from_pair(xfer.next().unwrap()).into();
 
             for m in methods.iter() {
                 xfers[*m] = Some(Transfer {
@@ -337,8 +339,8 @@ impl FromPair for Relation {
     }
 }
 
-impl<'a> IntoIterator for &'a Relation {
-    type Item = &'a TypedExpr;
+impl<'a, T> IntoIterator for &'a Relation<T> {
+    type Item = &'a T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -359,8 +361,8 @@ impl<'a> IntoIterator for &'a Relation {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Relation {
-    type Item = &'a mut TypedExpr;
+impl<'a, T> IntoIterator for &'a mut Relation<T> {
+    type Item = &'a mut T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -382,24 +384,24 @@ impl<'a> IntoIterator for &'a mut Relation {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum UriSegment {
+pub enum UriSegment<T> {
     Literal(Literal),
-    Variable(Property),
+    Variable(Property<T>),
 }
 
-impl UriSegment {
+impl<T> UriSegment<T> {
     pub fn root() -> Self {
         UriSegment::Literal("".into())
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Uri {
-    pub spec: Vec<UriSegment>,
+pub struct Uri<T> {
+    pub spec: Vec<UriSegment<T>>,
 }
 
-impl<'a> IntoIterator for &'a Uri {
-    type Item = &'a TypedExpr;
+impl<'a, T> IntoIterator for &'a Uri<T> {
+    type Item = &'a T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -414,8 +416,8 @@ impl<'a> IntoIterator for &'a Uri {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Uri {
-    type Item = &'a mut TypedExpr;
+impl<'a, T> IntoIterator for &'a mut Uri<T> {
+    type Item = &'a mut T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -430,7 +432,7 @@ impl<'a> IntoIterator for &'a mut Uri {
     }
 }
 
-impl FromPair for Uri {
+impl<T: Node> FromPair for Uri<T> {
     fn from_pair(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
         let spec: Vec<_> = match p.as_rule() {
@@ -453,19 +455,19 @@ impl FromPair for Uri {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Array {
-    pub item: Box<TypedExpr>,
+pub struct Array<T> {
+    pub item: Box<T>,
 }
 
-impl FromPair for Array {
+impl<T: Node> FromPair for Array<T> {
     fn from_pair(p: Pair) -> Self {
         let item = Box::new(p.into_inner().next().unwrap().into_node());
         Array { item }
     }
 }
 
-impl<'a> IntoIterator for &'a Array {
-    type Item = &'a TypedExpr;
+impl<'a, T> IntoIterator for &'a Array<T> {
+    type Item = &'a T;
     type IntoIter = Once<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -473,8 +475,8 @@ impl<'a> IntoIterator for &'a Array {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Array {
-    type Item = &'a mut TypedExpr;
+impl<'a, T> IntoIterator for &'a mut Array<T> {
+    type Item = &'a mut T;
     type IntoIter = Once<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -483,12 +485,12 @@ impl<'a> IntoIterator for &'a mut Array {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Property {
+pub struct Property<T> {
     pub key: Ident,
-    pub val: TypedExpr,
+    pub val: T,
 }
 
-impl FromPair for Property {
+impl<T: Node> FromPair for Property<T> {
     fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
         let key = inner.next().unwrap().as_str().into();
@@ -497,26 +499,26 @@ impl FromPair for Property {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct Object {
-    pub props: Vec<Property>,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Object<T> {
+    pub props: Vec<Property<T>>,
 }
 
-impl FromPair for Object {
+impl<T> Default for Object<T> {
+    fn default() -> Self {
+        Object { props: Vec::new() }
+    }
+}
+
+impl<T: Node> FromPair for Object<T> {
     fn from_pair(p: Pair) -> Self {
         let props = p.into_inner().map(|p| p.into_node()).collect();
         Object { props }
     }
 }
 
-impl Object {
-    pub fn iter(&self) -> Iter<Property> {
-        self.props.iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a Object {
-    type Item = &'a TypedExpr;
+impl<'a, T> IntoIterator for &'a Object<T> {
+    type Item = &'a T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -524,8 +526,8 @@ impl<'a> IntoIterator for &'a Object {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Object {
-    type Item = &'a mut TypedExpr;
+impl<'a, T> IntoIterator for &'a mut Object<T> {
+    type Item = &'a mut T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -541,12 +543,12 @@ pub enum Operator {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct VariadicOp {
+pub struct VariadicOp<T> {
     pub op: Operator,
-    pub exprs: Vec<TypedExpr>,
+    pub exprs: Vec<T>,
 }
 
-impl FromPair for VariadicOp {
+impl<T: Node> FromPair for VariadicOp<T> {
     fn from_pair(p: Pair) -> Self {
         let op = match p.as_rule() {
             Rule::join_type => Operator::Join,
@@ -559,24 +561,18 @@ impl FromPair for VariadicOp {
     }
 }
 
-impl VariadicOp {
-    pub fn iter(&self) -> std::slice::Iter<TypedExpr> {
-        self.exprs.iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a VariadicOp {
-    type Item = &'a TypedExpr;
-    type IntoIter = Iter<'a, TypedExpr>;
+impl<'a, T: Node> IntoIterator for &'a VariadicOp<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.exprs.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut VariadicOp {
-    type Item = &'a mut TypedExpr;
-    type IntoIter = IterMut<'a, TypedExpr>;
+impl<'a, T: Node> IntoIterator for &'a mut VariadicOp<T> {
+    type Item = &'a mut T;
+    type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.exprs.iter_mut()
@@ -602,13 +598,13 @@ impl FromPair for Primitive {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Lambda {
-    pub bindings: Vec<TypedExpr>,
-    pub body: Box<TypedExpr>,
+pub struct Lambda<T> {
+    pub bindings: Vec<T>,
+    pub body: Box<T>,
 }
 
-impl<'a> IntoIterator for &'a Lambda {
-    type Item = &'a TypedExpr;
+impl<'a, T> IntoIterator for &'a Lambda<T> {
+    type Item = &'a T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -616,8 +612,8 @@ impl<'a> IntoIterator for &'a Lambda {
     }
 }
 
-impl<'a> IntoIterator for &'a mut Lambda {
-    type Item = &'a mut TypedExpr;
+impl<'a, T> IntoIterator for &'a mut Lambda<T> {
+    type Item = &'a mut T;
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -626,12 +622,12 @@ impl<'a> IntoIterator for &'a mut Lambda {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Application {
+pub struct Application<T> {
     pub name: Ident,
-    pub args: Vec<TypedExpr>,
+    pub args: Vec<T>,
 }
 
-impl FromPair for Application {
+impl<T: Node> FromPair for Application<T> {
     fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
         let name = inner.next().unwrap().as_str().into();
@@ -640,18 +636,18 @@ impl FromPair for Application {
     }
 }
 
-impl<'a> IntoIterator for &'a Application {
-    type Item = &'a TypedExpr;
-    type IntoIter = Iter<'a, TypedExpr>;
+impl<'a, T> IntoIterator for &'a Application<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.args.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut Application {
-    type Item = &'a mut TypedExpr;
-    type IntoIter = IterMut<'a, TypedExpr>;
+impl<'a, T> IntoIterator for &'a mut Application<T> {
+    type Item = &'a mut T;
+    type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.args.iter_mut()

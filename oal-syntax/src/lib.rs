@@ -12,7 +12,7 @@ use crate::ast::IntoNode;
 
 pub type Pair<'a> = pest::iterators::Pair<'a, Rule>;
 
-pub fn parse(input: String) -> errors::Result<ast::Program> {
+pub fn parse(input: String) -> errors::Result<ast::Program<ast::TypedExpr>> {
     use pest::Parser as PestParser;
 
     let mut ast = Parser::parse(Rule::program, &input)?;

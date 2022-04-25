@@ -1,28 +1,28 @@
-use oal_syntax::ast::{Ident, TypedExpr};
+use oal_syntax::ast::{Ident, Node};
 use std::collections::HashMap;
 
-pub type Scope = HashMap<Ident, TypedExpr>;
+pub type Scope<T> = HashMap<Ident, T>;
 
-pub struct Env {
-    scopes: Vec<Scope>,
+pub struct Env<T> {
+    scopes: Vec<Scope<T>>,
 }
 
-impl Env {
-    pub fn new() -> Env {
+impl<T: Node> Env<T> {
+    pub fn new() -> Env<T> {
         Env {
             scopes: vec![Scope::new()],
         }
     }
 
-    pub fn head(&self) -> &Scope {
+    pub fn head(&self) -> &Scope<T> {
         self.scopes.last().unwrap()
     }
 
-    pub fn declare(&mut self, n: &Ident, e: &TypedExpr) {
+    pub fn declare(&mut self, n: &Ident, e: &T) {
         self.scopes.last_mut().unwrap().insert(n.clone(), e.clone());
     }
 
-    pub fn lookup(&self, n: &Ident) -> Option<&TypedExpr> {
+    pub fn lookup(&self, n: &Ident) -> Option<&T> {
         self.scopes
             .iter()
             .rev()

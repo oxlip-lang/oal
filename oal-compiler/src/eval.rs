@@ -6,8 +6,10 @@ use crate::scope::Env;
 use crate::transform::Transform;
 use enum_map::EnumMap;
 use oal_syntax::ast;
+use oal_syntax::ast::{Node, Tagged};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
@@ -15,10 +17,10 @@ pub enum UriSegment {
     Variable(Prop),
 }
 
-impl TryFrom<&ast::UriSegment> for UriSegment {
+impl<T: Node> TryFrom<&ast::UriSegment<T>> for UriSegment {
     type Error = Error;
 
-    fn try_from(s: &ast::UriSegment) -> Result<Self> {
+    fn try_from(s: &ast::UriSegment<T>) -> Result<Self> {
         match s {
             ast::UriSegment::Literal(l) => Ok(UriSegment::Literal(l.clone())),
             ast::UriSegment::Variable(p) => p.try_into().map(|p| UriSegment::Variable(p)),
@@ -43,19 +45,19 @@ impl Uri {
     }
 }
 
-impl TryFrom<&ast::Uri> for Uri {
+impl<T: Node> TryFrom<&ast::Uri<T>> for Uri {
     type Error = Error;
 
-    fn try_from(uri: &ast::Uri) -> Result<Self> {
+    fn try_from(uri: &ast::Uri<T>) -> Result<Self> {
         let spec: Result<Vec<UriSegment>> = uri.spec.iter().map(|s| s.try_into()).collect();
         spec.map(|spec| Uri { spec })
     }
 }
 
-impl TryFrom<&ast::Expr> for Uri {
+impl<T: Node> TryFrom<&ast::Expr<T>> for Uri {
     type Error = Error;
 
-    fn try_from(e: &ast::Expr) -> Result<Self> {
+    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
         match e {
             ast::Expr::Uri(uri) => uri.try_into(),
             _ => Err(Error::new("expected uri expression").with_expr(e)),
@@ -68,10 +70,10 @@ pub struct Array {
     pub item: Box<Schema>,
 }
 
-impl TryFrom<&ast::Array> for Array {
+impl<T: Node> TryFrom<&ast::Array<T>> for Array {
     type Error = Error;
 
-    fn try_from(a: &ast::Array) -> Result<Self> {
+    fn try_from(a: &ast::Array<T>) -> Result<Self> {
         a.item.as_ref().as_ref().try_into().map(|item| Array {
             item: Box::new(item),
         })
@@ -84,10 +86,10 @@ pub struct VariadicOp {
     pub schemas: Vec<Schema>,
 }
 
-impl TryFrom<&ast::VariadicOp> for VariadicOp {
+impl<T: Node> TryFrom<&ast::VariadicOp<T>> for VariadicOp {
     type Error = Error;
 
-    fn try_from(op: &ast::VariadicOp) -> Result<Self> {
+    fn try_from(op: &ast::VariadicOp<T>) -> Result<Self> {
         let schemas: Result<Vec<_>> = op.exprs.iter().map(|e| e.as_ref().try_into()).collect();
         schemas.map(|schemas| VariadicOp { op: op.op, schemas })
     }
@@ -103,10 +105,10 @@ pub enum Schema {
     Op(VariadicOp),
 }
 
-impl TryFrom<&ast::Expr> for Schema {
+impl<T: Node> TryFrom<&ast::Expr<T>> for Schema {
     type Error = Error;
 
-    fn try_from(e: &ast::Expr) -> Result<Self> {
+    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
         match e {
             ast::Expr::Prim(prim) => Ok(Schema::Prim(*prim)),
             ast::Expr::Rel(rel) => rel.try_into().map(|r| Schema::Rel(r)),
@@ -128,10 +130,10 @@ pub struct Prop {
     pub schema: Schema,
 }
 
-impl TryFrom<&ast::Property> for Prop {
+impl<T: Node> TryFrom<&ast::Property<T>> for Prop {
     type Error = Error;
 
-    fn try_from(p: &ast::Property) -> Result<Self> {
+    fn try_from(p: &ast::Property<T>) -> Result<Self> {
         p.val.as_ref().try_into().map(|s| Prop {
             name: p.key.clone(),
             schema: s,
@@ -144,10 +146,10 @@ pub struct Object {
     pub props: Vec<Prop>,
 }
 
-impl TryFrom<&ast::Object> for Object {
+impl<T: Node> TryFrom<&ast::Object<T>> for Object {
     type Error = Error;
 
-    fn try_from(o: &ast::Object) -> Result<Self> {
+    fn try_from(o: &ast::Object<T>) -> Result<Self> {
         let props: Result<Vec<_>> = o.props.iter().map(|p| p.try_into()).collect();
         props.map(|props| Object { props })
     }
@@ -159,10 +161,10 @@ pub struct Transfer {
     pub range: Box<Schema>,
 }
 
-impl TryFrom<&ast::Transfer> for Transfer {
+impl<T: Node> TryFrom<&ast::Transfer<T>> for Transfer {
     type Error = Error;
 
-    fn try_from(xfer: &ast::Transfer) -> Result<Self> {
+    fn try_from(xfer: &ast::Transfer<T>) -> Result<Self> {
         let range = xfer
             .range
             .as_ref()
@@ -185,10 +187,10 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
-impl TryFrom<&ast::Relation> for Relation {
+impl<T: Node> TryFrom<&ast::Relation<T>> for Relation {
     type Error = Error;
 
-    fn try_from(r: &ast::Relation) -> Result<Self> {
+    fn try_from(r: &ast::Relation<T>) -> Result<Self> {
         let uri: Uri = r.uri.as_ref().as_ref().try_into()?;
         let xfers = r
             .xfers
@@ -202,10 +204,10 @@ impl TryFrom<&ast::Relation> for Relation {
     }
 }
 
-impl TryFrom<&ast::Expr> for Relation {
+impl<T: Node> TryFrom<&ast::Expr<T>> for Relation {
     type Error = Error;
 
-    fn try_from(e: &ast::Expr) -> Result<Self> {
+    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
         match e {
             ast::Expr::Rel(rel) => rel.try_into(),
             _ => Err(Error::new("expected relation expression").with_expr(e)),
@@ -221,10 +223,10 @@ pub struct Spec {
     pub rels: Relations,
 }
 
-impl TryFrom<&ast::Program> for Spec {
+impl<T: Node> TryFrom<&ast::Program<T>> for Spec {
     type Error = Error;
 
-    fn try_from(prg: &ast::Program) -> Result<Self> {
+    fn try_from(prg: &ast::Program<T>) -> Result<Self> {
         let mut rels: Relations = HashMap::new();
 
         prg.stmts.iter().try_for_each(|stmt| match stmt {
@@ -245,7 +247,7 @@ impl TryFrom<&ast::Program> for Spec {
     }
 }
 
-pub fn evaluate(mut prg: ast::Program) -> Result<Spec> {
+pub fn evaluate<T: Node + Tagged>(mut prg: ast::Program<T>) -> Result<Spec> {
     prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)?;
 
     let constraint = &mut TypeConstraint::new();

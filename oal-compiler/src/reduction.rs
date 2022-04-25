@@ -1,9 +1,9 @@
 use crate::errors::{Error, Result};
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::*;
+use oal_syntax::ast::{Expr, Node};
 
-pub fn reduce(acc: &mut (), env: &mut Env, e: &mut TypedExpr) -> Result<()> {
+pub fn reduce<T: Node>(acc: &mut (), env: &mut Env<T>, e: &mut T) -> Result<()> {
     e.as_mut().transform(acc, env, reduce)?;
     match e.as_mut() {
         Expr::Var(var) => match env.lookup(var) {

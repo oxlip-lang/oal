@@ -1,18 +1,18 @@
 use crate::scope::Env;
 use oal_syntax::ast::*;
 
-pub trait Transform {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
+pub trait Transform<T: Node> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
     where
         Self: Sized,
         E: Sized,
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>;
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>;
 }
 
-impl Transform for Declaration {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Declaration<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         f(acc, env, &mut self.expr)?;
         env.declare(&self.name, &self.expr);
@@ -20,19 +20,19 @@ impl Transform for Declaration {
     }
 }
 
-impl Transform for Resource {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Resource<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         f(acc, env, &mut self.rel)
     }
 }
 
-impl Transform for Statement {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Statement<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         match self {
             Statement::Decl(d) => d.transform(acc, env, f),
@@ -42,10 +42,10 @@ impl Transform for Statement {
     }
 }
 
-impl Transform for Program {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Program<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         env.within(|env| {
             self.into_iter()
@@ -54,55 +54,55 @@ impl Transform for Program {
     }
 }
 
-impl Transform for Relation {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Relation<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
-impl Transform for Uri {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Uri<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
-impl Transform for Object {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Object<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
-impl Transform for Array {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Array<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
-impl Transform for VariadicOp {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for VariadicOp<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
-impl Transform for Lambda {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Lambda<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         env.within(|env| {
             (&mut self.bindings)
@@ -122,19 +122,19 @@ impl Transform for Lambda {
     }
 }
 
-impl Transform for Application {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, mut f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Application<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 
-impl Transform for Expr {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env, f: F) -> Result<(), E>
+impl<T: Node> Transform<T> for Expr<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env, &mut TypedExpr) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
         match self {
             Expr::Rel(rel) => rel.transform(acc, env, f),

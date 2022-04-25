@@ -118,7 +118,7 @@ fn unify_simple() {
     assert_eq!(t, Tag::Primitive);
 }
 
-fn check_tags(acc: &mut (), env: &mut Env, e: &TypedExpr) -> crate::errors::Result<()> {
+fn check_tags(acc: &mut (), env: &mut Env<TypedExpr>, e: &TypedExpr) -> crate::errors::Result<()> {
     e.as_ref().scan(acc, env, check_tags)?;
     match e.tag() {
         None => Err(Error::new("missing tag").with_expr(e.as_ref())),
