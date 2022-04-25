@@ -1,12 +1,13 @@
 use crate::errors::{Error, Result};
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
-use crate::reduce;
+use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
+use crate::tag::Tagged;
 use crate::transform::Transform;
 use enum_map::EnumMap;
 use oal_syntax::ast;
-use oal_syntax::ast::{Node, Tagged};
+use oal_syntax::ast::Node;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Debug;

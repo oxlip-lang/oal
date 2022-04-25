@@ -1,6 +1,6 @@
 use crate::eval::{Object, Schema, Uri, UriSegment};
-use crate::evaluate;
-use oal_syntax::{ast, parse};
+use crate::{evaluate, Program};
+use oal_syntax::parse;
 
 #[test]
 fn uri_pattern() {
@@ -13,7 +13,7 @@ fn uri_pattern() {
 
 #[test]
 fn evaluate_simple() {
-    let prg = parse("res / ( put : {} -> {} );".to_owned()).expect("parsing failed");
+    let prg: Program = parse("res / ( put : {} -> {} );".to_owned()).expect("parsing failed");
 
     let s = evaluate(prg).expect("evaluation failed");
 
@@ -25,7 +25,7 @@ fn evaluate_simple() {
     assert_eq!(p.uri.spec.len(), 1);
     assert_eq!(*p.uri.spec.first().unwrap(), UriSegment::Literal("".into()));
 
-    if let Some(x) = &p.xfers[ast::Method::Put] {
+    if let Some(x) = &p.xfers[oal_syntax::ast::Method::Put] {
         if let Some(d) = &x.domain {
             assert_eq!(*d.as_ref(), Schema::Object(Object::default()));
         } else {

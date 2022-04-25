@@ -12,10 +12,10 @@ use crate::ast::IntoNode;
 
 pub type Pair<'a> = pest::iterators::Pair<'a, Rule>;
 
-pub fn parse(input: String) -> errors::Result<ast::Program<ast::TypedExpr>> {
+pub fn parse<T: ast::Node>(input: String) -> errors::Result<ast::Program<T>> {
     use pest::Parser as PestParser;
 
-    let mut ast = Parser::parse(Rule::program, &input)?;
+    let mut pairs = Parser::parse(Rule::program, &input)?;
 
-    Ok(ast.next().unwrap().into_node())
+    Ok(pairs.next().unwrap().into_node())
 }

@@ -1,10 +1,11 @@
 use crate::errors::Error;
+use crate::expr::TypedExpr;
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
-use crate::reduce;
+use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, Operator, Primitive, Statement, TypedExpr};
+use oal_syntax::ast::{Expr, Operator, Primitive, Statement};
 use oal_syntax::parse;
 
 fn check_vars(acc: &mut (), env: &mut Env<TypedExpr>, e: &TypedExpr) -> crate::errors::Result<()> {

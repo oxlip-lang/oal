@@ -8,41 +8,6 @@ use std::slice::{Iter, IterMut};
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
 
-#[derive(PartialEq, Clone, Debug)]
-pub struct FuncTag {
-    pub bindings: Vec<Tag>,
-    pub range: Box<Tag>,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum Tag {
-    Primitive,
-    Relation,
-    Object,
-    Array,
-    Uri,
-    Any,
-    Func(FuncTag),
-    Var(usize),
-}
-
-impl Tag {
-    pub fn is_variable(&self) -> bool {
-        if let Tag::Var(_) = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-pub trait Tagged {
-    fn tag(&self) -> Option<&Tag>;
-    fn set_tag(&mut self, t: Tag);
-    fn unwrap_tag(&self) -> Tag;
-    fn with_tag(self, t: Tag) -> Self;
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<T> {
     Prim(Primitive),
@@ -60,52 +25,6 @@ pub enum Expr<T> {
 pub trait Node: From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug {}
 
 impl<T> Node for T where T: From<Expr<T>> + AsRef<Expr<T>> + AsMut<Expr<T>> + Clone + Debug {}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypedExpr {
-    tag: Option<Tag>,
-    inner: Expr<TypedExpr>,
-}
-
-impl Tagged for TypedExpr {
-    fn tag(&self) -> Option<&Tag> {
-        self.tag.as_ref()
-    }
-
-    fn set_tag(&mut self, t: Tag) {
-        self.tag = Some(t)
-    }
-
-    fn unwrap_tag(&self) -> Tag {
-        self.tag.as_ref().unwrap().clone()
-    }
-
-    fn with_tag(mut self, t: Tag) -> Self {
-        self.set_tag(t);
-        self
-    }
-}
-
-impl From<Expr<TypedExpr>> for TypedExpr {
-    fn from(e: Expr<TypedExpr>) -> Self {
-        TypedExpr {
-            tag: None,
-            inner: e,
-        }
-    }
-}
-
-impl AsRef<Expr<TypedExpr>> for TypedExpr {
-    fn as_ref(&self) -> &Expr<TypedExpr> {
-        &self.inner
-    }
-}
-
-impl AsMut<Expr<TypedExpr>> for TypedExpr {
-    fn as_mut(&mut self) -> &mut Expr<TypedExpr> {
-        &mut self.inner
-    }
-}
 
 pub trait FromPair: Sized {
     fn from_pair(_: Pair<'_>) -> Self;

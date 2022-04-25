@@ -1,5 +1,6 @@
 use crate::inference::TypeEquation;
-use oal_syntax::ast::{Expr, Node, Tag};
+use crate::tag::Tag;
+use oal_syntax::ast::{Expr, Node};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Default)]

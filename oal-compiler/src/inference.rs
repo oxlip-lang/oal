@@ -1,8 +1,9 @@
 use crate::errors::{Error, Result};
 use crate::scan::Scan;
 use crate::scope::Env;
+use crate::tag::{FuncTag, Tag, Tagged};
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, FuncTag, Node, Operator, Tag, Tagged};
+use oal_syntax::ast::{Expr, Node, Operator};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]

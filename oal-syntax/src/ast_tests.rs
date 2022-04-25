@@ -1,12 +1,32 @@
-use crate::ast::{
-    Application, Expr, Lambda, Method, Operator, Primitive, Property, Statement, Uri, UriSegment,
-    VariadicOp,
-};
+use crate::ast::*;
 use crate::parse;
+
+#[derive(Clone, Debug, PartialEq)]
+struct TestExpr(Expr<TestExpr>);
+
+impl From<Expr<TestExpr>> for TestExpr {
+    fn from(e: Expr<TestExpr>) -> Self {
+        TestExpr(e)
+    }
+}
+
+impl AsRef<Expr<TestExpr>> for TestExpr {
+    fn as_ref(&self) -> &Expr<TestExpr> {
+        &self.0
+    }
+}
+
+impl AsMut<Expr<TestExpr>> for TestExpr {
+    fn as_mut(&mut self) -> &mut Expr<TestExpr> {
+        &mut self.0
+    }
+}
+
+type Program = crate::ast::Program<TestExpr>;
 
 #[test]
 fn parse_variable_decl() {
-    let d = parse("let a = num;".into()).expect("parsing failed");
+    let d: Program = parse("let a = num;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -22,13 +42,13 @@ fn parse_variable_decl() {
 
 #[test]
 fn parse_assignment() {
-    let d = parse("let a = b;".into()).expect("parsing failed");
+    let d: Program = parse("let a = b;".into()).expect("parsing failed");
     assert_eq!(d.stmts.len(), 1);
 }
 
 #[test]
 fn parse_array() {
-    let d = parse("let a = [str];".into()).expect("parsing failed");
+    let d: Program = parse("let a = [str];".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -47,7 +67,7 @@ fn parse_array() {
 
 #[test]
 fn parse_root_uri() {
-    let d = parse("let a = /;".into()).expect("parsing failed");
+    let d: Program = parse("let a = /;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -67,7 +87,7 @@ fn parse_root_uri() {
 
 #[test]
 fn parse_template_uri() {
-    let d = parse("let a = /x/{ y str }/z/;".into()).expect("parsing failed");
+    let d: Program = parse("let a = /x/{ y str }/z/;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -100,7 +120,7 @@ fn parse_composite_relation() {
             get             -> {}
         );
     "#;
-    let d = parse(code.into()).expect("parsing failed");
+    let d: Program = parse(code.into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -122,7 +142,7 @@ fn parse_composite_relation() {
 
 #[test]
 fn parse_simple_relation() {
-    let d = parse("let a = / ( put : {} -> {} );".into()).expect("parsing failed");
+    let d: Program = parse("let a = / ( put : {} -> {} );".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -159,7 +179,7 @@ fn parse_simple_relation() {
 
 #[test]
 fn parse_any_type() {
-    let d = parse("let a = {} ~ uri ~ bool;".into()).expect("parsing failed");
+    let d: Program = parse("let a = {} ~ uri ~ bool;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -182,7 +202,7 @@ fn parse_any_type() {
 
 #[test]
 fn parse_application() {
-    let d = parse("let a = f num {} uri;".into()).expect("parsing failed");
+    let d: Program = parse("let a = f num {} uri;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -200,7 +220,7 @@ fn parse_application() {
 
 #[test]
 fn parse_lambda_decl() {
-    let d = parse("let f x y z = num;".into()).expect("parsing failed");
+    let d: Program = parse("let f x y z = num;".into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -239,7 +259,7 @@ fn parse_annotation() {
         let r = {};
         let a = /{ n id } ( put : r -> r );
     "#;
-    let d = parse(code.into()).expect("parsing failed");
+    let d: Program = parse(code.into()).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 5);
 }

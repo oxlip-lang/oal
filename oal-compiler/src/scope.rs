@@ -14,6 +14,7 @@ impl<T: Node> Env<T> {
         }
     }
 
+    #[cfg(test)]
     pub fn head(&self) -> &Scope<T> {
         self.scopes.last().unwrap()
     }
@@ -32,6 +33,7 @@ impl<T: Node> Env<T> {
             .next()
     }
 
+    #[cfg(test)]
     pub fn exists(&self, n: &Ident) -> bool {
         self.scopes.last().unwrap().contains_key(n)
     }

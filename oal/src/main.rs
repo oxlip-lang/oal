@@ -1,5 +1,5 @@
 use oal_codegen::Builder;
-use oal_compiler::evaluate;
+use oal_compiler::{evaluate, Program};
 use oal_syntax::parse;
 use std::env;
 
@@ -15,7 +15,7 @@ fn main() {
 
     let input = std::fs::read_to_string(input_file).expect("reading failed");
 
-    let prg = parse(input).expect("parsing failed");
+    let prg: Program = parse(input).expect("parsing failed");
 
     let spec = evaluate(prg).expect("compilation failed");
 
