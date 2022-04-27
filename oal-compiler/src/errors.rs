@@ -1,36 +1,39 @@
-use crate::inference::TypeEquation;
-use crate::tag::Tag;
-use oal_syntax::ast::{Expr, Node};
 use std::fmt::Debug;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Kind {
+    Unknown,
+    IdentifierNotInScope,
+    IdentifierNotAFunction,
+    CannotUnify,
+    RelationConflict,
+    UnexpectedExpression,
+}
+
+impl Default for Kind {
+    fn default() -> Self {
+        Kind::Unknown
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct Error {
+    pub kind: Kind,
     msg: String,
-    expr: Option<String>,
-    tag: Option<Tag>,
-    eq: Option<TypeEquation>,
+    details: Vec<String>,
 }
 
 impl Error {
-    pub fn new(msg: &str) -> Error {
+    pub fn new(kind: Kind, msg: &str) -> Error {
         Error {
+            kind,
             msg: msg.into(),
-            ..Default::default()
+            details: Vec::new(),
         }
     }
 
-    pub fn with_expr<T: Node>(mut self, e: &Expr<T>) -> Self {
-        self.expr = Some(format!("{:#?}", e));
-        self
-    }
-
-    pub fn with_tag(mut self, t: Option<&Tag>) -> Self {
-        self.tag = t.cloned();
-        self
-    }
-
-    pub fn with_eq(mut self, eq: &TypeEquation) -> Self {
-        self.eq = Some(eq.clone());
+    pub fn with<T: Debug>(mut self, e: &T) -> Self {
+        self.details.push(format!("{:?}", e));
         self
     }
 }

@@ -1,4 +1,4 @@
-use crate::errors::{Error, Result};
+use crate::errors::{Error, Kind, Result};
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
@@ -54,7 +54,7 @@ pub fn tag_type<T: Node + Tagged>(seq: &mut TagSeq, env: &mut Env<T>, e: &mut T)
             Ok(())
         }
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
+            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
             Some(val) => {
                 e.set_tag(val.unwrap_tag());
                 Ok(())
@@ -65,13 +65,13 @@ pub fn tag_type<T: Node + Tagged>(seq: &mut TagSeq, env: &mut Env<T>, e: &mut T)
             Ok(())
         }
         Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
+            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
             Some(val) => {
                 if let Expr::Lambda(l) = val.as_ref() {
                     e.set_tag(l.body.unwrap_tag());
                     Ok(())
                 } else {
-                    Err(Error::new("identifier not a function").with_expr(e.as_ref()))
+                    Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
                 }
             }
         },
@@ -196,7 +196,7 @@ impl TypeConstraint {
         let mut s = Subst::new();
         for eq in self.0.iter() {
             if !eq.unify(&mut s) {
-                return Err(Error::new("cannot unify").with_eq(eq));
+                return Err(Error::new(Kind::CannotUnify, "").with(eq));
             }
         }
         Ok(s)
@@ -270,9 +270,7 @@ pub fn constrain<T: Node + Tagged>(c: &mut TypeConstraint, env: &mut Env<T>, e: 
             Ok(())
         }
         Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new("identifier not in scope")
-                .with_expr(e.as_ref())
-                .with_tag(e.tag())),
+            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
             Some(val) => {
                 let bindings = application
                     .args

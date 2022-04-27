@@ -1,4 +1,4 @@
-use crate::errors::{Error, Result};
+use crate::errors::{Error, Kind, Result};
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
 use crate::reduction::reduce;
 use crate::scan::Scan;
@@ -61,7 +61,7 @@ impl<T: Node> TryFrom<&ast::Expr<T>> for Uri {
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
         match e {
             ast::Expr::Uri(uri) => uri.try_into(),
-            _ => Err(Error::new("expected uri expression").with_expr(e)),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "not a URI").with(e)),
         }
     }
 }
@@ -117,10 +117,10 @@ impl<T: Node> TryFrom<&ast::Expr<T>> for Schema {
             ast::Expr::Array(arr) => arr.try_into().map(|a| Schema::Array(a)),
             ast::Expr::Object(obj) => obj.try_into().map(|o| Schema::Object(o)),
             ast::Expr::Op(op) => op.try_into().map(|o| Schema::Op(o)),
-            ast::Expr::Var(_) => Err(Error::new("unexpected variable expression").with_expr(e)),
-            ast::Expr::Lambda(_) => Err(Error::new("unexpected lambda expression").with_expr(e)),
-            ast::Expr::App(_) => Err(Error::new("unexpected application expression").with_expr(e)),
-            ast::Expr::Binding(_) => Err(Error::new("unexpected binding expression").with_expr(e)),
+            ast::Expr::Var(_) => Err(Error::new(Kind::UnexpectedExpression, "variable").with(e)),
+            ast::Expr::Lambda(_) => Err(Error::new(Kind::UnexpectedExpression, "lambda").with(e)),
+            ast::Expr::App(_) => Err(Error::new(Kind::UnexpectedExpression, "application").with(e)),
+            ast::Expr::Binding(_) => Err(Error::new(Kind::UnexpectedExpression, "binding").with(e)),
         }
     }
 }
@@ -211,7 +211,7 @@ impl<T: Node> TryFrom<&ast::Expr<T>> for Relation {
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
         match e {
             ast::Expr::Rel(rel) => rel.try_into(),
-            _ => Err(Error::new("expected relation expression").with_expr(e)),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "not a relation").with(e)),
         }
     }
 }
@@ -238,7 +238,7 @@ impl<T: Node> TryFrom<&ast::Program<T>> for Spec {
                         v.insert(rel);
                         Ok(())
                     }
-                    Entry::Occupied(_) => Err(Error::new("relation conflict")),
+                    Entry::Occupied(_) => Err(Error::new(Kind::RelationConflict, "").with(&rel)),
                 })
             }
             _ => Ok(()),

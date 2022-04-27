@@ -25,7 +25,7 @@ impl<T: Node> Scan<T> for Resource<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
     {
-        f(acc, env, &self.rel)
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 

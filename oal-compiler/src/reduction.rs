@@ -1,4 +1,4 @@
-use crate::errors::{Error, Result};
+use crate::errors::{Error, Kind, Result};
 use crate::scope::Env;
 use crate::transform::Transform;
 use oal_syntax::ast::{Expr, Node};
@@ -7,7 +7,7 @@ pub fn reduce<T: Node>(acc: &mut (), env: &mut Env<T>, e: &mut T) -> Result<()> 
     e.as_mut().transform(acc, env, reduce)?;
     match e.as_mut() {
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
+            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
             Some(val) => {
                 match val.as_ref() {
                     Expr::Binding(_) => {}
@@ -17,7 +17,7 @@ pub fn reduce<T: Node>(acc: &mut (), env: &mut Env<T>, e: &mut T) -> Result<()> 
             }
         },
         Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
+            None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(e)),
             Some(val) => {
                 if let Expr::Lambda(lambda) = val.as_ref() {
                     let app_env = &mut Env::new();
@@ -33,7 +33,7 @@ pub fn reduce<T: Node>(acc: &mut (), env: &mut Env<T>, e: &mut T) -> Result<()> 
                     *e = app;
                     Ok(())
                 } else {
-                    Err(Error::new("identifier not a function").with_expr(e.as_ref()))
+                    Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
                 }
             }
         },

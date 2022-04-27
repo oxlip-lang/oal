@@ -147,6 +147,24 @@ impl<T: Node> FromPair for Resource<T> {
     }
 }
 
+impl<'a, T> IntoIterator for &'a Resource<T> {
+    type Item = &'a T;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(&self.rel)
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Resource<T> {
+    type Item = &'a mut T;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(&mut self.rel)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation {
     pub ann: String,

@@ -25,7 +25,7 @@ impl<T: Node> Transform<T> for Resource<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
     {
-        f(acc, env, &mut self.rel)
+        self.into_iter().try_for_each(|e| f(acc, env, e))
     }
 }
 

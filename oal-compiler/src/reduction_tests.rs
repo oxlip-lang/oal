@@ -1,4 +1,4 @@
-use crate::errors::Error;
+use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
 use crate::reduction::reduce;
@@ -12,10 +12,10 @@ fn check_vars(acc: &mut (), env: &mut Env<TypedExpr>, e: &TypedExpr) -> crate::e
     e.as_ref().scan(acc, env, check_vars)?;
     match e.as_ref() {
         Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new("identifier not in scope").with_expr(e.as_ref())),
+            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
             Some(val) => match val.as_ref() {
                 Expr::Binding(_) => Ok(()),
-                _ => Err(Error::new("remaining free variable").with_expr(e.as_ref())),
+                _ => Err(Error::new(Kind::Unknown, "remaining free variable").with(e)),
             },
         },
         _ => Ok(()),

@@ -1,4 +1,4 @@
-use crate::errors::Error;
+use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
 use crate::scan::Scan;
@@ -73,6 +73,19 @@ fn tag_lambda_decl() {
 }
 
 #[test]
+fn tag_not_in_scope() {
+    let mut d: Program = parse("let a = f {};".into()).expect("parsing failed");
+
+    let r = d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type);
+
+    if let Err(e) = r {
+        assert_eq!(e.kind, Kind::IdentifierNotInScope);
+    } else {
+        panic!("expected error");
+    }
+}
+
+#[test]
 fn constraint_var() {
     let code = r#"
         let id1 = {} & {};
@@ -124,10 +137,8 @@ fn unify_simple() {
 fn check_tags(acc: &mut (), env: &mut Env<TypedExpr>, e: &TypedExpr) -> crate::errors::Result<()> {
     e.as_ref().scan(acc, env, check_tags)?;
     match e.tag() {
-        None => Err(Error::new("missing tag").with_expr(e.as_ref())),
-        Some(Tag::Var(_)) => Err(Error::new("remaining tag variable")
-            .with_expr(e.as_ref())
-            .with_tag(e.tag())),
+        None => Err(Error::new(Kind::Unknown, "missing tag").with(e)),
+        Some(Tag::Var(_)) => Err(Error::new(Kind::Unknown, "remaining tag variable").with(e)),
         Some(_) => Ok(()),
     }
 }
