@@ -29,6 +29,15 @@ impl<T: Node> Transform<T> for Resource<T> {
     }
 }
 
+impl<T: Node> Transform<T> for Annotation<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env<T>, &mut T) -> Result<(), E>,
+    {
+        self.into_iter().try_for_each(|e| f(acc, env, e))
+    }
+}
+
 impl<T: Node> Transform<T> for Statement<T> {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
     where
@@ -37,7 +46,7 @@ impl<T: Node> Transform<T> for Statement<T> {
         match self {
             Statement::Decl(d) => d.transform(acc, env, f),
             Statement::Res(r) => r.transform(acc, env, f),
-            Statement::Ann(_) => Ok(()),
+            Statement::Ann(a) => a.transform(acc, env, f),
         }
     }
 }
@@ -145,6 +154,7 @@ impl<T: Node> Transform<T> for Expr<T> {
             Expr::Lambda(lambda) => lambda.transform(acc, env, f),
             Expr::App(application) => application.transform(acc, env, f),
             Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
+            Expr::Ann(_) => Ok(()),
         }
     }
 }

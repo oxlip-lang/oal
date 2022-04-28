@@ -1,3 +1,4 @@
+use crate::annotation::{annotate, Annotated};
 use crate::errors::{Error, Kind, Result};
 use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
 use crate::reduction::reduce;
@@ -121,6 +122,7 @@ impl<T: Node> TryFrom<&ast::Expr<T>> for Schema {
             ast::Expr::Lambda(_) => Err(Error::new(Kind::UnexpectedExpression, "lambda").with(e)),
             ast::Expr::App(_) => Err(Error::new(Kind::UnexpectedExpression, "application").with(e)),
             ast::Expr::Binding(_) => Err(Error::new(Kind::UnexpectedExpression, "binding").with(e)),
+            ast::Expr::Ann(_) => Err(Error::new(Kind::UnexpectedExpression, "annotation").with(e)),
         }
     }
 }
@@ -248,7 +250,7 @@ impl<T: Node> TryFrom<&ast::Program<T>> for Spec {
     }
 }
 
-pub fn evaluate<T: Node + Tagged>(mut prg: ast::Program<T>) -> Result<Spec> {
+pub fn evaluate<T: Node + Tagged + Annotated>(mut prg: ast::Program<T>) -> Result<Spec> {
     prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)?;
 
     let constraint = &mut TypeConstraint::new();
@@ -258,6 +260,8 @@ pub fn evaluate<T: Node + Tagged>(mut prg: ast::Program<T>) -> Result<Spec> {
     let subst = &mut constraint.unify()?;
 
     prg.transform(subst, &mut Env::new(), substitute)?;
+
+    prg.transform(&mut None, &mut Env::new(), annotate)?;
 
     prg.transform(&mut (), &mut Env::new(), reduce)?;
 

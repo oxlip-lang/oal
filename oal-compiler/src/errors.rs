@@ -8,6 +8,7 @@ pub enum Kind {
     CannotUnify,
     RelationConflict,
     UnexpectedExpression,
+    InvalidYAML,
 }
 
 impl Default for Kind {
@@ -35,6 +36,12 @@ impl Error {
     pub fn with<T: Debug>(mut self, e: &T) -> Self {
         self.details.push(format!("{:?}", e));
         self
+    }
+}
+
+impl From<serde_yaml::Error> for Error {
+    fn from(e: serde_yaml::Error) -> Self {
+        Error::new(Kind::InvalidYAML, e.to_string().as_str())
     }
 }
 

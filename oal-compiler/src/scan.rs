@@ -29,6 +29,15 @@ impl<T: Node> Scan<T> for Resource<T> {
     }
 }
 
+impl<T: Node> Scan<T> for Annotation<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+    {
+        self.into_iter().try_for_each(|e| f(acc, env, e))
+    }
+}
+
 impl<T: Node> Scan<T> for Statement<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
     where
@@ -37,7 +46,7 @@ impl<T: Node> Scan<T> for Statement<T> {
         match self {
             Statement::Decl(d) => d.scan(acc, env, f),
             Statement::Res(r) => r.scan(acc, env, f),
-            Statement::Ann(_) => Ok(()),
+            Statement::Ann(a) => a.scan(acc, env, f),
         }
     }
 }
@@ -145,6 +154,7 @@ impl<T: Node> Scan<T> for Expr<T> {
             Expr::Lambda(lambda) => lambda.scan(acc, env, f),
             Expr::App(application) => application.scan(acc, env, f),
             Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
+            Expr::Ann(_) => Ok(()),
         }
     }
 }

@@ -75,6 +75,7 @@ pub fn tag_type<T: Node + Tagged>(seq: &mut TagSeq, env: &mut Env<T>, e: &mut T)
                 }
             }
         },
+        Expr::Ann(_) => Ok(()),
     }
 }
 
@@ -284,5 +285,6 @@ pub fn constrain<T: Node + Tagged>(c: &mut TypeConstraint, env: &mut Env<T>, e: 
         },
         Expr::Var(_) => Ok(()),
         Expr::Binding(_) => Ok(()),
+        Expr::Ann(_) => Ok(()),
     }
 }

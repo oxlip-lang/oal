@@ -20,6 +20,7 @@ pub enum Expr<T> {
     Lambda(Lambda<T>),
     App(Application<T>),
     Binding(Ident),
+    Ann(String),
 }
 
 pub trait Node: From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug {}
@@ -37,6 +38,12 @@ pub trait IntoNode<T>: Sized {
 impl<T: FromPair> IntoNode<T> for Pair<'_> {
     fn into_node(self) -> T {
         T::from_pair(self)
+    }
+}
+
+impl FromPair for String {
+    fn from_pair(p: Pair) -> Self {
+        p.as_str().to_owned()
     }
 }
 
@@ -62,6 +69,7 @@ impl<T: Node> FromPair for T {
                 }
             }
             Rule::apply => Expr::App(p.into_node()).into(),
+            Rule::line => Expr::Ann(p.into_node()).into(),
             _ => unreachable!(),
         }
     }
@@ -166,15 +174,33 @@ impl<'a, T> IntoIterator for &'a mut Resource<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Annotation {
-    pub ann: String,
+pub struct Annotation<T> {
+    pub ann: T,
 }
 
-impl FromPair for Annotation {
+impl<T: Node> FromPair for Annotation<T> {
     fn from_pair(p: Pair) -> Self {
         Annotation {
-            ann: p.into_inner().next().unwrap().as_str().to_owned(),
+            ann: p.into_inner().next().unwrap().into_node(),
         }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Annotation<T> {
+    type Item = &'a T;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(&self.ann)
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Annotation<T> {
+    type Item = &'a mut T;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(&mut self.ann)
     }
 }
 
@@ -182,7 +208,7 @@ impl FromPair for Annotation {
 pub enum Statement<T> {
     Decl(Declaration<T>),
     Res(Resource<T>),
-    Ann(Annotation),
+    Ann(Annotation<T>),
 }
 
 impl<T: Node> FromPair for Statement<T> {

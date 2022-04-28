@@ -253,7 +253,7 @@ fn parse_lambda_decl() {
 #[test]
 fn parse_annotation() {
     let code = r#"
-        # description: "some identifer", required: true
+        # description: "some identifer"
         let id = num;
         # description: "some record"
         let r = {};

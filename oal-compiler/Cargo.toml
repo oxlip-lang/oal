@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 oal-syntax = { path = "../oal-syntax" }
-indexmap = "1.8.1"
-enum-map = "2.1.0"
-enum-map-derive = "0.8.0"
+indexmap = "1.8"
+enum-map = "2.1"
+enum-map-derive = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.8"

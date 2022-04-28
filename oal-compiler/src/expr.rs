@@ -1,9 +1,11 @@
+use crate::annotation::{Annotated, Annotation};
 use crate::tag::{Tag, Tagged};
 use oal_syntax::ast::Expr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedExpr {
     tag: Option<Tag>,
+    ann: Option<Annotation>,
     inner: Expr<TypedExpr>,
 }
 
@@ -26,10 +28,21 @@ impl Tagged for TypedExpr {
     }
 }
 
+impl Annotated for TypedExpr {
+    fn annotation(&self) -> Option<&Annotation> {
+        self.ann.as_ref()
+    }
+
+    fn set_annotation(&mut self, a: Annotation) {
+        self.ann = Some(a);
+    }
+}
+
 impl From<Expr<TypedExpr>> for TypedExpr {
     fn from(e: Expr<TypedExpr>) -> Self {
         TypedExpr {
             tag: None,
+            ann: None,
             inner: e,
         }
     }

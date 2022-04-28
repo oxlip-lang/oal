@@ -6,5 +6,5 @@ edition = "2021"
 [dependencies]
 pest = "2.1"
 pest_derive = "2.1"
-enum-map = "2.1.0"
-enum-map-derive = "0.8.0"
+enum-map = "2.1"
+enum-map-derive = "0.8"

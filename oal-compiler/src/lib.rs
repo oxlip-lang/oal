@@ -1,3 +1,6 @@
+extern crate core;
+
+mod annotation;
 mod errors;
 pub mod eval;
 mod expr;
@@ -8,6 +11,8 @@ mod scope;
 mod tag;
 mod transform;
 
+#[cfg(test)]
+mod annotation_tests;
 #[cfg(test)]
 mod eval_tests;
 #[cfg(test)]
