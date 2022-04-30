@@ -11,7 +11,7 @@ use serde_yaml::Value;
 fn annotate_simple() {
     let code = r#"
         # description: "some identifier", required: true
-        let id = num;
+        let id = num | str;
         # description: "some record"
         let r = {};
         res /{ n id } ( put : r -> r );

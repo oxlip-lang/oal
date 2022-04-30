@@ -76,7 +76,6 @@ where
                     }
                 }
             },
-            Expr::Ann(_) => Ok(()),
         },
         _ => Ok(()),
     }
@@ -294,7 +293,6 @@ where
             },
             Expr::Var(_) => Ok(()),
             Expr::Binding(_) => Ok(()),
-            Expr::Ann(_) => Ok(()),
         },
         _ => Ok(()),
     }

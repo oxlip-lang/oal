@@ -9,6 +9,15 @@ pub trait Transform<T> {
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>;
 }
 
+fn transform_expr<T, F, E, U>(e: &mut T, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+where
+    T: AsExpr,
+    F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
+{
+    e.as_mut().transform(acc, env, f)?;
+    f(acc, env, NodeMut::Expr(e))
+}
+
 impl<T: AsExpr> Transform<T> for Declaration<T> {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
@@ -16,7 +25,7 @@ impl<T: AsExpr> Transform<T> for Declaration<T> {
     {
         f(acc, env, NodeMut::Decl(self))?;
         self.into_iter()
-            .try_for_each(|e| e.transform(acc, env, f))?;
+            .try_for_each(|e| transform_expr(e, acc, env, f))?;
         env.declare(&self.name, &self.expr);
         Ok(())
     }
@@ -28,17 +37,17 @@ impl<T: AsExpr> Transform<T> for Resource<T> {
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
         f(acc, env, NodeMut::Res(self))?;
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
-impl<T: AsExpr> Transform<T> for Annotation<T> {
+impl<T> Transform<T> for Annotation {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        f(acc, env, NodeMut::Ann(self))?;
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        f(acc, env, NodeMut::Ann(self))
     }
 }
 
@@ -69,7 +78,8 @@ impl<T: AsExpr> Transform<T> for Relation<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
@@ -78,7 +88,8 @@ impl<T: AsExpr> Transform<T> for Uri<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
@@ -87,7 +98,8 @@ impl<T: AsExpr> Transform<T> for Object<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
@@ -96,7 +108,8 @@ impl<T: AsExpr> Transform<T> for Array<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
@@ -105,7 +118,8 @@ impl<T: AsExpr> Transform<T> for VariadicOp<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
@@ -118,7 +132,7 @@ impl<T: AsExpr> Transform<T> for Lambda<T> {
             (&mut self.bindings)
                 .into_iter()
                 .try_for_each(|binding| {
-                    binding.transform(acc, env, f).and_then(|_| {
+                    transform_expr(binding, acc, env, f).and_then(|_| {
                         if let Expr::Binding(name) = binding.as_ref() {
                             env.declare(name, binding);
                             Ok(())
@@ -127,7 +141,7 @@ impl<T: AsExpr> Transform<T> for Lambda<T> {
                         }
                     })
                 })
-                .and_then(|_| self.body.transform(acc, env, f))
+                .and_then(|_| transform_expr(self.body.as_mut(), acc, env, f))
         })
     }
 }
@@ -137,17 +151,8 @@ impl<T: AsExpr> Transform<T> for Application<T> {
     where
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| e.transform(acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for T {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.as_mut().transform(acc, env, f)?;
-        f(acc, env, NodeMut::Expr(self))
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 
@@ -165,7 +170,6 @@ impl<T: AsExpr> Transform<T> for Expr<T> {
             Expr::Lambda(lambda) => lambda.transform(acc, env, f),
             Expr::App(application) => application.transform(acc, env, f),
             Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
-            Expr::Ann(_) => Ok(()),
         }
     }
 }

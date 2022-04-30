@@ -122,7 +122,6 @@ impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Schema {
             ast::Expr::Lambda(_) => Err(Error::new(Kind::UnexpectedExpression, "lambda").with(e)),
             ast::Expr::App(_) => Err(Error::new(Kind::UnexpectedExpression, "application").with(e)),
             ast::Expr::Binding(_) => Err(Error::new(Kind::UnexpectedExpression, "binding").with(e)),
-            ast::Expr::Ann(_) => Err(Error::new(Kind::UnexpectedExpression, "annotation").with(e)),
         }
     }
 }

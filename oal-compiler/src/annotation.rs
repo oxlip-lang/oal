@@ -1,6 +1,6 @@
 use crate::errors::Result;
 use crate::scope::Env;
-use oal_syntax::ast::{AsExpr, Expr, NodeMut};
+use oal_syntax::ast::{AsExpr, NodeMut};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation {
@@ -17,17 +17,15 @@ where
     T: AsExpr + Annotated,
 {
     match node {
-        NodeMut::Expr(e) => match e.as_ref() {
-            Expr::Ann(doc) => {
-                let props = serde_yaml::from_str(format!("{{ {} }}", doc).as_str())?;
-                acc.replace(Annotation { props });
+        NodeMut::Ann(a) => {
+            let props = serde_yaml::from_str(format!("{{ {} }}", a.text).as_str())?;
+            acc.replace(Annotation { props });
+        }
+        NodeMut::Decl(d) => {
+            if let Some(ann) = acc.take() {
+                d.expr.set_annotation(ann);
             }
-            _ => {
-                if let Some(ann) = acc.take() {
-                    e.set_annotation(ann);
-                }
-            }
-        },
+        }
         _ => {}
     }
     Ok(())

@@ -13,7 +13,7 @@ pub enum NodeRef<'a, T> {
     Expr(&'a T),
     Decl(&'a Declaration<T>),
     Res(&'a Resource<T>),
-    Ann(&'a Annotation<T>),
+    Ann(&'a Annotation),
 }
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ pub enum NodeMut<'a, T> {
     Expr(&'a mut T),
     Decl(&'a mut Declaration<T>),
     Res(&'a mut Resource<T>),
-    Ann(&'a mut Annotation<T>),
+    Ann(&'a mut Annotation),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -36,7 +36,6 @@ pub enum Expr<T> {
     Lambda(Lambda<T>),
     App(Application<T>),
     Binding(Ident),
-    Ann(String),
 }
 
 pub trait AsExpr: From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug {}
@@ -54,12 +53,6 @@ pub trait IntoExpr<T>: Sized {
 impl<T: FromPair> IntoExpr<T> for Pair<'_> {
     fn into_expr(self) -> T {
         T::from_pair(self)
-    }
-}
-
-impl FromPair for String {
-    fn from_pair(p: Pair) -> Self {
-        p.as_str().to_owned()
     }
 }
 
@@ -85,7 +78,6 @@ impl<T: AsExpr> FromPair for T {
                 }
             }
             Rule::apply => Expr::App(p.into_expr()).into(),
-            Rule::line => Expr::Ann(p.into_expr()).into(),
             _ => unreachable!(),
         }
     }
@@ -208,33 +200,15 @@ impl<'a, T> IntoIterator for &'a mut Resource<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Annotation<T> {
-    pub ann: T,
+pub struct Annotation {
+    pub text: String,
 }
 
-impl<T: AsExpr> FromPair for Annotation<T> {
+impl FromPair for Annotation {
     fn from_pair(p: Pair) -> Self {
         Annotation {
-            ann: p.into_inner().next().unwrap().into_expr(),
+            text: p.into_inner().next().unwrap().as_str().to_owned(),
         }
-    }
-}
-
-impl<'a, T> IntoIterator for &'a Annotation<T> {
-    type Item = &'a T;
-    type IntoIter = Once<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        once(&self.ann)
-    }
-}
-
-impl<'a, T> IntoIterator for &'a mut Annotation<T> {
-    type Item = &'a mut T;
-    type IntoIter = Once<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        once(&mut self.ann)
     }
 }
 
@@ -242,7 +216,7 @@ impl<'a, T> IntoIterator for &'a mut Annotation<T> {
 pub enum Statement<T> {
     Decl(Declaration<T>),
     Res(Resource<T>),
-    Ann(Annotation<T>),
+    Ann(Annotation),
 }
 
 impl<T: AsExpr> FromPair for Statement<T> {
