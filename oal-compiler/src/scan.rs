@@ -1,47 +1,50 @@
 use crate::scope::Env;
 use oal_syntax::ast::*;
 
-pub trait Scan<T: Node> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
+pub trait Scan<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
         Self: Sized,
         E: Sized,
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>;
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>;
 }
 
-impl<T: Node> Scan<T> for Declaration<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Declaration<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        f(acc, env, &self.expr)?;
+        f(acc, env, NodeRef::Decl(self))?;
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))?;
         env.declare(&self.name, &self.expr);
         Ok(())
     }
 }
 
-impl<T: Node> Scan<T> for Resource<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Resource<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        f(acc, env, NodeRef::Res(self))?;
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Annotation<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Annotation<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        f(acc, env, NodeRef::Ann(self))?;
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Statement<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Statement<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         match self {
             Statement::Decl(d) => d.scan(acc, env, f),
@@ -51,73 +54,70 @@ impl<T: Node> Scan<T> for Statement<T> {
     }
 }
 
-impl<T: Node> Scan<T> for Program<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Program<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        env.within(|env| {
-            self.into_iter()
-                .try_for_each(|s| s.scan(acc, env, |a, v, e| f(a, v, e)))
-        })
+        env.within(|env| self.into_iter().try_for_each(|s| s.scan(acc, env, f)))
     }
 }
 
-impl<T: Node> Scan<T> for Relation<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Relation<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Uri<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Uri<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Object<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Object<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Array<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Array<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for VariadicOp<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for VariadicOp<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Lambda<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Lambda<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         env.within(|env| {
             (&self.bindings)
                 .into_iter()
                 .try_for_each(|binding| {
-                    f(acc, env, binding).and_then(|_| {
+                    binding.scan(acc, env, f).and_then(|_| {
                         if let Expr::Binding(name) = binding.as_ref() {
                             env.declare(name, binding);
                             Ok(())
@@ -126,24 +126,34 @@ impl<T: Node> Scan<T> for Lambda<T> {
                         }
                     })
                 })
-                .and_then(|_| f(acc, env, &self.body))
+                .and_then(|_| self.body.scan(acc, env, f))
         })
     }
 }
 
-impl<T: Node> Scan<T> for Application<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, mut f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for Application<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
-        self.into_iter().try_for_each(|e| f(acc, env, e))
+        self.into_iter().try_for_each(|e| e.scan(acc, env, f))
     }
 }
 
-impl<T: Node> Scan<T> for Expr<T> {
-    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: F) -> Result<(), E>
+impl<T: AsExpr> Scan<T> for T {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
-        F: FnMut(&mut U, &mut Env<T>, &T) -> Result<(), E>,
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
+    {
+        self.as_ref().scan(acc, env, f)?;
+        f(acc, env, NodeRef::Expr(self))
+    }
+}
+
+impl<T: AsExpr> Scan<T> for Expr<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         match self {
             Expr::Rel(rel) => rel.scan(acc, env, f),

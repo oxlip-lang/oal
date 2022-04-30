@@ -8,7 +8,7 @@ use crate::tag::Tagged;
 use crate::transform::Transform;
 use enum_map::EnumMap;
 use oal_syntax::ast;
-use oal_syntax::ast::Node;
+use oal_syntax::ast::AsExpr;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -19,7 +19,7 @@ pub enum UriSegment {
     Variable(Prop),
 }
 
-impl<T: Node> TryFrom<&ast::UriSegment<T>> for UriSegment {
+impl<T: AsExpr> TryFrom<&ast::UriSegment<T>> for UriSegment {
     type Error = Error;
 
     fn try_from(s: &ast::UriSegment<T>) -> Result<Self> {
@@ -47,7 +47,7 @@ impl Uri {
     }
 }
 
-impl<T: Node> TryFrom<&ast::Uri<T>> for Uri {
+impl<T: AsExpr> TryFrom<&ast::Uri<T>> for Uri {
     type Error = Error;
 
     fn try_from(uri: &ast::Uri<T>) -> Result<Self> {
@@ -56,7 +56,7 @@ impl<T: Node> TryFrom<&ast::Uri<T>> for Uri {
     }
 }
 
-impl<T: Node> TryFrom<&ast::Expr<T>> for Uri {
+impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Uri {
     type Error = Error;
 
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
@@ -72,7 +72,7 @@ pub struct Array {
     pub item: Box<Schema>,
 }
 
-impl<T: Node> TryFrom<&ast::Array<T>> for Array {
+impl<T: AsExpr> TryFrom<&ast::Array<T>> for Array {
     type Error = Error;
 
     fn try_from(a: &ast::Array<T>) -> Result<Self> {
@@ -88,7 +88,7 @@ pub struct VariadicOp {
     pub schemas: Vec<Schema>,
 }
 
-impl<T: Node> TryFrom<&ast::VariadicOp<T>> for VariadicOp {
+impl<T: AsExpr> TryFrom<&ast::VariadicOp<T>> for VariadicOp {
     type Error = Error;
 
     fn try_from(op: &ast::VariadicOp<T>) -> Result<Self> {
@@ -107,7 +107,7 @@ pub enum Schema {
     Op(VariadicOp),
 }
 
-impl<T: Node> TryFrom<&ast::Expr<T>> for Schema {
+impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Schema {
     type Error = Error;
 
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
@@ -133,7 +133,7 @@ pub struct Prop {
     pub schema: Schema,
 }
 
-impl<T: Node> TryFrom<&ast::Property<T>> for Prop {
+impl<T: AsExpr> TryFrom<&ast::Property<T>> for Prop {
     type Error = Error;
 
     fn try_from(p: &ast::Property<T>) -> Result<Self> {
@@ -149,7 +149,7 @@ pub struct Object {
     pub props: Vec<Prop>,
 }
 
-impl<T: Node> TryFrom<&ast::Object<T>> for Object {
+impl<T: AsExpr> TryFrom<&ast::Object<T>> for Object {
     type Error = Error;
 
     fn try_from(o: &ast::Object<T>) -> Result<Self> {
@@ -164,7 +164,7 @@ pub struct Transfer {
     pub range: Box<Schema>,
 }
 
-impl<T: Node> TryFrom<&ast::Transfer<T>> for Transfer {
+impl<T: AsExpr> TryFrom<&ast::Transfer<T>> for Transfer {
     type Error = Error;
 
     fn try_from(xfer: &ast::Transfer<T>) -> Result<Self> {
@@ -190,7 +190,7 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
-impl<T: Node> TryFrom<&ast::Relation<T>> for Relation {
+impl<T: AsExpr> TryFrom<&ast::Relation<T>> for Relation {
     type Error = Error;
 
     fn try_from(r: &ast::Relation<T>) -> Result<Self> {
@@ -207,7 +207,7 @@ impl<T: Node> TryFrom<&ast::Relation<T>> for Relation {
     }
 }
 
-impl<T: Node> TryFrom<&ast::Expr<T>> for Relation {
+impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Relation {
     type Error = Error;
 
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
@@ -226,7 +226,7 @@ pub struct Spec {
     pub rels: Relations,
 }
 
-impl<T: Node> TryFrom<&ast::Program<T>> for Spec {
+impl<T: AsExpr> TryFrom<&ast::Program<T>> for Spec {
     type Error = Error;
 
     fn try_from(prg: &ast::Program<T>) -> Result<Self> {
@@ -250,20 +250,20 @@ impl<T: Node> TryFrom<&ast::Program<T>> for Spec {
     }
 }
 
-pub fn evaluate<T: Node + Tagged + Annotated>(mut prg: ast::Program<T>) -> Result<Spec> {
-    prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)?;
+pub fn evaluate<T: AsExpr + Tagged + Annotated>(mut prg: ast::Program<T>) -> Result<Spec> {
+    prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)?;
 
     let constraint = &mut TypeConstraint::new();
 
-    prg.scan(constraint, &mut Env::new(), constrain)?;
+    prg.scan(constraint, &mut Env::new(), &mut constrain)?;
 
     let subst = &mut constraint.unify()?;
 
-    prg.transform(subst, &mut Env::new(), substitute)?;
+    prg.transform(subst, &mut Env::new(), &mut substitute)?;
 
-    prg.transform(&mut None, &mut Env::new(), annotate)?;
+    prg.transform(&mut None, &mut Env::new(), &mut annotate)?;
 
-    prg.transform(&mut (), &mut Env::new(), reduce)?;
+    prg.transform(&mut (), &mut Env::new(), &mut reduce)?;
 
     Spec::try_from(&prg)
 }

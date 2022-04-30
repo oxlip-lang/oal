@@ -6,7 +6,7 @@ use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use crate::transform::Transform;
 use crate::Program;
-use oal_syntax::ast::{Expr, Lambda, Statement};
+use oal_syntax::ast::{Expr, Lambda, NodeRef, Statement};
 use oal_syntax::parse;
 
 #[test]
@@ -15,7 +15,7 @@ fn tag_var_decl() {
 
     assert_eq!(d.stmts.len(), 1);
 
-    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
@@ -31,7 +31,7 @@ fn tag_array_decl() {
 
     assert_eq!(d.stmts.len(), 1);
 
-    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
@@ -45,7 +45,7 @@ fn tag_array_decl() {
 fn tag_lambda_decl() {
     let mut d: Program = parse("let f x y z = num;".into()).expect("parsing failed");
 
-    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
     assert_eq!(d.stmts.len(), 1);
@@ -76,7 +76,7 @@ fn tag_lambda_decl() {
 fn tag_not_in_scope() {
     let mut d: Program = parse("let a = f {};".into()).expect("parsing failed");
 
-    let r = d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type);
+    let r = d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type);
 
     if let Err(e) = r {
         assert_eq!(e.kind, Kind::IdentifierNotInScope);
@@ -93,12 +93,12 @@ fn constraint_var() {
     "#;
     let mut d: Program = parse(code.into()).expect("parsing failed");
 
-    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut TypeConstraint::new();
 
-    d.scan(cnt, &mut Env::new(), constrain)
+    d.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");
 
     assert_eq!(cnt.len(), 8);
@@ -108,12 +108,12 @@ fn constraint_var() {
 fn constraint_lambda() {
     let mut d: Program = parse("let f x y z = num;".into()).expect("parsing failed");
 
-    d.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut TypeConstraint::new();
 
-    d.scan(cnt, &mut Env::new(), constrain)
+    d.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");
 
     assert_eq!(cnt.len(), 2);
@@ -134,12 +134,18 @@ fn unify_simple() {
     assert_eq!(t, Tag::Primitive);
 }
 
-fn check_tags(acc: &mut (), env: &mut Env<TypedExpr>, e: &TypedExpr) -> crate::errors::Result<()> {
-    e.as_ref().scan(acc, env, check_tags)?;
-    match e.tag() {
-        None => Err(Error::new(Kind::Unknown, "missing tag").with(e)),
-        Some(Tag::Var(_)) => Err(Error::new(Kind::Unknown, "remaining tag variable").with(e)),
-        Some(_) => Ok(()),
+fn check_tags(
+    _acc: &mut (),
+    _env: &mut Env<TypedExpr>,
+    node: NodeRef<TypedExpr>,
+) -> crate::errors::Result<()> {
+    match node {
+        NodeRef::Expr(e) => match e.tag() {
+            None => Err(Error::new(Kind::Unknown, "missing tag").with(e)),
+            Some(Tag::Var(_)) => Err(Error::new(Kind::Unknown, "remaining tag variable").with(e)),
+            Some(_) => Ok(()),
+        },
+        _ => Ok(()),
     }
 }
 
@@ -151,19 +157,19 @@ fn unify_lambda() {
     "#;
     let mut prg: Program = parse(code.into()).expect("parsing failed");
 
-    prg.transform(&mut TagSeq::new(), &mut Env::new(), tag_type)
+    prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut TypeConstraint::new();
 
-    prg.scan(cnt, &mut Env::new(), constrain)
+    prg.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");
 
     let subst = &mut cnt.unify().expect("unification failed");
 
-    prg.transform(subst, &mut Env::new(), substitute)
+    prg.transform(subst, &mut Env::new(), &mut substitute)
         .expect("substitution failed");
 
-    prg.scan(&mut (), &mut Env::new(), check_tags)
+    prg.scan(&mut (), &mut Env::new(), &mut check_tags)
         .expect("substitution incomplete");
 }

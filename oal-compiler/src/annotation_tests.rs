@@ -20,10 +20,10 @@ fn annotate_simple() {
 
     assert_eq!(prg.stmts.len(), 5);
 
-    prg.transform(&mut None, &mut Env::new(), annotate)
+    prg.transform(&mut None, &mut Env::new(), &mut annotate)
         .expect("annotation failed");
 
-    prg.transform(&mut (), &mut Env::new(), reduce)
+    prg.transform(&mut (), &mut Env::new(), &mut reduce)
         .expect("reduction failed");
 
     if let Statement::Res(res) = prg.stmts.iter().nth(4).unwrap() {

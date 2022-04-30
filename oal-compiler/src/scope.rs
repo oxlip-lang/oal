@@ -1,4 +1,4 @@
-use oal_syntax::ast::{Ident, Node};
+use oal_syntax::ast::{AsExpr, Ident};
 use std::collections::HashMap;
 
 pub type Scope<T> = HashMap<Ident, T>;
@@ -7,7 +7,7 @@ pub struct Env<T> {
     scopes: Vec<Scope<T>>,
 }
 
-impl<T: Node> Env<T> {
+impl<T: AsExpr> Env<T> {
     pub fn new() -> Env<T> {
         Env {
             scopes: vec![Scope::new()],

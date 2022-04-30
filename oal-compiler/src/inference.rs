@@ -1,9 +1,7 @@
 use crate::errors::{Error, Kind, Result};
-use crate::scan::Scan;
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
-use crate::transform::Transform;
-use oal_syntax::ast::{Expr, Node, Operator};
+use oal_syntax::ast::{AsExpr, Expr, NodeMut, NodeRef, Operator};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -21,61 +19,66 @@ impl TagSeq {
     }
 }
 
-pub fn tag_type<T: Node + Tagged>(seq: &mut TagSeq, env: &mut Env<T>, e: &mut T) -> Result<()> {
-    e.as_mut().transform(seq, env, tag_type)?;
-    match e.as_ref() {
-        Expr::Prim(_) => {
-            e.set_tag(Tag::Primitive);
-            Ok(())
-        }
-        Expr::Rel(_) => {
-            e.set_tag(Tag::Relation);
-            Ok(())
-        }
-        Expr::Uri(_) => {
-            e.set_tag(Tag::Uri);
-            Ok(())
-        }
-        Expr::Object(_) => {
-            e.set_tag(Tag::Object);
-            Ok(())
-        }
-        Expr::Array(_) => {
-            e.set_tag(Tag::Array);
-            Ok(())
-        }
-        Expr::Op(operation) => {
-            let tag = match operation.op {
-                Operator::Join => Tag::Object,
-                Operator::Any => Tag::Any,
-                Operator::Sum => Tag::Var(seq.next()),
-            };
-            e.set_tag(tag);
-            Ok(())
-        }
-        Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
-            Some(val) => {
-                e.set_tag(val.unwrap_tag());
+pub fn tag_type<T>(seq: &mut TagSeq, env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
+where
+    T: AsExpr + Tagged,
+{
+    match node {
+        NodeMut::Expr(e) => match e.as_ref() {
+            Expr::Prim(_) => {
+                e.set_tag(Tag::Primitive);
                 Ok(())
             }
-        },
-        Expr::Lambda(_) | Expr::Binding(_) => {
-            e.set_tag(Tag::Var(seq.next()));
-            Ok(())
-        }
-        Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
-            Some(val) => {
-                if let Expr::Lambda(l) = val.as_ref() {
-                    e.set_tag(l.body.unwrap_tag());
-                    Ok(())
-                } else {
-                    Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
-                }
+            Expr::Rel(_) => {
+                e.set_tag(Tag::Relation);
+                Ok(())
             }
+            Expr::Uri(_) => {
+                e.set_tag(Tag::Uri);
+                Ok(())
+            }
+            Expr::Object(_) => {
+                e.set_tag(Tag::Object);
+                Ok(())
+            }
+            Expr::Array(_) => {
+                e.set_tag(Tag::Array);
+                Ok(())
+            }
+            Expr::Op(operation) => {
+                let tag = match operation.op {
+                    Operator::Join => Tag::Object,
+                    Operator::Any => Tag::Any,
+                    Operator::Sum => Tag::Var(seq.next()),
+                };
+                e.set_tag(tag);
+                Ok(())
+            }
+            Expr::Var(var) => match env.lookup(var) {
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                Some(val) => {
+                    e.set_tag(val.unwrap_tag());
+                    Ok(())
+                }
+            },
+            Expr::Lambda(_) | Expr::Binding(_) => {
+                e.set_tag(Tag::Var(seq.next()));
+                Ok(())
+            }
+            Expr::App(application) => match env.lookup(&application.name) {
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                Some(val) => {
+                    if let Expr::Lambda(l) = val.as_ref() {
+                        e.set_tag(l.body.unwrap_tag());
+                        Ok(())
+                    } else {
+                        Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
+                    }
+                }
+            },
+            Expr::Ann(_) => Ok(()),
         },
-        Expr::Ann(_) => Ok(()),
+        _ => Ok(()),
     }
 }
 
@@ -108,9 +111,12 @@ impl Subst {
     }
 }
 
-pub fn substitute<T: Node + Tagged>(subst: &mut Subst, env: &mut Env<T>, e: &mut T) -> Result<()> {
-    e.set_tag(subst.substitute(e.tag().unwrap()));
-    e.as_mut().transform(subst, env, substitute)
+pub fn substitute<T: Tagged>(subst: &mut Subst, _env: &mut Env<T>, node: NodeMut<T>) -> Result<()> {
+    match node {
+        NodeMut::Expr(e) => e.set_tag(subst.substitute(e.tag().unwrap())),
+        _ => {}
+    }
+    Ok(())
 }
 
 fn occurs(a: &Tag, b: &Tag) -> bool {
@@ -209,82 +215,87 @@ impl TypeConstraint {
     }
 }
 
-pub fn constrain<T: Node + Tagged>(c: &mut TypeConstraint, env: &mut Env<T>, e: &T) -> Result<()> {
-    e.as_ref().scan(c, env, constrain)?;
-    match e.as_ref() {
-        Expr::Prim(_) => {
-            c.push(e.unwrap_tag(), Tag::Primitive);
-            Ok(())
-        }
-        Expr::Rel(rel) => {
-            for xfer in rel.xfers.values() {
-                if let Some(x) = xfer.as_ref() {
-                    c.push(x.range.unwrap_tag(), Tag::Object);
-                    if let Some(domain) = &x.domain {
-                        c.push(domain.unwrap_tag(), Tag::Object);
-                    }
-                }
-            }
-            c.push(rel.uri.unwrap_tag(), Tag::Uri);
-            c.push(e.unwrap_tag(), Tag::Relation);
-            Ok(())
-        }
-        Expr::Uri(uri) => {
-            for seg in uri.into_iter() {
-                c.push(seg.unwrap_tag(), Tag::Primitive);
-            }
-            c.push(e.unwrap_tag(), Tag::Uri);
-            Ok(())
-        }
-        Expr::Object(_) => {
-            c.push(e.unwrap_tag(), Tag::Object);
-            Ok(())
-        }
-        Expr::Array(_) => {
-            c.push(e.unwrap_tag(), Tag::Array);
-            Ok(())
-        }
-        Expr::Op(operation) => {
-            let operator = operation.op;
-            for op in operation.into_iter() {
-                match operator {
-                    Operator::Join => c.push(op.unwrap_tag(), Tag::Object),
-                    Operator::Sum => c.push(e.unwrap_tag(), op.unwrap_tag()),
-                    _ => {}
-                }
-            }
-            match operator {
-                Operator::Join => c.push(e.unwrap_tag(), Tag::Object),
-                Operator::Any => c.push(e.unwrap_tag(), Tag::Any),
-                _ => {}
-            }
-            Ok(())
-        }
-        Expr::Lambda(lambda) => {
-            let bindings = lambda
-                .bindings
-                .iter()
-                .map(|b| b.unwrap_tag().clone())
-                .collect();
-            let range = lambda.body.unwrap_tag().clone().into();
-            c.push(e.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
-            Ok(())
-        }
-        Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
-            Some(val) => {
-                let bindings = application
-                    .args
-                    .iter()
-                    .map(|a| a.unwrap_tag().clone())
-                    .collect();
-                let range = e.unwrap_tag().clone().into();
-                c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+pub fn constrain<T>(c: &mut TypeConstraint, env: &mut Env<T>, node: NodeRef<T>) -> Result<()>
+where
+    T: AsExpr + Tagged,
+{
+    match node {
+        NodeRef::Expr(e) => match e.as_ref() {
+            Expr::Prim(_) => {
+                c.push(e.unwrap_tag(), Tag::Primitive);
                 Ok(())
             }
+            Expr::Rel(rel) => {
+                for xfer in rel.xfers.values() {
+                    if let Some(x) = xfer.as_ref() {
+                        c.push(x.range.unwrap_tag(), Tag::Object);
+                        if let Some(domain) = &x.domain {
+                            c.push(domain.unwrap_tag(), Tag::Object);
+                        }
+                    }
+                }
+                c.push(rel.uri.unwrap_tag(), Tag::Uri);
+                c.push(e.unwrap_tag(), Tag::Relation);
+                Ok(())
+            }
+            Expr::Uri(uri) => {
+                for seg in uri.into_iter() {
+                    c.push(seg.unwrap_tag(), Tag::Primitive);
+                }
+                c.push(e.unwrap_tag(), Tag::Uri);
+                Ok(())
+            }
+            Expr::Object(_) => {
+                c.push(e.unwrap_tag(), Tag::Object);
+                Ok(())
+            }
+            Expr::Array(_) => {
+                c.push(e.unwrap_tag(), Tag::Array);
+                Ok(())
+            }
+            Expr::Op(operation) => {
+                let operator = operation.op;
+                for op in operation.into_iter() {
+                    match operator {
+                        Operator::Join => c.push(op.unwrap_tag(), Tag::Object),
+                        Operator::Sum => c.push(e.unwrap_tag(), op.unwrap_tag()),
+                        _ => {}
+                    }
+                }
+                match operator {
+                    Operator::Join => c.push(e.unwrap_tag(), Tag::Object),
+                    Operator::Any => c.push(e.unwrap_tag(), Tag::Any),
+                    _ => {}
+                }
+                Ok(())
+            }
+            Expr::Lambda(lambda) => {
+                let bindings = lambda
+                    .bindings
+                    .iter()
+                    .map(|b| b.unwrap_tag().clone())
+                    .collect();
+                let range = lambda.body.unwrap_tag().clone().into();
+                c.push(e.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+                Ok(())
+            }
+            Expr::App(application) => match env.lookup(&application.name) {
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                Some(val) => {
+                    let bindings = application
+                        .args
+                        .iter()
+                        .map(|a| a.unwrap_tag().clone())
+                        .collect();
+                    let range = e.unwrap_tag().clone().into();
+                    c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+                    Ok(())
+                }
+            },
+            Expr::Var(_) => Ok(()),
+            Expr::Binding(_) => Ok(()),
+            Expr::Ann(_) => Ok(()),
         },
-        Expr::Var(_) => Ok(()),
-        Expr::Binding(_) => Ok(()),
-        Expr::Ann(_) => Ok(()),
+        _ => Ok(()),
     }
 }

@@ -1,7 +1,6 @@
 use crate::errors::Result;
 use crate::scope::Env;
-use crate::transform::Transform;
-use oal_syntax::ast::{Expr, Node};
+use oal_syntax::ast::{AsExpr, Expr, NodeMut};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation {
@@ -13,21 +12,23 @@ pub trait Annotated {
     fn set_annotation(&mut self, a: Annotation);
 }
 
-pub fn annotate<T>(acc: &mut Option<Annotation>, env: &mut Env<T>, e: &mut T) -> Result<()>
+pub fn annotate<T>(acc: &mut Option<Annotation>, _env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
 where
-    T: Node + Annotated,
+    T: AsExpr + Annotated,
 {
-    e.as_mut().transform(acc, env, annotate)?;
-    match e.as_ref() {
-        Expr::Ann(doc) => {
-            let props = serde_yaml::from_str(format!("{{ {} }}", doc).as_str())?;
-            acc.replace(Annotation { props });
-        }
-        _ => {
-            if let Some(ann) = acc.take() {
-                e.set_annotation(ann);
+    match node {
+        NodeMut::Expr(e) => match e.as_ref() {
+            Expr::Ann(doc) => {
+                let props = serde_yaml::from_str(format!("{{ {} }}", doc).as_str())?;
+                acc.replace(Annotation { props });
             }
-        }
+            _ => {
+                if let Some(ann) = acc.take() {
+                    e.set_annotation(ann);
+                }
+            }
+        },
+        _ => {}
     }
     Ok(())
 }

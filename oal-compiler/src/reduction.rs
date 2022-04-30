@@ -1,41 +1,46 @@
 use crate::errors::{Error, Kind, Result};
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, Node};
+use oal_syntax::ast::{AsExpr, Expr, NodeMut};
 
-pub fn reduce<T: Node>(acc: &mut (), env: &mut Env<T>, e: &mut T) -> Result<()> {
-    e.as_mut().transform(acc, env, reduce)?;
-    match e.as_mut() {
-        Expr::Var(var) => match env.lookup(var) {
-            None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
-            Some(val) => {
-                match val.as_ref() {
-                    Expr::Binding(_) => {}
-                    _ => *e = val.clone(),
-                };
-                Ok(())
-            }
-        },
-        Expr::App(application) => match env.lookup(&application.name) {
-            None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(e)),
-            Some(val) => {
-                if let Expr::Lambda(lambda) = val.as_ref() {
-                    let app_env = &mut Env::new();
-                    for (binding, arg) in lambda.bindings.iter().zip(application.args.iter()) {
-                        if let Expr::Binding(name) = binding.as_ref() {
-                            app_env.declare(name, arg)
-                        } else {
-                            unreachable!()
-                        }
-                    }
-                    let mut app = lambda.body.as_ref().clone();
-                    app.as_mut().transform(&mut (), app_env, reduce)?;
-                    *e = app;
+pub fn reduce<T>(_acc: &mut (), env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
+where
+    T: AsExpr,
+{
+    match node {
+        NodeMut::Expr(e) => match e.as_mut() {
+            Expr::Var(var) => match env.lookup(var) {
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                Some(val) => {
+                    match val.as_ref() {
+                        Expr::Binding(_) => {}
+                        _ => *e = val.clone(),
+                    };
                     Ok(())
-                } else {
-                    Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
                 }
-            }
+            },
+            Expr::App(application) => match env.lookup(&application.name) {
+                None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(e)),
+                Some(val) => {
+                    if let Expr::Lambda(lambda) = val.as_ref() {
+                        let app_env = &mut Env::new();
+                        for (binding, arg) in lambda.bindings.iter().zip(application.args.iter()) {
+                            if let Expr::Binding(name) = binding.as_ref() {
+                                app_env.declare(name, arg)
+                            } else {
+                                unreachable!()
+                            }
+                        }
+                        let mut app = lambda.body.as_ref().clone();
+                        app.as_mut().transform(&mut (), app_env, &mut reduce)?;
+                        *e = app;
+                        Ok(())
+                    } else {
+                        Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
+                    }
+                }
+            },
+            _ => Ok(()),
         },
         _ => Ok(()),
     }
