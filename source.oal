@@ -2,6 +2,7 @@
 let id1 = num;
 
 // Records
+# description: "some stuff"
 let rec1 = {
   firstName str,
   lastName str,

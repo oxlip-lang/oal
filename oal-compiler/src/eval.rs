@@ -9,6 +9,7 @@ use crate::transform::Transform;
 use enum_map::EnumMap;
 use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
+use serde_yaml::Value;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -19,7 +20,10 @@ pub enum UriSegment {
     Variable(Prop),
 }
 
-impl<T: AsExpr> TryFrom<&ast::UriSegment<T>> for UriSegment {
+impl<T> TryFrom<&ast::UriSegment<T>> for UriSegment
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(s: &ast::UriSegment<T>) -> Result<Self> {
@@ -47,7 +51,10 @@ impl Uri {
     }
 }
 
-impl<T: AsExpr> TryFrom<&ast::Uri<T>> for Uri {
+impl<T> TryFrom<&ast::Uri<T>> for Uri
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(uri: &ast::Uri<T>) -> Result<Self> {
@@ -56,7 +63,10 @@ impl<T: AsExpr> TryFrom<&ast::Uri<T>> for Uri {
     }
 }
 
-impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Uri {
+impl<T> TryFrom<&ast::Expr<T>> for Uri
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
@@ -72,11 +82,14 @@ pub struct Array {
     pub item: Box<Schema>,
 }
 
-impl<T: AsExpr> TryFrom<&ast::Array<T>> for Array {
+impl<T> TryFrom<&ast::Array<T>> for Array
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(a: &ast::Array<T>) -> Result<Self> {
-        a.item.as_ref().as_ref().try_into().map(|item| Array {
+        into_schema(a.item.as_ref()).map(|item| Array {
             item: Box::new(item),
         })
     }
@@ -88,17 +101,26 @@ pub struct VariadicOp {
     pub schemas: Vec<Schema>,
 }
 
-impl<T: AsExpr> TryFrom<&ast::VariadicOp<T>> for VariadicOp {
+impl<T> TryFrom<&ast::VariadicOp<T>> for VariadicOp
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(op: &ast::VariadicOp<T>) -> Result<Self> {
-        let schemas: Result<Vec<_>> = op.exprs.iter().map(|e| e.as_ref().try_into()).collect();
+        let schemas: Result<Vec<_>> = op.exprs.iter().map(into_schema).collect();
         schemas.map(|schemas| VariadicOp { op: op.op, schemas })
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Schema {
+pub struct Schema {
+    pub expr: Expr,
+    pub desc: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expr {
     Prim(ast::Primitive),
     Rel(Relation),
     Uri(Uri),
@@ -107,23 +129,27 @@ pub enum Schema {
     Op(VariadicOp),
 }
 
-impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Schema {
-    type Error = Error;
-
-    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
-        match e {
-            ast::Expr::Prim(prim) => Ok(Schema::Prim(*prim)),
-            ast::Expr::Rel(rel) => rel.try_into().map(|r| Schema::Rel(r)),
-            ast::Expr::Uri(uri) => uri.try_into().map(|u| Schema::Uri(u)),
-            ast::Expr::Array(arr) => arr.try_into().map(|a| Schema::Array(a)),
-            ast::Expr::Object(obj) => obj.try_into().map(|o| Schema::Object(o)),
-            ast::Expr::Op(op) => op.try_into().map(|o| Schema::Op(o)),
-            ast::Expr::Var(_) => Err(Error::new(Kind::UnexpectedExpression, "variable").with(e)),
-            ast::Expr::Lambda(_) => Err(Error::new(Kind::UnexpectedExpression, "lambda").with(e)),
-            ast::Expr::App(_) => Err(Error::new(Kind::UnexpectedExpression, "application").with(e)),
-            ast::Expr::Binding(_) => Err(Error::new(Kind::UnexpectedExpression, "binding").with(e)),
+fn into_schema<T>(e: &T) -> Result<Schema>
+where
+    T: AsExpr + Annotated,
+{
+    let expr = match e.as_ref() {
+        ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
+        ast::Expr::Rel(rel) => rel.try_into().map(|r| Expr::Rel(r)),
+        ast::Expr::Uri(uri) => uri.try_into().map(|u| Expr::Uri(u)),
+        ast::Expr::Array(arr) => arr.try_into().map(|a| Expr::Array(a)),
+        ast::Expr::Object(obj) => obj.try_into().map(|o| Expr::Object(o)),
+        ast::Expr::Op(op) => op.try_into().map(|o| Expr::Op(o)),
+        ast::Expr::Var(_) | ast::Expr::Lambda(_) | ast::Expr::App(_) | ast::Expr::Binding(_) => {
+            Err(Error::new(Kind::UnexpectedExpression, "").with(e))
         }
-    }
+    }?;
+    let desc = e
+        .annotation()
+        .and_then(|a| a.props.get(&Value::String("description".to_owned())))
+        .and_then(|a| a.as_str())
+        .map(|a| a.to_owned());
+    Ok(Schema { expr, desc })
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -132,11 +158,14 @@ pub struct Prop {
     pub schema: Schema,
 }
 
-impl<T: AsExpr> TryFrom<&ast::Property<T>> for Prop {
+impl<T> TryFrom<&ast::Property<T>> for Prop
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(p: &ast::Property<T>) -> Result<Self> {
-        p.val.as_ref().try_into().map(|s| Prop {
+        into_schema(&p.val).map(|s| Prop {
             name: p.key.clone(),
             schema: s,
         })
@@ -148,7 +177,10 @@ pub struct Object {
     pub props: Vec<Prop>,
 }
 
-impl<T: AsExpr> TryFrom<&ast::Object<T>> for Object {
+impl<T> TryFrom<&ast::Object<T>> for Object
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(o: &ast::Object<T>) -> Result<Self> {
@@ -163,18 +195,16 @@ pub struct Transfer {
     pub range: Box<Schema>,
 }
 
-impl<T: AsExpr> TryFrom<&ast::Transfer<T>> for Transfer {
+impl<T> TryFrom<&ast::Transfer<T>> for Transfer
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(xfer: &ast::Transfer<T>) -> Result<Self> {
-        let range = xfer
-            .range
-            .as_ref()
-            .as_ref()
-            .try_into()
-            .map(|r| Box::new(r))?;
+        let range = into_schema(xfer.range.as_ref()).map(Box::new)?;
         let domain = match &xfer.domain {
-            Some(d) => d.as_ref().as_ref().try_into().map(|d| Some(Box::new(d))),
+            Some(d) => into_schema(d.as_ref()).map(|d| Some(Box::new(d))),
             None => Ok(None),
         }?;
         Ok(Transfer { range, domain })
@@ -189,7 +219,10 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
-impl<T: AsExpr> TryFrom<&ast::Relation<T>> for Relation {
+impl<T> TryFrom<&ast::Relation<T>> for Relation
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(r: &ast::Relation<T>) -> Result<Self> {
@@ -206,7 +239,10 @@ impl<T: AsExpr> TryFrom<&ast::Relation<T>> for Relation {
     }
 }
 
-impl<T: AsExpr> TryFrom<&ast::Expr<T>> for Relation {
+impl<T> TryFrom<&ast::Expr<T>> for Relation
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(e: &ast::Expr<T>) -> Result<Self> {
@@ -225,7 +261,10 @@ pub struct Spec {
     pub rels: Relations,
 }
 
-impl<T: AsExpr> TryFrom<&ast::Program<T>> for Spec {
+impl<T> TryFrom<&ast::Program<T>> for Spec
+where
+    T: AsExpr + Annotated,
+{
     type Error = Error;
 
     fn try_from(prg: &ast::Program<T>) -> Result<Self> {
@@ -249,7 +288,10 @@ impl<T: AsExpr> TryFrom<&ast::Program<T>> for Spec {
     }
 }
 
-pub fn evaluate<T: AsExpr + Tagged + Annotated>(mut prg: ast::Program<T>) -> Result<Spec> {
+pub fn evaluate<T>(mut prg: ast::Program<T>) -> Result<Spec>
+where
+    T: AsExpr + Tagged + Annotated,
+{
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)?;
 
     let constraint = &mut TypeConstraint::new();

@@ -145,18 +145,20 @@ impl Builder {
     }
 
     fn schema(&self, s: &eval::Schema) -> Schema {
-        match s {
-            eval::Schema::Prim(prim) => self.prim_schema(prim),
-            eval::Schema::Rel(rel) => self.rel_schema(rel),
-            eval::Schema::Uri(uri) => self.uri_schema(uri),
-            eval::Schema::Object(obj) => self.object_schema(obj),
-            eval::Schema::Array(array) => self.array_schema(array),
-            eval::Schema::Op(operation) => match operation.op {
+        let mut sch = match &s.expr {
+            eval::Expr::Prim(prim) => self.prim_schema(prim),
+            eval::Expr::Rel(rel) => self.rel_schema(rel),
+            eval::Expr::Uri(uri) => self.uri_schema(uri),
+            eval::Expr::Object(obj) => self.object_schema(obj),
+            eval::Expr::Array(array) => self.array_schema(array),
+            eval::Expr::Op(operation) => match operation.op {
                 ast::Operator::Join => self.join_schema(&operation.schemas),
                 ast::Operator::Sum => self.sum_schema(&operation.schemas),
                 ast::Operator::Any => self.any_schema(&operation.schemas),
             },
-        }
+        };
+        sch.schema_data.description = s.desc.clone();
+        sch
     }
 
     fn prop_param(&self, prop: &eval::Prop) -> Parameter {
@@ -213,6 +215,7 @@ impl Builder {
                             schema: Some(ReferenceOr::Item(self.schema(domain))),
                             ..Default::default()
                         }},
+                        description: domain.desc.clone(),
                         ..Default::default()
                     })
                 }),
@@ -222,6 +225,7 @@ impl Builder {
                             schema: Some(ReferenceOr::Item(self.schema(&xfer.range))),
                             ..Default::default()
                         }},
+                        description: xfer.range.desc.clone().unwrap_or("".to_owned()),
                         ..Default::default()
                     })),
                     ..Default::default()
