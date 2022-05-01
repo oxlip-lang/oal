@@ -19,6 +19,7 @@ let id1 = num;
 ```
 ```
 // Objects
+# description: "some stuff"
 let rec1 = {
   firstName str,
   lastName str,
@@ -58,6 +59,7 @@ let f x y = rec2 & ( x | y );
 ```
 ```
 // Function application
+# description: "some other stuff"
 let rec3 = f { height num } { stuff any1 };
 ```
 ```
@@ -87,10 +89,11 @@ paths:
     get:
       responses:
         default:
-          description: ""
+          description: some stuff
           content:
             application/json:
               schema:
+                description: some stuff
                 type: object
                 properties:
                   firstName:
@@ -103,9 +106,11 @@ paths:
                       type: string
     put:
       requestBody:
+        description: some stuff
         content:
           application/json:
             schema:
+              description: some stuff
               type: object
               properties:
                 firstName:
@@ -118,10 +123,11 @@ paths:
                     type: string
       responses:
         default:
-          description: ""
+          description: some stuff
           content:
             application/json:
               schema:
+                description: some stuff
                 type: object
                 properties:
                   firstName:
@@ -134,9 +140,11 @@ paths:
                       type: string
     patch:
       requestBody:
+        description: some stuff
         content:
           application/json:
             schema:
+              description: some stuff
               type: object
               properties:
                 firstName:
@@ -149,10 +157,11 @@ paths:
                     type: string
       responses:
         default:
-          description: ""
+          description: some stuff
           content:
             application/json:
               schema:
+                description: some stuff
                 type: object
                 properties:
                   firstName:
@@ -174,13 +183,15 @@ paths:
     get:
       responses:
         default:
-          description: ""
+          description: some other stuff
           content:
             application/json:
               schema:
+                description: some other stuff
                 allOf:
                   - allOf:
-                      - type: object
+                      - description: some stuff
+                        type: object
                         properties:
                           firstName:
                             type: string
@@ -207,7 +218,8 @@ paths:
                                   - type: number
                                   - type: string
                               - allOf:
-                                  - type: object
+                                  - description: some stuff
+                                    type: object
                                     properties:
                                       firstName:
                                         type: string

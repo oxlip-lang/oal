@@ -1,11 +1,11 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Kind {
     Unknown,
     IdentifierNotInScope,
     IdentifierNotAFunction,
-    CannotUnify,
+    InvalidTypes,
     RelationConflict,
     UnexpectedExpression,
     InvalidYAML,
@@ -38,6 +38,21 @@ impl Error {
         self
     }
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{:?}: {}\n", self.kind, self.msg)?;
+        if !self.details.is_empty() {
+            write!(f, "Details:\n")?;
+            self.details
+                .iter()
+                .try_for_each(|d| write!(f, " {}\n", d))?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl From<serde_yaml::Error> for Error {
     fn from(e: serde_yaml::Error) -> Self {

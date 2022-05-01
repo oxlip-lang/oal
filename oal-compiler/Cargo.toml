@@ -2,6 +2,14 @@
 name = "oal-compiler"
 version = "0.1.0"
 edition = "2021"
+authors = ["Emmanuel Bastien <os@ebastien.name>"]
+license = "Apache-2.0"
+description = "A language for describing web services as OpenAPI"
+readme = "../README.md"
+homepage = "https://github.com/ebastien/openapi-lang"
+repository = "https://github.com/ebastien/openapi-lang"
+keywords = ["api"]
+categories = ["compilers"]
 
 [dependencies]
 oal-syntax = { path = "../oal-syntax" }

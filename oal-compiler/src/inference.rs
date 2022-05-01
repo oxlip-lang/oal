@@ -129,25 +129,25 @@ fn occurs(a: &Tag, b: &Tag) -> bool {
     }
 }
 
-fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> bool {
+fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
     let left = s.substitute(left);
     let right = s.substitute(right);
 
     if left == right {
-        true
+        Ok(())
     } else if let Tag::Var(v) = left {
         if occurs(&left, &right) {
-            false
+            Err(Error::new(Kind::InvalidTypes, "cycle").with(&(left, right)))
         } else {
             s.extend(v, right);
-            true
+            Ok(())
         }
     } else if let Tag::Var(v) = right {
         if occurs(&right, &left) {
-            false
+            Err(Error::new(Kind::InvalidTypes, "cycle").with(&(right, left)))
         } else {
             s.extend(v, left);
-            true
+            Ok(())
         }
     } else if let (
         Tag::Func(FuncTag {
@@ -158,19 +158,20 @@ fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> bool {
             bindings: right_bindings,
             range: right_range,
         }),
-    ) = (left, right)
+    ) = (&left, &right)
     {
         if left_bindings.len() != right_bindings.len() {
-            false
+            Err(Error::new(Kind::InvalidTypes, "arity").with(&(left_bindings, right_bindings)))
         } else {
-            unify(s, &left_range, &right_range)
-                && left_bindings
+            unify(s, &left_range, &right_range).and_then(|_| {
+                left_bindings
                     .iter()
                     .zip(right_bindings.iter())
-                    .all(|(l, r)| unify(s, l, r))
+                    .try_for_each(|(l, r)| unify(s, l, r))
+            })
         }
     } else {
-        false
+        Err(Error::new(Kind::InvalidTypes, "no match").with(&(left, right)))
     }
 }
 
@@ -181,7 +182,7 @@ pub struct TypeEquation {
 }
 
 impl TypeEquation {
-    pub fn unify(&self, s: &mut Subst) -> bool {
+    pub fn unify(&self, s: &mut Subst) -> Result<()> {
         unify(s, &self.left, &self.right)
     }
 }
@@ -200,11 +201,9 @@ impl TypeConstraint {
 
     pub fn unify(&self) -> Result<Subst> {
         let mut s = Subst::new();
-        for eq in self.0.iter() {
-            if !eq.unify(&mut s) {
-                return Err(Error::new(Kind::CannotUnify, "").with(eq));
-            }
-        }
+        self.0
+            .iter()
+            .try_for_each(|eq| eq.unify(&mut s).map_err(|e| e.with(eq)))?;
         Ok(s)
     }
 
