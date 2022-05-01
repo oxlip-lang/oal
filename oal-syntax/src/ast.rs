@@ -38,9 +38,21 @@ pub enum Expr<T> {
     Binding(Ident),
 }
 
-pub trait AsExpr: From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug {}
+pub trait Semigroup: Sized {
+    fn combine(&mut self, with: Self) {
+        *self = with;
+    }
+}
 
-impl<T> AsExpr for T where T: From<Expr<T>> + AsRef<Expr<T>> + AsMut<Expr<T>> + Clone + Debug {}
+pub trait AsExpr:
+    From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug + Semigroup
+{
+}
+
+impl<T> AsExpr for T where
+    T: From<Expr<T>> + AsRef<Expr<T>> + AsMut<Expr<T>> + Clone + Debug + Semigroup
+{
+}
 
 pub trait FromPair: Sized {
     fn from_pair(_: Pair<'_>) -> Self;

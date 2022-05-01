@@ -14,7 +14,7 @@ where
                 Some(val) => {
                     match val.as_ref() {
                         Expr::Binding(_) => {}
-                        _ => *e = val.clone(),
+                        _ => e.combine(val.clone()),
                     };
                     Ok(())
                 }
@@ -33,7 +33,7 @@ where
                         }
                         let mut app = lambda.body.as_ref().clone();
                         app.as_mut().transform(&mut (), app_env, &mut reduce)?;
-                        *e = app;
+                        e.combine(app);
                         Ok(())
                     } else {
                         Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))

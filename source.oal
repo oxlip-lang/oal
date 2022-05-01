@@ -34,6 +34,7 @@ let any1 = id2 ~ rec2 ~ uri1;
 let f x y = rec2 & ( x | y );
 
 // Function application
+# description: "some other stuff"
 let rec3 = f { height num } { stuff any1 };
 
 // Resources

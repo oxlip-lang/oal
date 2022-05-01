@@ -1,6 +1,6 @@
 use crate::annotation::{Annotated, Annotation};
 use crate::tag::{Tag, Tagged};
-use oal_syntax::ast::Expr;
+use oal_syntax::ast::{Expr, Semigroup};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedExpr {
@@ -57,5 +57,16 @@ impl AsRef<Expr<TypedExpr>> for TypedExpr {
 impl AsMut<Expr<TypedExpr>> for TypedExpr {
     fn as_mut(&mut self) -> &mut Expr<TypedExpr> {
         &mut self.inner
+    }
+}
+
+impl Semigroup for TypedExpr {
+    /// Combines two expressions retaining the top-most annotation.
+    fn combine(&mut self, with: Self) {
+        self.inner = with.inner;
+        self.tag = with.tag;
+        if self.ann.is_none() {
+            self.ann = with.ann;
+        }
     }
 }

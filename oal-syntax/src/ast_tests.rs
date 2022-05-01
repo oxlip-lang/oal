@@ -22,6 +22,8 @@ impl AsMut<Expr<TestExpr>> for TestExpr {
     }
 }
 
+impl Semigroup for TestExpr {}
+
 type Program = crate::ast::Program<TestExpr>;
 
 #[test]
