@@ -10,6 +10,7 @@ mod scan;
 mod scope;
 mod tag;
 mod transform;
+mod typecheck;
 
 #[cfg(test)]
 mod annotation_tests;
@@ -21,6 +22,8 @@ mod inference_tests;
 mod reduction_tests;
 #[cfg(test)]
 mod scope_tests;
+#[cfg(test)]
+mod typecheck_tests;
 
 pub use crate::errors::Result;
 pub use crate::eval::evaluate;

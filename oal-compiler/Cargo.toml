@@ -18,3 +18,4 @@ enum-map = "2.1"
 enum-map-derive = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.8"
+anyhow = "1.0"

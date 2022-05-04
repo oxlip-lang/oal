@@ -18,10 +18,16 @@ pub enum Tag {
 
 impl Tag {
     pub fn is_variable(&self) -> bool {
-        if let Tag::Var(_) = self {
-            true
-        } else {
-            false
+        match self {
+            Tag::Var(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_schema(&self) -> bool {
+        match self {
+            Tag::Primitive | Tag::Relation | Tag::Object | Tag::Array | Tag::Uri | Tag::Any => true,
+            _ => false,
         }
     }
 }

@@ -81,6 +81,10 @@ where
     }
 }
 
+/// A naive implementation of a union-find/disjoint-set data structure
+/// for storing equivalences between Tag values
+/// and substituting a representative Tag from each equivalence class.
+
 #[derive(Debug, Default)]
 pub struct Subst(HashMap<usize, Tag>);
 
@@ -94,18 +98,20 @@ impl Subst {
     }
 
     pub fn substitute(&self, tag: &Tag) -> Tag {
-        if let Tag::Var(v) = tag {
-            if let Some(t) = self.0.get(v) {
-                self.substitute(t)
-            } else {
-                tag.clone()
+        match tag {
+            Tag::Var(v) => {
+                if let Some(t) = self.0.get(v) {
+                    self.substitute(t)
+                } else {
+                    tag.clone()
+                }
             }
-        } else if let Tag::Func(FuncTag { bindings, range }) = tag {
-            let bindings = bindings.iter().map(|b| self.substitute(b)).collect();
-            let range = self.substitute(range).into();
-            Tag::Func(FuncTag { bindings, range })
-        } else {
-            tag.clone()
+            Tag::Func(FuncTag { bindings, range }) => {
+                let bindings = bindings.iter().map(|b| self.substitute(b)).collect();
+                let range = self.substitute(range).into();
+                Tag::Func(FuncTag { bindings, range })
+            }
+            _ => tag.clone(),
         }
     }
 }
@@ -188,9 +194,9 @@ impl TypeEquation {
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct TypeConstraint(Vec<TypeEquation>);
+pub struct InferenceSet(Vec<TypeEquation>);
 
-impl TypeConstraint {
+impl InferenceSet {
     pub fn new() -> Self {
         Default::default()
     }
@@ -213,7 +219,7 @@ impl TypeConstraint {
     }
 }
 
-pub fn constrain<T>(c: &mut TypeConstraint, env: &mut Env<T>, node: NodeRef<T>) -> Result<()>
+pub fn constrain<T>(c: &mut InferenceSet, env: &mut Env<T>, node: NodeRef<T>) -> Result<()>
 where
     T: AsExpr + Tagged,
 {

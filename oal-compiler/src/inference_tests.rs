@@ -1,6 +1,6 @@
 use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
-use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
+use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
@@ -96,7 +96,7 @@ fn constraint_var() {
     d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
-    let cnt = &mut TypeConstraint::new();
+    let cnt = &mut InferenceSet::new();
 
     d.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");
@@ -111,7 +111,7 @@ fn constraint_lambda() {
     d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
-    let cnt = &mut TypeConstraint::new();
+    let cnt = &mut InferenceSet::new();
 
     d.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");
@@ -121,7 +121,7 @@ fn constraint_lambda() {
 
 #[test]
 fn unify_simple() {
-    let mut c = TypeConstraint::new();
+    let mut c = InferenceSet::new();
 
     c.push(Tag::Var(0), Tag::Primitive);
     c.push(Tag::Var(2), Tag::Var(1));
@@ -160,7 +160,7 @@ fn unify_lambda() {
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
-    let cnt = &mut TypeConstraint::new();
+    let cnt = &mut InferenceSet::new();
 
     prg.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");

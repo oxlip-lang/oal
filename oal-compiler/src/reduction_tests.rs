@@ -1,6 +1,6 @@
 use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
-use crate::inference::{constrain, substitute, tag_type, TagSeq, TypeConstraint};
+use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
 use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
@@ -42,7 +42,7 @@ fn compile_application() {
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
 
-    let cnt = &mut TypeConstraint::new();
+    let cnt = &mut InferenceSet::new();
 
     prg.scan(cnt, &mut Env::new(), &mut constrain)
         .expect("constraining failed");
