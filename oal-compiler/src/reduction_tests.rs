@@ -37,7 +37,7 @@ fn compile_application() {
         let f x = x | num | g x;
         let a = f bool;
     "#;
-    let mut prg = parse(code.into()).expect("parsing failed");
+    let mut prg = parse(code).expect("parsing failed");
 
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");

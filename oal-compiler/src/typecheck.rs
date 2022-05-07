@@ -38,11 +38,11 @@ impl<T: AsExpr + Tagged> TypeChecked for Relation<T> {
         let xfers_check = self.xfers.values().all(|t| {
             if let Some(t) = t {
                 let domain_check = if let Some(d) = &t.domain {
-                    d.unwrap_tag().is_schema()
+                    d.unwrap_tag() == Tag::Content
                 } else {
                     true
                 };
-                let range_check = t.range.unwrap_tag().is_schema();
+                let range_check = t.range.unwrap_tag() == Tag::Content;
                 domain_check && range_check
             } else {
                 true

@@ -9,6 +9,7 @@ pub enum Tag {
     Primitive,
     Relation,
     Object,
+    Content,
     Array,
     Uri,
     Any,

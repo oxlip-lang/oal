@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
 
     let input = std::fs::read_to_string(args.input)?;
 
-    let prg: oal_compiler::Program = oal_syntax::parse(input)?;
+    let prg: oal_compiler::Program = oal_syntax::parse(&input)?;
 
     let spec = oal_compiler::evaluate(prg)?;
 

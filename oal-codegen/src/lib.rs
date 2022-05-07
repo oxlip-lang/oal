@@ -208,26 +208,30 @@ impl Builder {
             .filter_map(|(m, x)| x.as_ref().map(|x| (m, x)));
 
         for (method, xfer) in xfers {
+            let request = xfer.domain.schema.as_ref().map(|schema| {
+                ReferenceOr::Item(RequestBody {
+                    content: indexmap! { self.media_type() => MediaType {
+                        schema: Some(ReferenceOr::Item(self.schema(schema))),
+                        ..Default::default()
+                    }},
+                    description: schema.desc.clone(),
+                    ..Default::default()
+                })
+            });
+            let response = xfer.range.schema.as_ref().map(|schema| {
+                ReferenceOr::Item(Response {
+                    content: indexmap! { self.media_type() => MediaType {
+                        schema: Some(ReferenceOr::Item(self.schema(schema))),
+                        ..Default::default()
+                    }},
+                    description: schema.desc.clone().unwrap_or("".to_owned()),
+                    ..Default::default()
+                })
+            });
             let op = Operation {
-                request_body: xfer.domain.as_ref().map(|domain| {
-                    ReferenceOr::Item(RequestBody {
-                        content: indexmap! { self.media_type() => MediaType {
-                            schema: Some(ReferenceOr::Item(self.schema(domain))),
-                            ..Default::default()
-                        }},
-                        description: domain.desc.clone(),
-                        ..Default::default()
-                    })
-                }),
+                request_body: request,
                 responses: Responses {
-                    default: Some(ReferenceOr::Item(Response {
-                        content: indexmap! { self.media_type() => MediaType {
-                            schema: Some(ReferenceOr::Item(self.schema(&xfer.range))),
-                            ..Default::default()
-                        }},
-                        description: xfer.range.desc.clone().unwrap_or("".to_owned()),
-                        ..Default::default()
-                    })),
+                    default: response,
                     ..Default::default()
                 },
                 ..Default::default()

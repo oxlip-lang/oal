@@ -1,3 +1,4 @@
+use crate::errors::{Error, Kind};
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
 use crate::scan::Scan;
 use crate::scope::Env;
@@ -7,7 +8,7 @@ use crate::Program;
 use oal_syntax::parse;
 
 fn compile(code: &str) -> anyhow::Result<()> {
-    let mut prg: Program = parse(code.into())?;
+    let mut prg: Program = parse(code)?;
 
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)?;
 
@@ -25,6 +26,18 @@ fn compile(code: &str) -> anyhow::Result<()> {
 }
 
 #[test]
-fn typecheck_simple() -> anyhow::Result<()> {
-    compile("let a = { b [bool], c / } ~ num ~ uri;")
+fn typecheck_ok() -> anyhow::Result<()> {
+    ["let a = { b [bool], c / } ~ num ~ uri;"]
+        .iter()
+        .try_for_each(|c| compile(c))
+}
+
+#[test]
+fn typecheck_error() {
+    assert!(["let a = <> ~ {};"].iter().map(|c| compile(c)).all(|r| r
+        .unwrap_err()
+        .downcast_ref::<Error>()
+        .unwrap()
+        .kind
+        == Kind::InvalidTypes))
 }

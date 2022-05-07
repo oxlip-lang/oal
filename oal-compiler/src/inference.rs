@@ -41,6 +41,10 @@ where
                 e.set_tag(Tag::Object);
                 Ok(())
             }
+            Expr::Content(_) => {
+                e.set_tag(Tag::Content);
+                Ok(())
+            }
             Expr::Array(_) => {
                 e.set_tag(Tag::Array);
                 Ok(())
@@ -232,9 +236,9 @@ where
             Expr::Rel(rel) => {
                 for xfer in rel.xfers.values() {
                     if let Some(x) = xfer.as_ref() {
-                        c.push(x.range.unwrap_tag(), Tag::Object);
+                        c.push(x.range.unwrap_tag(), Tag::Content);
                         if let Some(domain) = &x.domain {
-                            c.push(domain.unwrap_tag(), Tag::Object);
+                            c.push(domain.unwrap_tag(), Tag::Content);
                         }
                     }
                 }
@@ -251,6 +255,10 @@ where
             }
             Expr::Object(_) => {
                 c.push(e.unwrap_tag(), Tag::Object);
+                Ok(())
+            }
+            Expr::Content(_) => {
+                c.push(e.unwrap_tag(), Tag::Content);
                 Ok(())
             }
             Expr::Array(_) => {

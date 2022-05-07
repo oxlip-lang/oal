@@ -1,7 +1,7 @@
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
-use std::iter::{once, Once};
+use std::iter::{empty, once, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
@@ -31,6 +31,7 @@ pub enum Expr<T> {
     Uri(Uri<T>),
     Array(Array<T>),
     Object(Object<T>),
+    Content(Content<T>),
     Op(VariadicOp<T>),
     Var(Ident),
     Lambda(Lambda<T>),
@@ -79,6 +80,7 @@ impl<T: AsExpr> FromPair for T {
             Rule::uri_type => Expr::Uri(p.into_expr()).into(),
             Rule::array_type => Expr::Array(p.into_expr()).into(),
             Rule::object_type => Expr::Object(p.into_expr()).into(),
+            Rule::content_type => Expr::Content(p.into_expr()).into(),
             Rule::var => Expr::Var(p.as_str().into()).into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
@@ -147,7 +149,6 @@ impl<T: AsExpr> FromPair for Declaration<T> {
             .into_inner()
             .map(|p| p.into_expr())
             .collect();
-        let _hint = p.next().unwrap();
         let expr = p.next().unwrap().into_expr();
         let expr = if bindings.is_empty() {
             expr
@@ -515,6 +516,43 @@ impl<'a, T> IntoIterator for &'a mut Object<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.props.iter_mut().map(|p| &mut p.val))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Content<T> {
+    pub schema: Option<Box<T>>,
+}
+
+impl<T: AsExpr> FromPair for Content<T> {
+    fn from_pair(p: Pair) -> Self {
+        let mut inner = p.into_inner();
+        let schema = inner.next().map(|s| Box::new(s.into_expr()));
+        Content { schema }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Content<T> {
+    type Item = &'a T;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match &self.schema {
+            None => Box::new(empty()),
+            Some(s) => Box::new(once(s.as_ref())),
+        }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Content<T> {
+    type Item = &'a mut T;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match &mut self.schema {
+            None => Box::new(empty()),
+            Some(s) => Box::new(once(s.as_mut())),
+        }
     }
 }
 

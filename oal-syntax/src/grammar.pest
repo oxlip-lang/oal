@@ -51,7 +51,9 @@ array_type = { "[" ~ expr_type ~ "]" }
 
 paren_type = { "(" ~ expr_type ~ ")" }
 
-term_type = { prim_type | uri_type | array_type | object_type | paren_type | var }
+content_type = { "<" ~ expr_type? ~ ">" }
+
+term_type = { prim_type | uri_type | array_type | object_type | content_type | paren_type | var }
 apply = { ident ~ term_type+ }
 app_type = { apply | term_type }
 
@@ -70,8 +72,7 @@ expr_type = { rel_type | sum_type }
 
 binding = { ident }
 bindings = { binding* }
-hint = { ( ":" ~ type_kw )? }
-decl = { let_kw ~ ident ~ bindings ~ hint ~ "=" ~ expr_type ~ ";" }
+decl = { let_kw ~ ident ~ bindings ~ "=" ~ expr_type ~ ";" }
 
 res = { res_kw ~ expr_type ~ ";" }
 

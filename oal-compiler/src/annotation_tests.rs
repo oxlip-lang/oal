@@ -14,9 +14,9 @@ fn annotate_simple() {
         let id = num | str;
         # description: "some record"
         let r = {};
-        res /{ n id } ( put : r -> r );
+        res /{ n id } ( put : <r> -> <r> );
     "#;
-    let mut prg: Program = parse(code.into()).expect("parsing failed");
+    let mut prg: Program = parse(code).expect("parsing failed");
 
     assert_eq!(prg.stmts.len(), 5);
 

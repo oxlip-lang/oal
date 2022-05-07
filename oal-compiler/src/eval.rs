@@ -141,9 +141,11 @@ where
         ast::Expr::Array(arr) => arr.try_into().map(|a| Expr::Array(a)),
         ast::Expr::Object(obj) => obj.try_into().map(|o| Expr::Object(o)),
         ast::Expr::Op(op) => op.try_into().map(|o| Expr::Op(o)),
-        ast::Expr::Var(_) | ast::Expr::Lambda(_) | ast::Expr::App(_) | ast::Expr::Binding(_) => {
-            Err(Error::new(Kind::UnexpectedExpression, "").with(e))
-        }
+        ast::Expr::Content(_)
+        | ast::Expr::Var(_)
+        | ast::Expr::Lambda(_)
+        | ast::Expr::App(_)
+        | ast::Expr::Binding(_) => Err(Error::new(Kind::UnexpectedExpression, "").with(e)),
     }?;
     let desc = e
         .annotation()
@@ -191,9 +193,44 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Content {
+    pub schema: Option<Box<Schema>>,
+}
+
+impl<T> TryFrom<&ast::Content<T>> for Content
+where
+    T: AsExpr + Annotated,
+{
+    type Error = Error;
+
+    fn try_from(c: &ast::Content<T>) -> Result<Self> {
+        let schema = match &c.schema {
+            Some(s) => into_schema(s.as_ref()).map(|s| Some(Box::new(s))),
+            None => Ok(None),
+        }?;
+        Ok(Content { schema })
+    }
+}
+
+impl<T> TryFrom<&ast::Expr<T>> for Content
+where
+    T: AsExpr + Annotated,
+{
+    type Error = Error;
+
+    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
+        if let ast::Expr::Content(cnt) = e {
+            cnt.try_into()
+        } else {
+            Err(Error::new(Kind::InvalidTypes, "expected content expression").with(e))
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Transfer {
-    pub domain: Option<Box<Schema>>,
-    pub range: Box<Schema>,
+    pub domain: Content,
+    pub range: Content,
 }
 
 impl<T> TryFrom<&ast::Transfer<T>> for Transfer
@@ -203,10 +240,10 @@ where
     type Error = Error;
 
     fn try_from(xfer: &ast::Transfer<T>) -> Result<Self> {
-        let range = into_schema(xfer.range.as_ref()).map(Box::new)?;
+        let range = xfer.range.as_ref().as_ref().try_into()?;
         let domain = match &xfer.domain {
-            Some(d) => into_schema(d.as_ref()).map(|d| Some(Box::new(d))),
-            None => Ok(None),
+            Some(d) => d.as_ref().as_ref().try_into(),
+            None => Ok(Content { schema: None }),
         }?;
         Ok(Transfer { range, domain })
     }

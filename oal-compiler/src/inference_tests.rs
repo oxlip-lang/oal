@@ -11,7 +11,7 @@ use oal_syntax::parse;
 
 #[test]
 fn tag_var_decl() {
-    let mut d: Program = parse("let id1 = num;".into()).expect("parsing failed");
+    let mut d: Program = parse("let id1 = num;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -27,7 +27,7 @@ fn tag_var_decl() {
 
 #[test]
 fn tag_array_decl() {
-    let mut d: Program = parse("let id1 = [num];".into()).expect("parsing failed");
+    let mut d: Program = parse("let id1 = [num];").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -43,7 +43,7 @@ fn tag_array_decl() {
 
 #[test]
 fn tag_lambda_decl() {
-    let mut d: Program = parse("let f x y z = num;".into()).expect("parsing failed");
+    let mut d: Program = parse("let f x y z = num;").expect("parsing failed");
 
     d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
@@ -74,7 +74,7 @@ fn tag_lambda_decl() {
 
 #[test]
 fn tag_not_in_scope() {
-    let mut d: Program = parse("let a = f {};".into()).expect("parsing failed");
+    let mut d: Program = parse("let a = f {};").expect("parsing failed");
 
     let r = d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type);
 
@@ -91,7 +91,7 @@ fn constraint_var() {
         let id1 = {} & {};
         let id2 = id1 | {};
     "#;
-    let mut d: Program = parse(code.into()).expect("parsing failed");
+    let mut d: Program = parse(code).expect("parsing failed");
 
     d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
@@ -106,7 +106,7 @@ fn constraint_var() {
 
 #[test]
 fn constraint_lambda() {
-    let mut d: Program = parse("let f x y z = num;".into()).expect("parsing failed");
+    let mut d: Program = parse("let f x y z = num;").expect("parsing failed");
 
     d.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");
@@ -155,7 +155,7 @@ fn unify_lambda() {
         let f x y z = num;
         let a = f num {} uri;
     "#;
-    let mut prg: Program = parse(code.into()).expect("parsing failed");
+    let mut prg: Program = parse(code).expect("parsing failed");
 
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
         .expect("tagging failed");

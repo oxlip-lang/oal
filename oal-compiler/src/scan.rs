@@ -99,6 +99,15 @@ impl<T: AsExpr> Scan<T> for Object<T> {
     }
 }
 
+impl<T: AsExpr> Scan<T> for Content<T> {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
+    {
+        self.into_iter().try_for_each(|e| scan_expr(e, acc, env, f))
+    }
+}
+
 impl<T: AsExpr> Scan<T> for Array<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
@@ -158,6 +167,7 @@ impl<T: AsExpr> Scan<T> for Expr<T> {
             Expr::Rel(rel) => rel.scan(acc, env, f),
             Expr::Uri(uri) => uri.scan(acc, env, f),
             Expr::Object(obj) => obj.scan(acc, env, f),
+            Expr::Content(cnt) => cnt.scan(acc, env, f),
             Expr::Array(array) => array.scan(acc, env, f),
             Expr::Op(operation) => operation.scan(acc, env, f),
             Expr::Lambda(lambda) => lambda.scan(acc, env, f),

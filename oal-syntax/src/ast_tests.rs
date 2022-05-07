@@ -28,7 +28,7 @@ type Program = crate::ast::Program<TestExpr>;
 
 #[test]
 fn parse_variable_decl() {
-    let d: Program = parse("let a = num;".into()).expect("parsing failed");
+    let d: Program = parse("let a = num;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -44,13 +44,13 @@ fn parse_variable_decl() {
 
 #[test]
 fn parse_assignment() {
-    let d: Program = parse("let a = b;".into()).expect("parsing failed");
+    let d: Program = parse("let a = b;").expect("parsing failed");
     assert_eq!(d.stmts.len(), 1);
 }
 
 #[test]
 fn parse_array() {
-    let d: Program = parse("let a = [str];".into()).expect("parsing failed");
+    let d: Program = parse("let a = [str];").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -69,7 +69,7 @@ fn parse_array() {
 
 #[test]
 fn parse_root_uri() {
-    let d: Program = parse("let a = /;".into()).expect("parsing failed");
+    let d: Program = parse("let a = /;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -89,7 +89,7 @@ fn parse_root_uri() {
 
 #[test]
 fn parse_template_uri() {
-    let d: Program = parse("let a = /x/{ y str }/z/;".into()).expect("parsing failed");
+    let d: Program = parse("let a = /x/{ y str }/z/;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -118,11 +118,11 @@ fn parse_template_uri() {
 fn parse_composite_relation() {
     let code = r#"
         let a = / (
-            patch, put : {} -> {},
-            get             -> {}
+            patch, put : <{}> -> <{}>,
+            get               -> <{}>
         );
     "#;
-    let d: Program = parse(code.into()).expect("parsing failed");
+    let d: Program = parse(code).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -144,7 +144,7 @@ fn parse_composite_relation() {
 
 #[test]
 fn parse_simple_relation() {
-    let d: Program = parse("let a = / ( put : {} -> {} );".into()).expect("parsing failed");
+    let d: Program = parse("let a = / ( put : <{}> -> <{}> );").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -160,14 +160,25 @@ fn parse_simple_relation() {
             );
             if let Some(xfer) = &rel.xfers[Method::Put] {
                 if let Some(domain) = &xfer.domain {
-                    assert_eq!(*domain.as_ref().as_ref(), Expr::Object(Default::default()));
+                    if let Expr::Content(cnt) = domain.as_ref().as_ref() {
+                        assert_eq!(
+                            *cnt.schema.as_ref().unwrap().as_ref().as_ref(),
+                            Expr::Object(Default::default())
+                        );
+                    } else {
+                        panic!("expected content expression");
+                    }
                 } else {
                     panic!("expected domain expression");
                 }
-                assert_eq!(
-                    *xfer.range.as_ref().as_ref(),
-                    Expr::Object(Default::default())
-                );
+                if let Expr::Content(cnt) = xfer.range.as_ref().as_ref() {
+                    assert_eq!(
+                        *cnt.schema.as_ref().unwrap().as_ref().as_ref(),
+                        Expr::Object(Default::default())
+                    );
+                } else {
+                    panic!("expected content expression");
+                }
             } else {
                 panic!("expected transfer on HTTP PUT");
             }
@@ -181,7 +192,7 @@ fn parse_simple_relation() {
 
 #[test]
 fn parse_any_type() {
-    let d: Program = parse("let a = {} ~ uri ~ bool;".into()).expect("parsing failed");
+    let d: Program = parse("let a = {} ~ uri ~ bool;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -204,7 +215,7 @@ fn parse_any_type() {
 
 #[test]
 fn parse_application() {
-    let d: Program = parse("let a = f num {} uri;".into()).expect("parsing failed");
+    let d: Program = parse("let a = f num {} uri;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -222,7 +233,7 @@ fn parse_application() {
 
 #[test]
 fn parse_lambda_decl() {
-    let d: Program = parse("let f x y z = num;".into()).expect("parsing failed");
+    let d: Program = parse("let f x y z = num;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -259,9 +270,29 @@ fn parse_annotation() {
         let id = num;
         # description: "some record"
         let r = {};
-        let a = /{ n id } ( put : r -> r );
+        let a = /{ n id } ( put : <r> -> <r> );
     "#;
-    let d: Program = parse(code.into()).expect("parsing failed");
+    let d: Program = parse(code).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 5);
+}
+
+#[test]
+fn parse_empty_content() {
+    let d: Program = parse("let c = <>;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Statement::Decl(decl) = s {
+        assert_eq!(decl.name.as_ref(), "c");
+        if let Expr::Content(cnt) = decl.expr.as_ref() {
+            assert!(cnt.schema.is_none());
+        } else {
+            panic!("expected content expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
 }

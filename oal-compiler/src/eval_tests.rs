@@ -16,9 +16,9 @@ fn evaluate_simple() {
     let code = r#"
         # description: "some record"
         let r = {};
-        res / ( put : r -> r );
+        res / ( put : <r> -> <r> );
     "#;
-    let prg: Program = parse(code.to_owned()).expect("parsing failed");
+    let prg: Program = parse(code).expect("parsing failed");
 
     let s = evaluate(prg).expect("evaluation failed");
 
@@ -31,15 +31,26 @@ fn evaluate_simple() {
     assert_eq!(*p.uri.spec.first().unwrap(), UriSegment::Literal("".into()));
 
     if let Some(x) = &p.xfers[oal_syntax::ast::Method::Put] {
-        if let Some(d) = &x.domain {
-            assert_eq!(d.expr, Expr::Object(Object::default()));
-            assert_eq!(d.desc, Some("some record".to_owned()));
-        } else {
-            panic!("expected domain");
-        }
-        assert_eq!(x.range.expr, Expr::Object(Object::default()));
-        assert_eq!(x.range.desc, Some("some record".to_owned()));
+        let d = x.domain.schema.as_ref().unwrap();
+        assert_eq!(d.expr, Expr::Object(Object::default()));
+        assert_eq!(d.desc, Some("some record".to_owned()));
+        let r = x.range.schema.as_ref().unwrap();
+        assert_eq!(r.expr, Expr::Object(Object::default()));
+        assert_eq!(r.desc, Some("some record".to_owned()));
     } else {
         panic!("expected transfer on HTTP PUT");
     }
+}
+
+#[test]
+fn evaluate_content() {
+    let code = r#"
+        let r = {};
+        res / ( put : <r> -> <r> );
+    "#;
+    let prg: Program = parse(code).expect("parsing failed");
+
+    let s = evaluate(prg).expect("evaluation failed");
+
+    assert_eq!(s.rels.len(), 1);
 }

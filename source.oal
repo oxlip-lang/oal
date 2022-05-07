@@ -17,8 +17,8 @@ let uri2 = uri;
 
 // Relations
 let rel1 = uri1 (
-  patch, put : rec1 -> rec1,
-  get               -> rec1
+  patch, put : <rec1> -> <rec1>,
+  get                 -> <rec1>
 );
 
 // Joining schemas (allOf)
@@ -39,7 +39,7 @@ let rec3 = f { height num } { stuff any1 };
 
 // Resources
 res rel1;
-res /something ( get -> rec3 );
+res /something ( get -> <rec3> );
 
 /*
  * Block
