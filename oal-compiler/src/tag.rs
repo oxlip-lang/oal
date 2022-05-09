@@ -10,6 +10,7 @@ pub enum Tag {
     Relation,
     Object,
     Content,
+    Transfer,
     Array,
     Uri,
     Any,
@@ -30,6 +31,10 @@ impl Tag {
             Tag::Primitive | Tag::Relation | Tag::Object | Tag::Array | Tag::Uri | Tag::Any => true,
             _ => false,
         }
+    }
+
+    pub fn is_schema_like(&self) -> bool {
+        *self == Tag::Content || self.is_schema()
     }
 }
 

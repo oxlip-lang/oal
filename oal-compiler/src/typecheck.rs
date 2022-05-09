@@ -2,7 +2,7 @@ use crate::errors::{Error, Kind, Result};
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use oal_syntax::ast::{
-    Array, AsExpr, Expr, NodeRef, Object, Operator, Relation, Uri, UriSegment, VariadicOp,
+    Array, AsExpr, Expr, NodeRef, Object, Operator, Relation, Transfer, Uri, UriSegment, VariadicOp,
 };
 
 trait TypeChecked {
@@ -32,22 +32,26 @@ impl<T: AsExpr + Tagged> TypeChecked for VariadicOp<T> {
     }
 }
 
+impl<T: AsExpr + Tagged> TypeChecked for Transfer<T> {
+    fn type_check(&self) -> Result<()> {
+        let domain_check = if let Some(domain) = &self.domain {
+            domain.unwrap_tag().is_schema_like()
+        } else {
+            true
+        };
+        let range_check = self.range.unwrap_tag().is_schema_like();
+        if domain_check && range_check {
+            Ok(())
+        } else {
+            Err(Error::new(Kind::InvalidTypes, "ill-formed transfer").with(self))
+        }
+    }
+}
+
 impl<T: AsExpr + Tagged> TypeChecked for Relation<T> {
     fn type_check(&self) -> Result<()> {
         let uri_check = self.uri.unwrap_tag() == Tag::Uri;
-        let xfers_check = self.xfers.values().all(|t| {
-            if let Some(t) = t {
-                let domain_check = if let Some(d) = &t.domain {
-                    d.unwrap_tag() == Tag::Content
-                } else {
-                    true
-                };
-                let range_check = t.range.unwrap_tag() == Tag::Content;
-                domain_check && range_check
-            } else {
-                true
-            }
-        });
+        let xfers_check = self.xfers.iter().all(|x| x.unwrap_tag() == Tag::Transfer);
         if uri_check && xfers_check {
             Ok(())
         } else {
@@ -104,6 +108,7 @@ where
             Expr::Uri(uri) => uri.type_check(),
             Expr::Array(arr) => arr.type_check(),
             Expr::Object(obj) => obj.type_check(),
+            Expr::Xfer(xfer) => xfer.type_check(),
             _ => Ok(()),
         }
     } else {

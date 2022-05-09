@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::parse;
+use enum_map::enum_map;
 
 #[derive(Clone, Debug, PartialEq)]
 struct TestExpr(Expr<TestExpr>);
@@ -130,10 +131,26 @@ fn parse_composite_relation() {
 
     if let Statement::Decl(decl) = s {
         if let Expr::Rel(rel) = decl.expr.as_ref() {
-            assert!(rel.xfers[Method::Get].is_some());
-            assert!(rel.xfers[Method::Patch].is_some());
-            assert!(rel.xfers[Method::Put].is_some());
-            assert_eq!(rel.xfers.values().filter(|x| x.is_some()).count(), 3);
+            assert_eq!(rel.xfers.len(), 2);
+
+            if let (Expr::Xfer(x0), Expr::Xfer(x1)) = (rel.xfers[0].as_ref(), rel.xfers[1].as_ref())
+            {
+                assert_eq!(
+                    x0.methods,
+                    enum_map! {
+                        Method::Put => true,
+                        Method::Patch => true,
+                        _ => false,
+                    }
+                );
+                assert_eq!(
+                    x1.methods,
+                    enum_map! {
+                        Method::Get => true,
+                        _ => false,
+                    }
+                );
+            }
         } else {
             panic!("expected relation expression");
         }
@@ -158,7 +175,10 @@ fn parse_simple_relation() {
                     spec: vec![UriSegment::root()]
                 })
             );
-            if let Some(xfer) = &rel.xfers[Method::Put] {
+
+            assert_eq!(rel.xfers.len(), 1);
+
+            if let Expr::Xfer(xfer) = rel.xfers[0].as_ref() {
                 if let Some(domain) = &xfer.domain {
                     if let Expr::Content(cnt) = domain.as_ref().as_ref() {
                         assert_eq!(
@@ -171,6 +191,7 @@ fn parse_simple_relation() {
                 } else {
                     panic!("expected domain expression");
                 }
+
                 if let Expr::Content(cnt) = xfer.range.as_ref().as_ref() {
                     assert_eq!(
                         *cnt.schema.as_ref().unwrap().as_ref().as_ref(),
@@ -180,7 +201,7 @@ fn parse_simple_relation() {
                     panic!("expected content expression");
                 }
             } else {
-                panic!("expected transfer on HTTP PUT");
+                panic!("expected transfer expression");
             }
         } else {
             panic!("expected relation expression");

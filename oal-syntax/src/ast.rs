@@ -32,6 +32,7 @@ pub enum Expr<T> {
     Array(Array<T>),
     Object(Object<T>),
     Content(Content<T>),
+    Xfer(Transfer<T>),
     Op(VariadicOp<T>),
     Var(Ident),
     Lambda(Lambda<T>),
@@ -72,9 +73,11 @@ impl<T: FromPair> IntoExpr<T> for Pair<'_> {
 impl<T: AsExpr> FromPair for T {
     fn from_pair(p: Pair) -> T {
         match p.as_rule() {
-            Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::term_type => {
-                p.into_inner().next().unwrap().into_expr()
-            }
+            Rule::expr_type
+            | Rule::paren_type
+            | Rule::app_type
+            | Rule::term_type
+            | Rule::xfer_type => p.into_inner().next().unwrap().into_expr(),
             Rule::prim_type => Expr::Prim(p.into_expr()).into(),
             Rule::rel_type => Expr::Rel(p.into_expr()).into(),
             Rule::uri_type => Expr::Uri(p.into_expr()).into(),
@@ -92,6 +95,7 @@ impl<T: AsExpr> FromPair for T {
                 }
             }
             Rule::apply => Expr::App(p.into_expr()).into(),
+            Rule::xfer => Expr::Xfer(p.into_expr()).into(),
             _ => unreachable!(),
         }
     }
@@ -272,16 +276,71 @@ impl FromPair for Method {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Transfer<T> {
+    pub methods: EnumMap<Method, bool>,
     pub domain: Option<Box<T>>,
     pub range: Box<T>,
 }
 
-pub type Transfers<T> = EnumMap<Method, Option<Transfer<T>>>;
+impl<T: AsExpr> FromPair for Transfer<T> {
+    fn from_pair(p: Pair) -> Self {
+        let mut inner = p.into_inner();
+
+        let methods: EnumMap<_, _> = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .map(|p| (p.into_expr(), true))
+            .collect();
+
+        let domain = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .next()
+            .map(|p| Box::new(p.into_expr()));
+
+        let range = T::from_pair(inner.next().unwrap()).into();
+
+        Transfer {
+            methods,
+            domain,
+            range,
+        }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Transfer<T> {
+    type Item = &'a T;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let it = once(self.range.as_ref());
+        if let Some(d) = self.domain.as_ref() {
+            Box::new(it.chain(once(d.as_ref())))
+        } else {
+            Box::new(it)
+        }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Transfer<T> {
+    type Item = &'a mut T;
+    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let it = once(self.range.as_mut());
+        if let Some(d) = self.domain.as_mut() {
+            Box::new(it.chain(once(d.as_mut())))
+        } else {
+            Box::new(it)
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Relation<T> {
     pub uri: Box<T>,
-    pub xfers: Transfers<T>,
+    pub xfers: Vec<T>,
 }
 
 impl<T: AsExpr> FromPair for Relation<T> {
@@ -290,34 +349,7 @@ impl<T: AsExpr> FromPair for Relation<T> {
 
         let uri: Box<_> = T::from_pair(inner.next().unwrap()).into();
 
-        let mut xfers: Transfers<T> = EnumMap::default();
-
-        for xfer in inner {
-            let mut xfer = xfer.into_inner();
-
-            let methods: Vec<_> = xfer
-                .next()
-                .unwrap()
-                .into_inner()
-                .map(|p| p.into_expr())
-                .collect();
-
-            let domain = xfer
-                .next()
-                .unwrap()
-                .into_inner()
-                .next()
-                .map(|p| Box::new(p.into_expr()));
-
-            let range: Box<_> = T::from_pair(xfer.next().unwrap()).into();
-
-            for m in methods.iter() {
-                xfers[*m] = Some(Transfer {
-                    domain: domain.clone(),
-                    range: range.clone(),
-                })
-            }
-        }
+        let xfers: Vec<_> = inner.map(IntoExpr::into_expr).collect();
 
         Relation { uri, xfers }
     }
@@ -328,20 +360,7 @@ impl<'a, T> IntoIterator for &'a Relation<T> {
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = once(self.uri.as_ref()).chain(
-            self.xfers
-                .values()
-                .flatten()
-                .flat_map(|xfer| {
-                    if let Some(domain) = &xfer.domain {
-                        [Some(xfer.range.as_ref()), Some(domain.as_ref())]
-                    } else {
-                        [Some(xfer.range.as_ref()), None]
-                    }
-                })
-                .flatten(),
-        );
-        Box::new(it)
+        Box::new(once(self.uri.as_ref()).chain(self.xfers.iter()))
     }
 }
 
@@ -350,20 +369,7 @@ impl<'a, T> IntoIterator for &'a mut Relation<T> {
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = once(self.uri.as_mut()).chain(
-            self.xfers
-                .values_mut()
-                .flatten()
-                .flat_map(|xfer| {
-                    if let Some(domain) = &mut xfer.domain {
-                        [Some(xfer.range.as_mut()), Some(domain.as_mut())]
-                    } else {
-                        [Some(xfer.range.as_mut()), None]
-                    }
-                })
-                .flatten(),
-        );
-        Box::new(it)
+        Box::new(once(self.uri.as_mut()).chain(self.xfers.iter_mut()))
     }
 }
 

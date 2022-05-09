@@ -1,6 +1,14 @@
-use crate::eval::{Expr, Object, Uri, UriSegment};
+use crate::eval::{Expr, Object, Spec, Uri, UriSegment};
 use crate::{evaluate, Program};
 use oal_syntax::parse;
+
+fn eval(code: &str) -> anyhow::Result<Spec> {
+    let prg: Program = parse(code)?;
+
+    let spec = evaluate(prg)?;
+
+    anyhow::Ok(spec)
+}
 
 #[test]
 fn uri_pattern() {
@@ -12,15 +20,14 @@ fn uri_pattern() {
 }
 
 #[test]
-fn evaluate_simple() {
+fn evaluate_simple() -> anyhow::Result<()> {
     let code = r#"
         # description: "some record"
         let r = {};
         res / ( put : <r> -> <r> );
     "#;
-    let prg: Program = parse(code).expect("parsing failed");
 
-    let s = evaluate(prg).expect("evaluation failed");
+    let s = eval(code)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -40,17 +47,20 @@ fn evaluate_simple() {
     } else {
         panic!("expected transfer on HTTP PUT");
     }
+
+    anyhow::Ok(())
 }
 
 #[test]
-fn evaluate_content() {
+fn evaluate_content() -> anyhow::Result<()> {
     let code = r#"
         let r = {};
-        res / ( put : <r> -> <r> );
+        res / ( put : r -> <r> );
     "#;
-    let prg: Program = parse(code).expect("parsing failed");
 
-    let s = evaluate(prg).expect("evaluation failed");
+    let s = eval(code)?;
 
     assert_eq!(s.rels.len(), 1);
+
+    anyhow::Ok(())
 }

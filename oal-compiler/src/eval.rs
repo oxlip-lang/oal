@@ -50,6 +50,13 @@ impl Uri {
             })
             .collect()
     }
+
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        match e.as_ref() {
+            ast::Expr::Uri(uri) => uri.try_into(),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "not a URI").with(e)),
+        }
+    }
 }
 
 impl<T> TryFrom<&ast::Uri<T>> for Uri
@@ -61,20 +68,6 @@ where
     fn try_from(uri: &ast::Uri<T>) -> Result<Self> {
         let spec: Result<Vec<UriSegment>> = uri.spec.iter().map(|s| s.try_into()).collect();
         spec.map(|spec| Uri { spec })
-    }
-}
-
-impl<T> TryFrom<&ast::Expr<T>> for Uri
-where
-    T: AsExpr + Annotated,
-{
-    type Error = Error;
-
-    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
-        match e {
-            ast::Expr::Uri(uri) => uri.try_into(),
-            _ => Err(Error::new(Kind::UnexpectedExpression, "not a URI").with(e)),
-        }
     }
 }
 
@@ -90,7 +83,7 @@ where
     type Error = Error;
 
     fn try_from(a: &ast::Array<T>) -> Result<Self> {
-        into_schema(a.item.as_ref()).map(|item| Array {
+        Schema::try_from(a.item.as_ref()).map(|item| Array {
             item: Box::new(item),
         })
     }
@@ -109,7 +102,7 @@ where
     type Error = Error;
 
     fn try_from(op: &ast::VariadicOp<T>) -> Result<Self> {
-        let schemas: Result<Vec<_>> = op.exprs.iter().map(into_schema).collect();
+        let schemas: Result<Vec<_>> = op.exprs.iter().map(Schema::try_from).collect();
         schemas.map(|schemas| VariadicOp { op: op.op, schemas })
     }
 }
@@ -120,6 +113,26 @@ pub struct Schema {
     pub desc: Option<String>,
 }
 
+impl Schema {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        let expr = match e.as_ref() {
+            ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
+            ast::Expr::Rel(rel) => rel.try_into().map(|r| Expr::Rel(r)),
+            ast::Expr::Uri(uri) => uri.try_into().map(|u| Expr::Uri(u)),
+            ast::Expr::Array(arr) => arr.try_into().map(|a| Expr::Array(a)),
+            ast::Expr::Object(obj) => obj.try_into().map(|o| Expr::Object(o)),
+            ast::Expr::Op(op) => op.try_into().map(|o| Expr::Op(o)),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
+        }?;
+        let desc = e
+            .annotation()
+            .and_then(|a| a.props.get(&Value::String("description".to_owned())))
+            .and_then(|a| a.as_str())
+            .map(|a| a.to_owned());
+        Ok(Schema { expr, desc })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Prim(ast::Primitive),
@@ -128,31 +141,6 @@ pub enum Expr {
     Array(Array),
     Object(Object),
     Op(VariadicOp),
-}
-
-fn into_schema<T>(e: &T) -> Result<Schema>
-where
-    T: AsExpr + Annotated,
-{
-    let expr = match e.as_ref() {
-        ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
-        ast::Expr::Rel(rel) => rel.try_into().map(|r| Expr::Rel(r)),
-        ast::Expr::Uri(uri) => uri.try_into().map(|u| Expr::Uri(u)),
-        ast::Expr::Array(arr) => arr.try_into().map(|a| Expr::Array(a)),
-        ast::Expr::Object(obj) => obj.try_into().map(|o| Expr::Object(o)),
-        ast::Expr::Op(op) => op.try_into().map(|o| Expr::Op(o)),
-        ast::Expr::Content(_)
-        | ast::Expr::Var(_)
-        | ast::Expr::Lambda(_)
-        | ast::Expr::App(_)
-        | ast::Expr::Binding(_) => Err(Error::new(Kind::UnexpectedExpression, "").with(e)),
-    }?;
-    let desc = e
-        .annotation()
-        .and_then(|a| a.props.get(&Value::String("description".to_owned())))
-        .and_then(|a| a.as_str())
-        .map(|a| a.to_owned());
-    Ok(Schema { expr, desc })
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -168,7 +156,7 @@ where
     type Error = Error;
 
     fn try_from(p: &ast::Property<T>) -> Result<Self> {
-        into_schema(&p.val).map(|s| Prop {
+        Schema::try_from(&p.val).map(|s| Prop {
             name: p.key.clone(),
             schema: s,
         })
@@ -197,6 +185,23 @@ pub struct Content {
     pub schema: Option<Box<Schema>>,
 }
 
+impl From<Schema> for Content {
+    fn from(s: Schema) -> Self {
+        Content {
+            schema: Some(s.into()),
+        }
+    }
+}
+
+impl Content {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        match e.as_ref() {
+            ast::Expr::Content(c) => c.try_into(),
+            _ => Schema::try_from(e).map(Content::from),
+        }
+    }
+}
+
 impl<T> TryFrom<&ast::Content<T>> for Content
 where
     T: AsExpr + Annotated,
@@ -205,32 +210,27 @@ where
 
     fn try_from(c: &ast::Content<T>) -> Result<Self> {
         let schema = match &c.schema {
-            Some(s) => into_schema(s.as_ref()).map(|s| Some(Box::new(s))),
+            Some(s) => Schema::try_from(s.as_ref()).map(|s| Some(Box::new(s))),
             None => Ok(None),
         }?;
         Ok(Content { schema })
     }
 }
 
-impl<T> TryFrom<&ast::Expr<T>> for Content
-where
-    T: AsExpr + Annotated,
-{
-    type Error = Error;
-
-    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
-        if let ast::Expr::Content(cnt) = e {
-            cnt.try_into()
-        } else {
-            Err(Error::new(Kind::InvalidTypes, "expected content expression").with(e))
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Transfer {
+    pub methods: EnumMap<ast::Method, bool>,
     pub domain: Content,
     pub range: Content,
+}
+
+impl Transfer {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        match e.as_ref() {
+            ast::Expr::Xfer(xfer) => xfer.try_into(),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "not a transfer").with(e)),
+        }
+    }
 }
 
 impl<T> TryFrom<&ast::Transfer<T>> for Transfer
@@ -240,12 +240,17 @@ where
     type Error = Error;
 
     fn try_from(xfer: &ast::Transfer<T>) -> Result<Self> {
-        let range = xfer.range.as_ref().as_ref().try_into()?;
+        let methods = xfer.methods.clone();
+        let range = Content::try_from(xfer.range.as_ref())?;
         let domain = match &xfer.domain {
-            Some(d) => d.as_ref().as_ref().try_into(),
+            Some(d) => Content::try_from(d.as_ref()),
             None => Ok(Content { schema: None }),
         }?;
-        Ok(Transfer { range, domain })
+        Ok(Transfer {
+            methods,
+            range,
+            domain,
+        })
     }
 }
 
@@ -257,6 +262,15 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
+impl Relation {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        match e.as_ref() {
+            ast::Expr::Rel(rel) => rel.try_into(),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "not a relation").with(e)),
+        }
+    }
+}
+
 impl<T> TryFrom<&ast::Relation<T>> for Relation
 where
     T: AsExpr + Annotated,
@@ -264,30 +278,17 @@ where
     type Error = Error;
 
     fn try_from(r: &ast::Relation<T>) -> Result<Self> {
-        let uri: Uri = r.uri.as_ref().as_ref().try_into()?;
-        let xfers = r
-            .xfers
-            .iter()
-            .map(|(m, x)| match x.as_ref() {
-                Some(t) => t.try_into().map(|t| (m, Some(t))),
-                None => Ok((m, None)),
-            })
-            .collect::<Result<_>>()?;
-        Ok(Relation { uri, xfers })
-    }
-}
-
-impl<T> TryFrom<&ast::Expr<T>> for Relation
-where
-    T: AsExpr + Annotated,
-{
-    type Error = Error;
-
-    fn try_from(e: &ast::Expr<T>) -> Result<Self> {
-        match e {
-            ast::Expr::Rel(rel) => rel.try_into(),
-            _ => Err(Error::new(Kind::UnexpectedExpression, "not a relation").with(e)),
+        let uri = Uri::try_from(r.uri.as_ref())?;
+        let mut xfers = Transfers::default();
+        for x in r.xfers.iter() {
+            let t = Transfer::try_from(x)?;
+            for (m, b) in t.methods {
+                if b {
+                    xfers[m] = Some(t.clone());
+                }
+            }
         }
+        Ok(Relation { uri, xfers })
     }
 }
 
@@ -310,7 +311,7 @@ where
 
         prg.stmts.iter().try_for_each(|stmt| match stmt {
             ast::Statement::Res(res) => {
-                let rel = Relation::try_from(res.rel.as_ref());
+                let rel = Relation::try_from(&res.rel);
                 rel.and_then(|rel| match rels.entry(rel.uri.pattern()) {
                     Entry::Vacant(v) => {
                         v.insert(rel);

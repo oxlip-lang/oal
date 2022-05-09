@@ -17,8 +17,8 @@ let uri2 = uri;
 
 // Relations
 let rel1 = uri1 (
-  patch, put : <rec1> -> <rec1>,
-  get                 -> <rec1>
+  patch, put : rec1 -> rec1,
+  get               -> rec1
 );
 
 // Joining schemas (allOf)

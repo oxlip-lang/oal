@@ -7,7 +7,7 @@ use crate::typecheck::type_check;
 use crate::Program;
 use oal_syntax::parse;
 
-fn compile(code: &str) -> anyhow::Result<()> {
+fn eval(code: &str) -> anyhow::Result<()> {
     let mut prg: Program = parse(code)?;
 
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)?;
@@ -27,17 +27,31 @@ fn compile(code: &str) -> anyhow::Result<()> {
 
 #[test]
 fn typecheck_ok() -> anyhow::Result<()> {
-    ["let a = { b [bool], c / } ~ num ~ uri;"]
-        .iter()
-        .try_for_each(|c| compile(c))
+    let cases = [
+        "let a = { b [bool], c / } ~ num ~ uri;",
+        "let a = / ( get -> str );",
+        "let a = / ( get -> <{}> );",
+    ];
+
+    cases.iter().try_for_each(|c| eval(c))
 }
 
 #[test]
 fn typecheck_error() {
-    assert!(["let a = <> ~ {};"].iter().map(|c| compile(c)).all(|r| r
-        .unwrap_err()
-        .downcast_ref::<Error>()
-        .unwrap()
-        .kind
-        == Kind::InvalidTypes))
+    let cases = [
+        "let a = <> ~ {};",
+        "let a = / ( num );",
+        "let a = / ( get -> ( get -> str ) );",
+    ];
+
+    for c in cases {
+        assert_eq!(
+            eval(c)
+                .expect_err(format!("expected error evaluating: {}", c).as_str())
+                .downcast_ref::<Error>()
+                .unwrap()
+                .kind,
+            Kind::InvalidTypes
+        );
+    }
 }

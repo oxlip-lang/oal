@@ -64,11 +64,14 @@ any_type = { join_type ~ ( "~" ~ join_type )* }
 sum_type = { any_type ~ ( "|" ~ any_type )* }
 
 methods = { method_kw ~ ( "," ~ method_kw )* }
-domain = { ( ":" ~ sum_type )? }
-xfer = { methods ~ domain ~ "->" ~ sum_type }
-rel_type = { sum_type ~ "(" ~ xfer ~ ( "," ~ xfer )* ~ ")" }
+domain = { ( ":" ~ term_type )? }
+xfer = { methods ~ domain ~ "->" ~ term_type }
 
-expr_type = { rel_type | sum_type }
+xfer_type = { xfer | sum_type }
+
+rel_type = { term_type ~ "(" ~ xfer_type ~ ( "," ~ xfer_type )* ~ ")" }
+
+expr_type = { rel_type | xfer_type }
 
 binding = { ident }
 bindings = { binding* }

@@ -113,6 +113,16 @@ impl<T: AsExpr> Transform<T> for Content<T> {
     }
 }
 
+impl<T: AsExpr> Transform<T> for Transfer<T> {
+    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
+    {
+        self.into_iter()
+            .try_for_each(|e| transform_expr(e, acc, env, f))
+    }
+}
+
 impl<T: AsExpr> Transform<T> for Array<T> {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
@@ -176,6 +186,7 @@ impl<T: AsExpr> Transform<T> for Expr<T> {
             Expr::Uri(uri) => uri.transform(acc, env, f),
             Expr::Object(obj) => obj.transform(acc, env, f),
             Expr::Content(cnt) => cnt.transform(acc, env, f),
+            Expr::Xfer(xfer) => xfer.transform(acc, env, f),
             Expr::Array(array) => array.transform(acc, env, f),
             Expr::Op(operation) => operation.transform(acc, env, f),
             Expr::Lambda(lambda) => lambda.transform(acc, env, f),
