@@ -18,6 +18,34 @@ where
     f(acc, env, NodeMut::Expr(e))
 }
 
+macro_rules! transform_expr_node {
+    ( $node:ident ) => {
+        impl<T: AsExpr> Transform<T> for $node<T> {
+            fn transform<F, E, U>(
+                &mut self,
+                acc: &mut U,
+                env: &mut Env<T>,
+                f: &mut F,
+            ) -> Result<(), E>
+            where
+                F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
+            {
+                self.into_iter()
+                    .try_for_each(|e| transform_expr(e, acc, env, f))
+            }
+        }
+    };
+}
+
+transform_expr_node!(Relation);
+transform_expr_node!(Uri);
+transform_expr_node!(Object);
+transform_expr_node!(Content);
+transform_expr_node!(Transfer);
+transform_expr_node!(Array);
+transform_expr_node!(VariadicOp);
+transform_expr_node!(Application);
+
 impl<T: AsExpr> Transform<T> for Declaration<T> {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
@@ -73,76 +101,6 @@ impl<T: AsExpr> Transform<T> for Program<T> {
     }
 }
 
-impl<T: AsExpr> Transform<T> for Relation<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for Uri<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for Object<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for Content<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for Transfer<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for Array<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
-impl<T: AsExpr> Transform<T> for VariadicOp<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
-    }
-}
-
 impl<T: AsExpr> Transform<T> for Lambda<T> {
     fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
@@ -163,16 +121,6 @@ impl<T: AsExpr> Transform<T> for Lambda<T> {
                 })
                 .and_then(|_| transform_expr(self.body.as_mut(), acc, env, f))
         })
-    }
-}
-
-impl<T: AsExpr> Transform<T> for Application<T> {
-    fn transform<F, E, U>(&mut self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
-    where
-        F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
-    {
-        self.into_iter()
-            .try_for_each(|e| transform_expr(e, acc, env, f))
     }
 }
 

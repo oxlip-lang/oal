@@ -26,14 +26,16 @@ fn eval(code: &str) -> anyhow::Result<()> {
 }
 
 #[test]
-fn typecheck_ok() -> anyhow::Result<()> {
+fn typecheck_ok() {
     let cases = [
         "let a = { b [bool], c / } ~ num ~ uri;",
         "let a = / ( get -> str );",
         "let a = / ( get -> <{}> );",
     ];
 
-    cases.iter().try_for_each(|c| eval(c))
+    for c in cases {
+        eval(c).expect(format!("error evaluating: {}", c).as_str());
+    }
 }
 
 #[test]
