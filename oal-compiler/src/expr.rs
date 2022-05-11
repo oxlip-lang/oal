@@ -1,6 +1,7 @@
 use crate::annotation::{Annotated, Annotation};
+use crate::reduction::Semigroup;
 use crate::tag::{Tag, Tagged};
-use oal_syntax::ast::{Expr, Semigroup};
+use oal_syntax::ast::Expr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedExpr {

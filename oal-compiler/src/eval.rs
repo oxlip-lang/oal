@@ -1,7 +1,7 @@
 use crate::annotation::{annotate, Annotated};
 use crate::errors::{Error, Kind, Result};
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
-use crate::reduction::reduce;
+use crate::reduction::{reduce, Semigroup};
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::tag::Tagged;
@@ -286,7 +286,7 @@ where
 
 pub fn evaluate<T>(mut prg: ast::Program<T>) -> Result<Spec>
 where
-    T: AsExpr + Tagged + Annotated,
+    T: AsExpr + Tagged + Annotated + Semigroup,
 {
     prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)?;
 

@@ -3,9 +3,15 @@ use crate::scope::Env;
 use crate::transform::Transform;
 use oal_syntax::ast::{AsExpr, Expr, NodeMut};
 
+pub trait Semigroup: Sized {
+    fn combine(&mut self, with: Self) {
+        *self = with;
+    }
+}
+
 pub fn reduce<T>(_acc: &mut (), env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
 where
-    T: AsExpr,
+    T: AsExpr + Semigroup,
 {
     match node {
         NodeMut::Expr(e) => match e.as_mut() {
