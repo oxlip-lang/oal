@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
 
     let api = oal_codegen::Builder::new(spec).open_api();
 
-    let output = serde_yaml::to_string(&api).unwrap();
+    let output = serde_yaml::to_string(&api)?;
 
     std::fs::write(args.output, output)?;
 
