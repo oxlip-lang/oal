@@ -94,12 +94,15 @@ openapi: 3.0.1
 info:
   title: Test OpenAPI specification
   version: 0.1.0
+servers:
+  - url: /
 paths:
   "/some/path/{id}/template":
     get:
+      summary: does something else
       responses:
         default:
-          description: some stuff
+          description: some content
           content:
             application/json:
               schema:
@@ -115,8 +118,9 @@ paths:
                     items:
                       type: string
     put:
+      summary: does something
       requestBody:
-        description: some stuff
+        description: some content
         content:
           application/json:
             schema:
@@ -133,7 +137,7 @@ paths:
                     type: string
       responses:
         default:
-          description: some stuff
+          description: some content
           content:
             application/json:
               schema:
@@ -149,8 +153,9 @@ paths:
                     items:
                       type: string
     patch:
+      summary: does something
       requestBody:
-        description: some stuff
+        description: some content
         content:
           application/json:
             schema:
@@ -167,7 +172,7 @@ paths:
                     type: string
       responses:
         default:
-          description: some stuff
+          description: some content
           content:
             application/json:
               schema:
