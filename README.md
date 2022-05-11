@@ -35,11 +35,21 @@ let uri1 = /some/path/{ id id1 }/template;
 let uri2 = uri;
 ```
 ```
+// Contents
+# description: "some content"
+let cnt1 = <rec1>;
+```
+```
+// Operations
+# summary: "does something"
+let op1 = patch, put : cnt1 -> cnt1;
+
+# summary: "does something else"
+let op2 = get -> cnt1;
+```
+```
 // Relations
-let rel1 = uri1 (
-  patch, put : rec1 -> rec1,
-  get               -> rec1
-);
+let rel1 = uri1 ( op1, op2 );
 ```
 ```
 // Joining schemas (allOf)

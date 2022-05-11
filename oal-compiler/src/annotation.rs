@@ -7,6 +7,15 @@ pub struct Annotation {
     pub props: serde_yaml::Mapping,
 }
 
+impl Annotation {
+    pub fn get_string(&self, s: &str) -> Option<String> {
+        self.props
+            .get(&serde_yaml::Value::String(s.to_owned()))
+            .and_then(|a| a.as_str())
+            .map(|a| a.to_owned())
+    }
+}
+
 pub trait Annotated {
     fn annotation(&self) -> Option<&Annotation>;
     fn set_annotation(&mut self, a: Annotation);

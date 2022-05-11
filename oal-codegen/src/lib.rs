@@ -4,7 +4,7 @@ use oal_syntax::ast;
 use openapiv3::{
     ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
-    Schema, SchemaData, SchemaKind, StringType, Type, VariantOrUnknownOrEmpty,
+    Schema, SchemaData, SchemaKind, Server, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
 pub struct Builder {
@@ -24,6 +24,10 @@ impl Builder {
                 version: "0.1.0".into(),
                 ..Default::default()
             },
+            servers: vec![Server {
+                url: "/".to_owned(),
+                ..Default::default()
+            }],
             paths: self.all_paths(),
             ..Default::default()
         }
@@ -190,6 +194,32 @@ impl Builder {
             .collect()
     }
 
+    fn transfer_request(&self, xfer: &eval::Transfer) -> Option<ReferenceOr<RequestBody>> {
+        xfer.domain.schema.as_ref().map(|schema| {
+            ReferenceOr::Item(RequestBody {
+                content: indexmap! { self.media_type() => MediaType {
+                    schema: Some(ReferenceOr::Item(self.schema(schema))),
+                    ..Default::default()
+                }},
+                description: xfer.domain.desc.clone(),
+                ..Default::default()
+            })
+        })
+    }
+
+    fn transfer_response(&self, xfer: &eval::Transfer) -> Option<ReferenceOr<Response>> {
+        xfer.range.schema.as_ref().map(|schema| {
+            ReferenceOr::Item(Response {
+                content: indexmap! { self.media_type() => MediaType {
+                    schema: Some(ReferenceOr::Item(self.schema(schema))),
+                    ..Default::default()
+                }},
+                description: xfer.range.desc.clone().unwrap_or("".to_owned()),
+                ..Default::default()
+            })
+        })
+    }
+
     fn relation_path_item(&self, rel: &eval::Relation) -> PathItem {
         let parameters = self
             .uri_params(&rel.uri)
@@ -208,30 +238,11 @@ impl Builder {
             .filter_map(|(m, x)| x.as_ref().map(|x| (m, x)));
 
         for (method, xfer) in xfers {
-            let request = xfer.domain.schema.as_ref().map(|schema| {
-                ReferenceOr::Item(RequestBody {
-                    content: indexmap! { self.media_type() => MediaType {
-                        schema: Some(ReferenceOr::Item(self.schema(schema))),
-                        ..Default::default()
-                    }},
-                    description: schema.desc.clone(),
-                    ..Default::default()
-                })
-            });
-            let response = xfer.range.schema.as_ref().map(|schema| {
-                ReferenceOr::Item(Response {
-                    content: indexmap! { self.media_type() => MediaType {
-                        schema: Some(ReferenceOr::Item(self.schema(schema))),
-                        ..Default::default()
-                    }},
-                    description: schema.desc.clone().unwrap_or("".to_owned()),
-                    ..Default::default()
-                })
-            });
             let op = Operation {
-                request_body: request,
+                summary: xfer.summary.clone(),
+                request_body: self.transfer_request(xfer),
                 responses: Responses {
-                    default: response,
+                    default: self.transfer_response(xfer),
                     ..Default::default()
                 },
                 ..Default::default()
