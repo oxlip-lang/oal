@@ -14,11 +14,11 @@ where
     T: AsExpr + Semigroup,
 {
     match node {
-        NodeMut::Expr(e) => match e.as_mut() {
+        NodeMut::Expr(e) => match e.as_node_mut().as_expr_mut() {
             Expr::Var(var) => match env.lookup(var) {
                 None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
                 Some(val) => {
-                    match val.as_ref() {
+                    match val.as_node().as_expr() {
                         Expr::Binding(_) => {}
                         _ => e.combine(val.clone()),
                     };
@@ -28,17 +28,19 @@ where
             Expr::App(application) => match env.lookup(&application.name) {
                 None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(e)),
                 Some(val) => {
-                    if let Expr::Lambda(lambda) = val.as_ref() {
+                    if let Expr::Lambda(lambda) = val.as_node().as_expr() {
                         let app_env = &mut Env::new();
                         for (binding, arg) in lambda.bindings.iter().zip(application.args.iter()) {
-                            if let Expr::Binding(name) = binding.as_ref() {
+                            if let Expr::Binding(name) = binding.as_node().as_expr() {
                                 app_env.declare(name, arg)
                             } else {
                                 unreachable!()
                             }
                         }
                         let mut app = lambda.body.as_ref().clone();
-                        app.as_mut().transform(&mut (), app_env, &mut reduce)?;
+                        app.as_node_mut()
+                            .as_expr_mut()
+                            .transform(&mut (), app_env, &mut reduce)?;
                         e.combine(app);
                         Ok(())
                     } else {

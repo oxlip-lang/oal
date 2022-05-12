@@ -6,7 +6,7 @@ use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use crate::transform::Transform;
 use crate::Program;
-use oal_syntax::ast::{Expr, Lambda, NodeRef, Statement};
+use oal_syntax::ast::{AsRefNode, Expr, Lambda, NodeRef, Statement};
 use oal_syntax::parse;
 
 #[test]
@@ -55,7 +55,7 @@ fn tag_lambda_decl() {
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "f");
         assert_eq!(decl.expr.unwrap_tag(), Tag::Var(3));
-        if let Expr::Lambda(Lambda { bindings, .. }) = decl.expr.as_ref() {
+        if let Expr::Lambda(Lambda { bindings, .. }) = decl.expr.as_node().as_expr() {
             let tags: Vec<_> = bindings
                 .iter()
                 .filter_map(|a| match a.tag() {

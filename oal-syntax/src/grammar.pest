@@ -11,15 +11,12 @@ res_kw  = @{ "res"  ~ !ASCII_ALPHANUMERIC }
 
 stmt_kw = { let_kw | res_kw }
 
-any_kw  = @{ "any"  ~ !ASCII_ALPHANUMERIC }
-obj_kw  = @{ "obj"  ~ !ASCII_ALPHANUMERIC }
-rel_kw  = @{ "rel"  ~ !ASCII_ALPHANUMERIC }
 num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
 str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
 uri_kw  = @{ "uri"  ~ !ASCII_ALPHANUMERIC }
 bool_kw = @{ "bool" ~ !ASCII_ALPHANUMERIC }
 
-type_kw = { any_kw | obj_kw | rel_kw | num_kw | str_kw | uri_kw | bool_kw }
+type_kw = { num_kw | str_kw | uri_kw | bool_kw }
 
 get_kw     = @{ "get"     ~ !ASCII_ALPHANUMERIC }
 put_kw     = @{ "put"     ~ !ASCII_ALPHANUMERIC }
@@ -53,7 +50,7 @@ paren_type = { "(" ~ expr_type ~ ")" }
 
 content_type = { "<" ~ expr_type? ~ ">" }
 
-term_type = { prim_type | uri_type | array_type | object_type | content_type | paren_type | var }
+term_type = { ( prim_type | uri_type | array_type | object_type | content_type | paren_type | var ) ~ inline_ann? }
 apply = { ident ~ term_type+ }
 app_type = { apply | term_type }
 
@@ -80,7 +77,10 @@ decl = { let_kw ~ ident ~ bindings ~ "=" ~ expr_type ~ ";" }
 res = { res_kw ~ expr_type ~ ";" }
 
 line = @{ ( !NEWLINE ~ ANY )* }
-ann = { "#" ~ line }
+ann = ${ "#" ~ line }
+
+inline_ann_body = @{ ( !"`" ~ ANY )* }
+inline_ann = ${ "`" ~ inline_ann_body ~ "`" }
 
 stmt = { ann | decl | res }
 

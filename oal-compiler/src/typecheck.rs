@@ -102,7 +102,7 @@ where
     T: AsExpr + Tagged,
 {
     if let NodeRef::Expr(e) = node {
-        match e.as_ref() {
+        match e.as_node().as_expr() {
             Expr::Op(op) => op.type_check(),
             Expr::Rel(rel) => rel.type_check(),
             Expr::Uri(uri) => uri.type_check(),

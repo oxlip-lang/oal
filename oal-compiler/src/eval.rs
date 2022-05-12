@@ -51,7 +51,7 @@ impl Uri {
     }
 
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Uri(uri) = e.as_ref() {
+        if let ast::Expr::Uri(uri) = e.as_node().as_expr() {
             let spec: Result<Vec<UriSegment>> = uri.spec.iter().map(|s| s.try_into()).collect();
             spec.map(|spec| Uri { spec })
         } else {
@@ -67,7 +67,7 @@ pub struct Array {
 
 impl Array {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Array(a) = e.as_ref() {
+        if let ast::Expr::Array(a) = e.as_node().as_expr() {
             Schema::try_from(a.item.as_ref()).map(|item| Array {
                 item: Box::new(item),
             })
@@ -85,7 +85,7 @@ pub struct VariadicOp {
 
 impl VariadicOp {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Op(op) = e.as_ref() {
+        if let ast::Expr::Op(op) = e.as_node().as_expr() {
             let schemas: Result<Vec<_>> = op.exprs.iter().map(Schema::try_from).collect();
             schemas.map(|schemas| VariadicOp { op: op.op, schemas })
         } else {
@@ -102,7 +102,7 @@ pub struct Schema {
 
 impl Schema {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        let expr = match e.as_ref() {
+        let expr = match e.as_node().as_expr() {
             ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
             ast::Expr::Rel(_) => Relation::try_from(e).map(|r| Expr::Rel(r)),
             ast::Expr::Uri(_) => Uri::try_from(e).map(|u| Expr::Uri(u)),
@@ -153,7 +153,7 @@ pub struct Object {
 
 impl Object {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Object(o) = e.as_ref() {
+        if let ast::Expr::Object(o) = e.as_node().as_expr() {
             let props: Result<Vec<_>> = o.props.iter().map(|p| p.try_into()).collect();
             props.map(|props| Object { props })
         } else {
@@ -178,7 +178,7 @@ impl From<Schema> for Content {
 
 impl Content {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Content(c) = e.as_ref() {
+        if let ast::Expr::Content(c) = e.as_node().as_expr() {
             let schema = match &c.schema {
                 Some(s) => Schema::try_from(s.as_ref()).map(|s| Some(Box::new(s))),
                 None => Ok(None),
@@ -201,7 +201,7 @@ pub struct Transfer {
 
 impl Transfer {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Xfer(xfer) = e.as_ref() {
+        if let ast::Expr::Xfer(xfer) = e.as_node().as_expr() {
             let methods = xfer.methods.clone();
             let range = Content::try_from(xfer.range.as_ref())?;
             let domain = match &xfer.domain {
@@ -231,7 +231,7 @@ pub struct Relation {
 
 impl Relation {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Rel(rel) = e.as_ref() {
+        if let ast::Expr::Rel(rel) = e.as_node().as_expr() {
             let uri = Uri::try_from(rel.uri.as_ref())?;
             let mut xfers = Transfers::default();
             for x in rel.xfers.iter() {

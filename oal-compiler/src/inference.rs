@@ -24,7 +24,7 @@ where
     T: AsExpr + Tagged,
 {
     match node {
-        NodeMut::Expr(e) => match e.as_ref() {
+        NodeMut::Expr(e) => match e.as_node().as_expr() {
             Expr::Prim(_) => {
                 e.set_tag(Tag::Primitive);
                 Ok(())
@@ -76,7 +76,7 @@ where
             Expr::App(application) => match env.lookup(&application.name) {
                 None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
                 Some(val) => {
-                    if let Expr::Lambda(l) = val.as_ref() {
+                    if let Expr::Lambda(l) = val.as_node().as_expr() {
                         e.set_tag(l.body.unwrap_tag());
                         Ok(())
                     } else {
@@ -232,7 +232,7 @@ where
     T: AsExpr + Tagged,
 {
     match node {
-        NodeRef::Expr(e) => match e.as_ref() {
+        NodeRef::Expr(e) => match e.as_node().as_expr() {
             Expr::Prim(_) => {
                 c.push(e.unwrap_tag(), Tag::Primitive);
                 Ok(())

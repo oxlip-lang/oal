@@ -3,22 +3,22 @@ use crate::parse;
 use enum_map::enum_map;
 
 #[derive(Clone, Debug, PartialEq)]
-struct TestExpr(Expr<TestExpr>);
+struct TestExpr(NodeExpr<TestExpr>);
 
-impl From<Expr<TestExpr>> for TestExpr {
-    fn from(e: Expr<TestExpr>) -> Self {
+impl From<NodeExpr<TestExpr>> for TestExpr {
+    fn from(e: NodeExpr<TestExpr>) -> Self {
         TestExpr(e)
     }
 }
 
-impl AsRef<Expr<TestExpr>> for TestExpr {
-    fn as_ref(&self) -> &Expr<TestExpr> {
+impl AsRefNode for TestExpr {
+    fn as_node(&self) -> &NodeExpr<TestExpr> {
         &self.0
     }
 }
 
-impl AsMut<Expr<TestExpr>> for TestExpr {
-    fn as_mut(&mut self) -> &mut Expr<TestExpr> {
+impl AsMutNode for TestExpr {
+    fn as_node_mut(&mut self) -> &mut NodeExpr<TestExpr> {
         &mut self.0
     }
 }
@@ -35,7 +35,7 @@ fn parse_variable_decl() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "a");
-        assert_eq!(*decl.expr.as_ref(), Expr::Prim(Primitive::Num));
+        assert_eq!(*decl.expr.as_node().as_expr(), Expr::Prim(Primitive::Num));
     } else {
         panic!("expected declaration");
     }
@@ -56,8 +56,8 @@ fn parse_array() {
     let s = d.stmts.first().unwrap();
 
     if let Statement::Decl(decl) = s {
-        if let Expr::Array(array) = decl.expr.as_ref() {
-            assert_eq!(*array.item.as_ref().as_ref(), Expr::Prim(Primitive::Str));
+        if let Expr::Array(array) = decl.expr.as_node().as_expr() {
+            assert_eq!(*array.item.as_node().as_expr(), Expr::Prim(Primitive::Str));
         } else {
             panic!("expected array expression");
         }
@@ -75,7 +75,7 @@ fn parse_root_uri() {
     let s = d.stmts.first().unwrap();
 
     if let Statement::Decl(decl) = s {
-        if let Expr::Uri(uri) = decl.expr.as_ref() {
+        if let Expr::Uri(uri) = decl.expr.as_node().as_expr() {
             assert_eq!(uri.spec.len(), 1);
             assert_eq!(*uri.spec.first().unwrap(), UriSegment::root());
         } else {
@@ -95,13 +95,13 @@ fn parse_template_uri() {
     let s = d.stmts.first().unwrap();
 
     if let Statement::Decl(decl) = s {
-        if let Expr::Uri(uri) = decl.expr.as_ref() {
+        if let Expr::Uri(uri) = decl.expr.as_node().as_expr() {
             assert_eq!(uri.spec.len(), 3);
             assert_eq!(*uri.spec.get(0).unwrap(), UriSegment::Literal("x".into()));
             assert_eq!(*uri.spec.get(2).unwrap(), UriSegment::Literal("z".into()));
             if let UriSegment::Variable(Property { key, val }) = uri.spec.get(1).unwrap() {
                 assert_eq!(key.as_ref(), "y");
-                assert_eq!(*val.as_ref(), Expr::Prim(Primitive::Str));
+                assert_eq!(*val.as_node().as_expr(), Expr::Prim(Primitive::Str));
             } else {
                 panic!("expected uri segment variable");
             }
@@ -128,11 +128,13 @@ fn parse_composite_relation() {
     let s = d.stmts.first().unwrap();
 
     if let Statement::Decl(decl) = s {
-        if let Expr::Rel(rel) = decl.expr.as_ref() {
+        if let Expr::Rel(rel) = decl.expr.as_node().as_expr() {
             assert_eq!(rel.xfers.len(), 2);
 
-            if let (Expr::Xfer(x0), Expr::Xfer(x1)) = (rel.xfers[0].as_ref(), rel.xfers[1].as_ref())
-            {
+            if let (Expr::Xfer(x0), Expr::Xfer(x1)) = (
+                rel.xfers[0].as_node().as_expr(),
+                rel.xfers[1].as_node().as_expr(),
+            ) {
                 assert_eq!(
                     x0.methods,
                     enum_map! {
@@ -166,9 +168,9 @@ fn parse_simple_relation() {
     let s = d.stmts.first().unwrap();
 
     if let Statement::Decl(decl) = s {
-        if let Expr::Rel(rel) = decl.expr.as_ref() {
+        if let Expr::Rel(rel) = decl.expr.as_node().as_expr() {
             assert_eq!(
-                *rel.uri.as_ref().as_ref(),
+                *rel.uri.as_node().as_expr(),
                 Expr::Uri(Uri {
                     spec: vec![UriSegment::root()]
                 })
@@ -176,11 +178,11 @@ fn parse_simple_relation() {
 
             assert_eq!(rel.xfers.len(), 1);
 
-            if let Expr::Xfer(xfer) = rel.xfers[0].as_ref() {
+            if let Expr::Xfer(xfer) = rel.xfers[0].as_node().as_expr() {
                 if let Some(domain) = &xfer.domain {
-                    if let Expr::Content(cnt) = domain.as_ref().as_ref() {
+                    if let Expr::Content(cnt) = domain.as_node().as_expr() {
                         assert_eq!(
-                            *cnt.schema.as_ref().unwrap().as_ref().as_ref(),
+                            *cnt.schema.as_ref().unwrap().as_node().as_expr(),
                             Expr::Object(Default::default())
                         );
                     } else {
@@ -190,9 +192,9 @@ fn parse_simple_relation() {
                     panic!("expected domain expression");
                 }
 
-                if let Expr::Content(cnt) = xfer.range.as_ref().as_ref() {
+                if let Expr::Content(cnt) = xfer.range.as_node().as_expr() {
                     assert_eq!(
-                        *cnt.schema.as_ref().unwrap().as_ref().as_ref(),
+                        *cnt.schema.as_ref().unwrap().as_node().as_expr(),
                         Expr::Object(Default::default())
                     );
                 } else {
@@ -221,7 +223,7 @@ fn parse_any_type() {
         if let Expr::Op(VariadicOp {
             op: Operator::Any,
             exprs,
-        }) = decl.expr.as_ref()
+        }) = decl.expr.as_node().as_expr()
         {
             assert_eq!(exprs.len(), 3);
         } else {
@@ -241,7 +243,7 @@ fn parse_application() {
     let s = d.stmts.first().unwrap();
 
     if let Statement::Decl(decl) = s {
-        if let Expr::App(Application { name, args }) = decl.expr.as_ref() {
+        if let Expr::App(Application { name, args }) = decl.expr.as_node().as_expr() {
             assert_eq!(name.as_ref(), "f");
             assert_eq!(args.len(), 3);
         } else {
@@ -263,17 +265,17 @@ fn parse_lambda_decl() {
         if let Expr::Lambda(Lambda {
             body,
             bindings: args,
-        }) = decl.expr.as_ref()
+        }) = decl.expr.as_node().as_expr()
         {
             let bindings: Vec<_> = args
                 .iter()
-                .filter_map(|a| match a.as_ref() {
+                .filter_map(|a| match a.as_node().as_expr() {
                     Expr::Binding(b) => Some(b.as_ref()),
                     _ => None,
                 })
                 .collect();
             assert_eq!(bindings, vec!["x", "y", "z"]);
-            assert_eq!(*body.as_ref().as_ref(), Expr::Prim(Primitive::Num));
+            assert_eq!(*body.as_node().as_expr(), Expr::Prim(Primitive::Num));
         } else {
             panic!("expected lambda expression");
         }
@@ -294,6 +296,17 @@ fn parse_annotation() {
     let d: Program = parse(code).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 5);
+
+    if let Statement::Ann(ann) = d.stmts.get(0).unwrap() {
+        assert_eq!(ann.text, r#" description: "some identifer""#);
+    } else {
+        panic!("expected annotation");
+    }
+    if let Statement::Ann(ann) = d.stmts.get(2).unwrap() {
+        assert_eq!(ann.text, r#" description: "some record""#);
+    } else {
+        panic!("expected annotation");
+    }
 }
 
 #[test]
@@ -306,11 +319,30 @@ fn parse_empty_content() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "c");
-        if let Expr::Content(cnt) = decl.expr.as_ref() {
+        if let Expr::Content(cnt) = decl.expr.as_node().as_expr() {
             assert!(cnt.schema.is_none());
         } else {
             panic!("expected content expression");
         }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_inline_annotation() {
+    let d: Program = parse(r#"let a = num `title: "number"`;"#).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        let ann = decl
+            .expr
+            .as_node()
+            .ann
+            .as_ref()
+            .expect("expected annotation");
+        assert_eq!(ann.text, r#"title: "number""#);
     } else {
         panic!("expected declaration");
     }

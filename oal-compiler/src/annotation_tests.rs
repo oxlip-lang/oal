@@ -3,7 +3,7 @@ use crate::reduction::reduce;
 use crate::scope::Env;
 use crate::transform::Transform;
 use crate::Program;
-use oal_syntax::ast::{Expr, Statement, UriSegment};
+use oal_syntax::ast::{AsRefNode, Expr, Statement, UriSegment};
 use oal_syntax::parse;
 use serde_yaml::Value;
 
@@ -27,8 +27,8 @@ fn annotate_simple() {
         .expect("reduction failed");
 
     if let Statement::Res(res) = prg.stmts.iter().nth(4).unwrap() {
-        if let Expr::Rel(rel) = res.rel.as_ref() {
-            if let Expr::Uri(uri) = rel.uri.as_ref().as_ref() {
+        if let Expr::Rel(rel) = res.rel.as_node().as_expr() {
+            if let Expr::Uri(uri) = rel.uri.as_node().as_expr() {
                 if let UriSegment::Variable(p) = uri.spec.first().expect("expected URI segment") {
                     let ann = p.val.annotation().expect("expected annotation");
                     let desc = ann

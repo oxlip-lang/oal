@@ -14,7 +14,7 @@ where
     T: AsExpr,
     F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
 {
-    e.as_ref().scan(acc, env, f)?;
+    e.as_node().as_expr().scan(acc, env, f)?;
     f(acc, env, NodeRef::Expr(e))
 }
 
@@ -104,7 +104,7 @@ impl<T: AsExpr> Scan<T> for Lambda<T> {
                 .into_iter()
                 .try_for_each(|binding| {
                     scan_expr(binding, acc, env, f).and_then(|_| {
-                        if let Expr::Binding(name) = binding.as_ref() {
+                        if let Expr::Binding(name) = binding.as_node().as_expr() {
                             env.declare(name, binding);
                             Ok(())
                         } else {

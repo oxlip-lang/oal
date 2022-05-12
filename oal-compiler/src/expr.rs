@@ -1,13 +1,13 @@
 use crate::annotation::{Annotated, Annotation};
 use crate::reduction::Semigroup;
 use crate::tag::{Tag, Tagged};
-use oal_syntax::ast::Expr;
+use oal_syntax::ast::{AsMutNode, AsRefNode, NodeExpr};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedExpr {
     tag: Option<Tag>,
     ann: Option<Annotation>,
-    inner: Expr<TypedExpr>,
+    inner: NodeExpr<TypedExpr>,
 }
 
 impl Tagged for TypedExpr {
@@ -39,8 +39,8 @@ impl Annotated for TypedExpr {
     }
 }
 
-impl From<Expr<TypedExpr>> for TypedExpr {
-    fn from(e: Expr<TypedExpr>) -> Self {
+impl From<NodeExpr<TypedExpr>> for TypedExpr {
+    fn from(e: NodeExpr<TypedExpr>) -> Self {
         TypedExpr {
             tag: None,
             ann: None,
@@ -49,14 +49,14 @@ impl From<Expr<TypedExpr>> for TypedExpr {
     }
 }
 
-impl AsRef<Expr<TypedExpr>> for TypedExpr {
-    fn as_ref(&self) -> &Expr<TypedExpr> {
+impl AsRefNode for TypedExpr {
+    fn as_node(&self) -> &NodeExpr<TypedExpr> {
         &self.inner
     }
 }
 
-impl AsMut<Expr<TypedExpr>> for TypedExpr {
-    fn as_mut(&mut self) -> &mut Expr<TypedExpr> {
+impl AsMutNode for TypedExpr {
+    fn as_node_mut(&mut self) -> &mut NodeExpr<TypedExpr> {
         &mut self.inner
     }
 }

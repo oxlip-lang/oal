@@ -5,7 +5,7 @@ use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{Expr, NodeRef, Operator, Primitive, Statement};
+use oal_syntax::ast::{AsRefNode, Expr, NodeRef, Operator, Primitive, Statement};
 use oal_syntax::parse;
 
 fn check_vars(
@@ -14,10 +14,10 @@ fn check_vars(
     node: NodeRef<TypedExpr>,
 ) -> crate::errors::Result<()> {
     match node {
-        NodeRef::Expr(e) => match e.as_ref() {
+        NodeRef::Expr(e) => match e.as_node().as_expr() {
             Expr::Var(var) => match env.lookup(var) {
                 None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
-                Some(val) => match val.as_ref() {
+                Some(val) => match val.as_node().as_expr() {
                     Expr::Binding(_) => Ok(()),
                     _ => Err(Error::new(Kind::Unknown, "remaining free variable").with(e)),
                 },
@@ -61,13 +61,22 @@ fn compile_application() {
     match prg.stmts.iter().nth(4).unwrap() {
         Statement::Decl(d) => {
             assert_eq!(d.name.as_ref(), "a");
-            match d.expr.as_ref() {
+            match d.expr.as_node().as_expr() {
                 Expr::Op(o) => {
                     assert_eq!(o.op, Operator::Sum);
                     let mut i = o.exprs.iter();
-                    assert_eq!(*i.next().unwrap().as_ref(), Expr::Prim(Primitive::Bool));
-                    assert_eq!(*i.next().unwrap().as_ref(), Expr::Prim(Primitive::Num));
-                    assert_eq!(*i.next().unwrap().as_ref(), Expr::Prim(Primitive::Str));
+                    assert_eq!(
+                        *i.next().unwrap().as_node().as_expr(),
+                        Expr::Prim(Primitive::Bool)
+                    );
+                    assert_eq!(
+                        *i.next().unwrap().as_node().as_expr(),
+                        Expr::Prim(Primitive::Num)
+                    );
+                    assert_eq!(
+                        *i.next().unwrap().as_node().as_expr(),
+                        Expr::Prim(Primitive::Str)
+                    );
                 }
                 _ => panic!("expected operation"),
             }

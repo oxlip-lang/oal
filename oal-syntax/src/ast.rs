@@ -40,9 +40,46 @@ pub enum Expr<T> {
     Binding(Ident),
 }
 
-pub trait AsExpr: From<Expr<Self>> + AsRef<Expr<Self>> + AsMut<Expr<Self>> + Clone + Debug {}
+impl<T> Expr<T> {
+    pub fn into_node(self) -> NodeExpr<T> {
+        NodeExpr {
+            inner: self,
+            ann: None,
+        }
+    }
+}
 
-impl<T> AsExpr for T where T: From<Expr<T>> + AsRef<Expr<T>> + AsMut<Expr<T>> + Clone + Debug {}
+#[derive(Clone, Debug, PartialEq)]
+pub struct NodeExpr<T> {
+    pub inner: Expr<T>,
+    pub ann: Option<Annotation>,
+}
+
+impl<T> NodeExpr<T> {
+    pub fn as_expr(&self) -> &Expr<T> {
+        &self.inner
+    }
+
+    pub fn as_expr_mut(&mut self) -> &mut Expr<T> {
+        &mut self.inner
+    }
+}
+
+pub trait AsRefNode {
+    fn as_node(&self) -> &NodeExpr<Self>
+    where
+        Self: Sized;
+}
+
+pub trait AsMutNode {
+    fn as_node_mut(&mut self) -> &mut NodeExpr<Self>
+    where
+        Self: Sized;
+}
+
+pub trait AsExpr: From<NodeExpr<Self>> + AsRefNode + AsMutNode + Clone + Debug {}
+
+impl<T> AsExpr for T where T: From<NodeExpr<T>> + AsRefNode + AsMutNode + Clone + Debug {}
 
 pub trait FromPair: Sized {
     fn from_pair(_: Pair<'_>) -> Self;
@@ -61,29 +98,33 @@ impl<T: FromPair> IntoExpr<T> for Pair<'_> {
 impl<T: AsExpr> FromPair for T {
     fn from_pair(p: Pair) -> T {
         match p.as_rule() {
-            Rule::expr_type
-            | Rule::paren_type
-            | Rule::app_type
-            | Rule::term_type
-            | Rule::xfer_type => p.into_inner().next().unwrap().into_expr(),
-            Rule::prim_type => Expr::Prim(p.into_expr()).into(),
-            Rule::rel_type => Expr::Rel(p.into_expr()).into(),
-            Rule::uri_type => Expr::Uri(p.into_expr()).into(),
-            Rule::array_type => Expr::Array(p.into_expr()).into(),
-            Rule::object_type => Expr::Object(p.into_expr()).into(),
-            Rule::content_type => Expr::Content(p.into_expr()).into(),
-            Rule::var => Expr::Var(p.as_str().into()).into(),
-            Rule::binding => Expr::Binding(p.as_str().into()).into(),
+            Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::xfer_type => {
+                p.into_inner().next().unwrap().into_expr()
+            }
+            Rule::term_type => {
+                let mut inner = p.into_inner();
+                let mut term: T = inner.next().unwrap().into_expr();
+                term.as_node_mut().ann = inner.next().map(|p| Annotation::from_pair(p));
+                term
+            }
+            Rule::prim_type => Expr::Prim(p.into_expr()).into_node().into(),
+            Rule::rel_type => Expr::Rel(p.into_expr()).into_node().into(),
+            Rule::uri_type => Expr::Uri(p.into_expr()).into_node().into(),
+            Rule::array_type => Expr::Array(p.into_expr()).into_node().into(),
+            Rule::object_type => Expr::Object(p.into_expr()).into_node().into(),
+            Rule::content_type => Expr::Content(p.into_expr()).into_node().into(),
+            Rule::var => Expr::Var(p.as_str().into()).into_node().into(),
+            Rule::binding => Expr::Binding(p.as_str().into()).into_node().into(),
             Rule::join_type | Rule::any_type | Rule::sum_type => {
                 let mut op = VariadicOp::from_pair(p);
                 if op.exprs.len() == 1 {
                     op.exprs.remove(0)
                 } else {
-                    Expr::Op(op).into()
+                    Expr::Op(op).into_node().into()
                 }
             }
-            Rule::apply => Expr::App(p.into_expr()).into(),
-            Rule::xfer => Expr::Xfer(p.into_expr()).into(),
+            Rule::apply => Expr::App(p.into_expr()).into_node().into(),
+            Rule::xfer => Expr::Xfer(p.into_expr()).into_node().into(),
             _ => unreachable!(),
         }
     }
@@ -149,6 +190,7 @@ impl<T: AsExpr> FromPair for Declaration<T> {
                 bindings,
                 body: Box::new(expr),
             })
+            .into_node()
             .into()
         };
         Declaration { name, expr }
