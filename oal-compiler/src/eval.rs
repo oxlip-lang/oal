@@ -98,6 +98,7 @@ impl VariadicOp {
 pub struct Schema {
     pub expr: Expr,
     pub desc: Option<String>,
+    pub title: Option<String>,
 }
 
 impl Schema {
@@ -112,7 +113,8 @@ impl Schema {
             _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
         }?;
         let desc = e.annotation().and_then(|a| a.get_string("description"));
-        Ok(Schema { expr, desc })
+        let title = e.annotation().and_then(|a| a.get_string("title"));
+        Ok(Schema { expr, desc, title })
     }
 }
 

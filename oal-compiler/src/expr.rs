@@ -34,8 +34,8 @@ impl Annotated for TypedExpr {
         self.ann.as_ref()
     }
 
-    fn set_annotation(&mut self, a: Annotation) {
-        self.ann = Some(a);
+    fn annotate(&mut self, a: Annotation) {
+        self.ann.get_or_insert(Default::default()).extend(a);
     }
 }
 

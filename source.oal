@@ -4,9 +4,9 @@ let id1 = num;
 // Objects
 # description: "some stuff"
 let rec1 = {
-  firstName str,
-  lastName str,
-  middleNames [str]
+  firstName str     `title: "First name"`
+, lastName str      `title: "Last name"`
+, middleNames [str] `title: "Middle names"`
 };
 
 // Templated URIs

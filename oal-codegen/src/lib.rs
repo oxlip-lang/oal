@@ -162,6 +162,7 @@ impl Builder {
             },
         };
         sch.schema_data.description = s.desc.clone();
+        sch.schema_data.title = s.title.clone();
         sch
     }
 

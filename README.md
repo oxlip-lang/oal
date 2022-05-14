@@ -21,9 +21,9 @@ let id1 = num;
 // Objects
 # description: "some stuff"
 let rec1 = {
-  firstName str,
-  lastName str,
-  middleNames [str]
+  firstName str     `title: "First name"`
+, lastName str      `title: "Last name"`
+, middleNames [str] `title: "Middle names"`
 };
 ```
 ```
@@ -84,9 +84,8 @@ res /something ( get -> rec3 );
  */
 ```
 
-## OpenAPI Output
-
-The above source program generates the following OpenAPI specification:
+<details>
+  <summary>Example of OpenAPI specification generated from the program above</summary>
 
 ```yaml
 ---
@@ -110,10 +109,13 @@ paths:
                 type: object
                 properties:
                   firstName:
+                    title: First name
                     type: string
                   lastName:
+                    title: Last name
                     type: string
                   middleNames:
+                    title: Middle names
                     type: array
                     items:
                       type: string
@@ -128,10 +130,13 @@ paths:
               type: object
               properties:
                 firstName:
+                  title: First name
                   type: string
                 lastName:
+                  title: Last name
                   type: string
                 middleNames:
+                  title: Middle names
                   type: array
                   items:
                     type: string
@@ -145,10 +150,13 @@ paths:
                 type: object
                 properties:
                   firstName:
+                    title: First name
                     type: string
                   lastName:
+                    title: Last name
                     type: string
                   middleNames:
+                    title: Middle names
                     type: array
                     items:
                       type: string
@@ -163,10 +171,13 @@ paths:
               type: object
               properties:
                 firstName:
+                  title: First name
                   type: string
                 lastName:
+                  title: Last name
                   type: string
                 middleNames:
+                  title: Middle names
                   type: array
                   items:
                     type: string
@@ -180,10 +191,13 @@ paths:
                 type: object
                 properties:
                   firstName:
+                    title: First name
                     type: string
                   lastName:
+                    title: Last name
                     type: string
                   middleNames:
+                    title: Middle names
                     type: array
                     items:
                       type: string
@@ -209,10 +223,13 @@ paths:
                         type: object
                         properties:
                           firstName:
+                            title: First name
                             type: string
                           lastName:
+                            title: Last name
                             type: string
                           middleNames:
+                            title: Middle names
                             type: array
                             items:
                               type: string
@@ -237,10 +254,13 @@ paths:
                                     type: object
                                     properties:
                                       firstName:
+                                        title: First name
                                         type: string
                                       lastName:
+                                        title: Last name
                                         type: string
                                       middleNames:
+                                        title: Middle names
                                         type: array
                                         items:
                                           type: string
@@ -252,3 +272,4 @@ paths:
                                 type: string
                                 format: uri-reference
 ```
+</details>
