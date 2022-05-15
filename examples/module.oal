@@ -44,12 +44,3 @@ let f x y = rec2 & ( x | y );
 // Function application
 # description: "some other stuff"
 let rec3 = f { height num } { stuff any1 };
-
-// Resources
-res rel1;
-res /something ( get -> rec3 );
-
-/*
- * Block
- * comments
-*/

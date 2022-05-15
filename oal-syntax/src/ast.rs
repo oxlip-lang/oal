@@ -2,11 +2,13 @@ use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
 use std::iter::{empty, once, Once};
+use std::path::Path;
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
+pub type Locator = Rc<Path>;
 
 #[derive(Debug)]
 pub enum NodeRef<'a, T> {
@@ -14,6 +16,7 @@ pub enum NodeRef<'a, T> {
     Decl(&'a Declaration<T>),
     Res(&'a Resource<T>),
     Ann(&'a Annotation),
+    Use(&'a Import),
 }
 
 #[derive(Debug)]
@@ -22,6 +25,7 @@ pub enum NodeMut<'a, T> {
     Decl(&'a mut Declaration<T>),
     Res(&'a mut Resource<T>),
     Ann(&'a mut Annotation),
+    Use(&'a mut Import),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -260,10 +264,31 @@ impl FromPair for Annotation {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Import {
+    pub module: Locator,
+}
+
+impl FromPair for Import {
+    fn from_pair(p: Pair) -> Self {
+        let loc = p
+            .into_inner()
+            .nth(1)
+            .unwrap()
+            .into_inner()
+            .next()
+            .unwrap()
+            .as_str();
+        let module = Locator::from(Path::new(loc));
+        Import { module }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement<T> {
     Decl(Declaration<T>),
     Res(Resource<T>),
     Ann(Annotation),
+    Use(Import),
 }
 
 impl<T: AsExpr> FromPair for Statement<T> {
@@ -273,6 +298,7 @@ impl<T: AsExpr> FromPair for Statement<T> {
             Rule::decl => Statement::Decl(p.into_expr()),
             Rule::res => Statement::Res(p.into_expr()),
             Rule::ann => Statement::Ann(p.into_expr()),
+            Rule::import => Statement::Use(p.into_expr()),
             _ => unreachable!(),
         }
     }

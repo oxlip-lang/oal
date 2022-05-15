@@ -29,10 +29,10 @@ where
                 None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(e)),
                 Some(val) => {
                     if let Expr::Lambda(lambda) = val.as_node().as_expr() {
-                        let app_env = &mut Env::new();
+                        let app_env = &mut Env::new(None);
                         for (binding, arg) in lambda.bindings.iter().zip(application.args.iter()) {
                             if let Expr::Binding(name) = binding.as_node().as_expr() {
-                                app_env.declare(name, arg)
+                                app_env.declare(name.clone(), arg.clone())
                             } else {
                                 unreachable!()
                             }

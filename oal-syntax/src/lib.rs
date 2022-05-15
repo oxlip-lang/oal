@@ -12,10 +12,10 @@ use crate::ast::IntoExpr;
 
 pub type Pair<'a> = pest::iterators::Pair<'a, Rule>;
 
-pub fn parse<T: ast::AsExpr>(input: &str) -> errors::Result<ast::Program<T>> {
+pub fn parse<T: ast::AsExpr, I: AsRef<str>>(input: I) -> errors::Result<ast::Program<T>> {
     use pest::Parser as PestParser;
 
-    let mut pairs = Parser::parse(Rule::program, input)?;
+    let mut pairs = Parser::parse(Rule::program, input.as_ref())?;
 
     Ok(pairs.next().unwrap().into_expr())
 }

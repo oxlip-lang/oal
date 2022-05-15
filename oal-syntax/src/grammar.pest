@@ -6,10 +6,11 @@
 
 ident = @{ !keyword ~ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
-let_kw  = @{ "let"  ~ !ASCII_ALPHANUMERIC }
-res_kw  = @{ "res"  ~ !ASCII_ALPHANUMERIC }
+let_kw = @{ "let"  ~ !ASCII_ALPHANUMERIC }
+res_kw = @{ "res"  ~ !ASCII_ALPHANUMERIC }
+use_kw = @{ "use"  ~ !ASCII_ALPHANUMERIC }
 
-stmt_kw = { let_kw | res_kw }
+stmt_kw = { let_kw | res_kw | use_kw }
 
 num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
 str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
@@ -82,7 +83,11 @@ ann = ${ "#" ~ line }
 inline_ann_body = @{ ( !"`" ~ ANY )* }
 inline_ann = ${ "`" ~ inline_ann_body ~ "`" }
 
-stmt = { ann | decl | res }
+string_lit_body = @{ ( !"\"" ~ ANY )* }
+string_lit = ${ "\"" ~ string_lit_body ~ "\"" }
+import = { use_kw ~ string_lit ~ ";" }
+
+stmt = { ann | decl | res | import }
 
 program = { SOI ~ stmt* ~ EOI }
 

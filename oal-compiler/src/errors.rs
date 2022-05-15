@@ -9,6 +9,7 @@ pub enum Kind {
     RelationConflict,
     UnexpectedExpression,
     InvalidYAML,
+    CycleDetected,
 }
 
 impl Default for Kind {

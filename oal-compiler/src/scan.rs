@@ -1,3 +1,4 @@
+use crate::errors::Error;
 use crate::scope::Env;
 use oal_syntax::ast::*;
 
@@ -5,13 +6,14 @@ pub trait Scan<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
         Self: Sized,
-        E: Sized,
+        E: Sized + From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>;
 }
 
 fn scan_expr<T, F, E, U>(e: &T, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
 where
     T: AsExpr,
+    E: From<Error>,
     F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
 {
     e.as_node().as_expr().scan(acc, env, f)?;
@@ -23,6 +25,7 @@ macro_rules! scan_expr_node {
         impl<T: AsExpr> Scan<T> for $node<T> {
             fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
             where
+                E: From<Error>,
                 F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
             {
                 self.into_iter().try_for_each(|e| scan_expr(e, acc, env, f))
@@ -43,12 +46,13 @@ scan_expr_node!(Application);
 impl<T: AsExpr> Scan<T> for Declaration<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
+        E: From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         f(acc, env, NodeRef::Decl(self))?;
         self.into_iter()
             .try_for_each(|e| scan_expr(e, acc, env, f))?;
-        env.declare(&self.name, &self.expr);
+        env.declare(self.name.clone(), self.expr.clone());
         Ok(())
     }
 }
@@ -56,6 +60,7 @@ impl<T: AsExpr> Scan<T> for Declaration<T> {
 impl<T: AsExpr> Scan<T> for Resource<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
+        E: From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         f(acc, env, NodeRef::Res(self))?;
@@ -72,15 +77,29 @@ impl<T> Scan<T> for Annotation {
     }
 }
 
+impl<T: AsExpr> Scan<T> for Import {
+    fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+    where
+        F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
+        E: From<Error>,
+    {
+        f(acc, env, NodeRef::Use(self))?;
+        env.import(&self.module)?;
+        Ok(())
+    }
+}
+
 impl<T: AsExpr> Scan<T> for Statement<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
+        E: From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         match self {
             Statement::Decl(d) => d.scan(acc, env, f),
             Statement::Res(r) => r.scan(acc, env, f),
             Statement::Ann(a) => a.scan(acc, env, f),
+            Statement::Use(u) => u.scan(acc, env, f),
         }
     }
 }
@@ -88,6 +107,7 @@ impl<T: AsExpr> Scan<T> for Statement<T> {
 impl<T: AsExpr> Scan<T> for Program<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
+        E: From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         env.within(|env| self.into_iter().try_for_each(|s| s.scan(acc, env, f)))
@@ -97,6 +117,7 @@ impl<T: AsExpr> Scan<T> for Program<T> {
 impl<T: AsExpr> Scan<T> for Lambda<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
+        E: From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         env.within(|env| {
@@ -105,7 +126,7 @@ impl<T: AsExpr> Scan<T> for Lambda<T> {
                 .try_for_each(|binding| {
                     scan_expr(binding, acc, env, f).and_then(|_| {
                         if let Expr::Binding(name) = binding.as_node().as_expr() {
-                            env.declare(name, binding);
+                            env.declare(name.clone(), binding.clone());
                             Ok(())
                         } else {
                             unreachable!()
@@ -120,6 +141,7 @@ impl<T: AsExpr> Scan<T> for Lambda<T> {
 impl<T: AsExpr> Scan<T> for Expr<T> {
     fn scan<F, E, U>(&self, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
     where
+        E: From<Error>,
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>,
     {
         match self {

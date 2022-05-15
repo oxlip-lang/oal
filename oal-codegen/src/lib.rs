@@ -1,5 +1,5 @@
 use indexmap::indexmap;
-use oal_compiler::eval;
+use oal_compiler::spec;
 use oal_syntax::ast;
 use openapiv3::{
     ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
@@ -8,11 +8,11 @@ use openapiv3::{
 };
 
 pub struct Builder {
-    spec: eval::Spec,
+    spec: spec::Spec,
 }
 
 impl Builder {
-    pub fn new(s: eval::Spec) -> Builder {
+    pub fn new(s: spec::Spec) -> Builder {
         Builder { spec: s }
     }
 
@@ -37,7 +37,7 @@ impl Builder {
         "application/json".into()
     }
 
-    fn uri_pattern(&self, uri: &eval::Uri) -> String {
+    fn uri_pattern(&self, uri: &spec::Uri) -> String {
         uri.pattern()
     }
 
@@ -56,11 +56,11 @@ impl Builder {
         }
     }
 
-    fn rel_schema(&self, rel: &eval::Relation) -> Schema {
+    fn rel_schema(&self, rel: &spec::Relation) -> Schema {
         self.uri_schema(&rel.uri)
     }
 
-    fn uri_schema(&self, uri: &eval::Uri) -> Schema {
+    fn uri_schema(&self, uri: &spec::Uri) -> Schema {
         let pattern = if uri.spec.is_empty() {
             None
         } else {
@@ -78,7 +78,7 @@ impl Builder {
         }
     }
 
-    fn join_schema(&self, schemas: &Vec<eval::Schema>) -> Schema {
+    fn join_schema(&self, schemas: &Vec<spec::Schema>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AllOf {
@@ -90,7 +90,7 @@ impl Builder {
         }
     }
 
-    fn object_type(&self, obj: &eval::Object) -> Type {
+    fn object_type(&self, obj: &spec::Object) -> Type {
         Type::Object(ObjectType {
             properties: obj
                 .props
@@ -105,14 +105,14 @@ impl Builder {
         })
     }
 
-    fn object_schema(&self, obj: &eval::Object) -> Schema {
+    fn object_schema(&self, obj: &spec::Object) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(self.object_type(obj)),
         }
     }
 
-    fn array_schema(&self, array: &eval::Array) -> Schema {
+    fn array_schema(&self, array: &spec::Array) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(Type::Array(ArrayType {
@@ -124,7 +124,7 @@ impl Builder {
         }
     }
 
-    fn sum_schema(&self, schemas: &Vec<eval::Schema>) -> Schema {
+    fn sum_schema(&self, schemas: &Vec<spec::Schema>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::OneOf {
@@ -136,7 +136,7 @@ impl Builder {
         }
     }
 
-    fn any_schema(&self, schemas: &Vec<eval::Schema>) -> Schema {
+    fn any_schema(&self, schemas: &Vec<spec::Schema>) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AnyOf {
@@ -148,14 +148,14 @@ impl Builder {
         }
     }
 
-    fn schema(&self, s: &eval::Schema) -> Schema {
+    fn schema(&self, s: &spec::Schema) -> Schema {
         let mut sch = match &s.expr {
-            eval::Expr::Prim(prim) => self.prim_schema(prim),
-            eval::Expr::Rel(rel) => self.rel_schema(rel),
-            eval::Expr::Uri(uri) => self.uri_schema(uri),
-            eval::Expr::Object(obj) => self.object_schema(obj),
-            eval::Expr::Array(array) => self.array_schema(array),
-            eval::Expr::Op(operation) => match operation.op {
+            spec::Expr::Prim(prim) => self.prim_schema(prim),
+            spec::Expr::Rel(rel) => self.rel_schema(rel),
+            spec::Expr::Uri(uri) => self.uri_schema(uri),
+            spec::Expr::Object(obj) => self.object_schema(obj),
+            spec::Expr::Array(array) => self.array_schema(array),
+            spec::Expr::Op(operation) => match operation.op {
                 ast::Operator::Join => self.join_schema(&operation.schemas),
                 ast::Operator::Sum => self.sum_schema(&operation.schemas),
                 ast::Operator::Any => self.any_schema(&operation.schemas),
@@ -166,7 +166,7 @@ impl Builder {
         sch
     }
 
-    fn prop_param(&self, prop: &eval::Prop) -> Parameter {
+    fn prop_param(&self, prop: &spec::Prop) -> Parameter {
         Parameter::Path {
             parameter_data: ParameterData {
                 name: prop.name.as_ref().into(),
@@ -185,17 +185,17 @@ impl Builder {
         }
     }
 
-    fn uri_params(&self, uri: &eval::Uri) -> Vec<Parameter> {
+    fn uri_params(&self, uri: &spec::Uri) -> Vec<Parameter> {
         uri.spec
             .iter()
             .flat_map(|s| match s {
-                eval::UriSegment::Variable(p) => Some(self.prop_param(p)),
+                spec::UriSegment::Variable(p) => Some(self.prop_param(p)),
                 _ => None,
             })
             .collect()
     }
 
-    fn transfer_request(&self, xfer: &eval::Transfer) -> Option<ReferenceOr<RequestBody>> {
+    fn transfer_request(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<RequestBody>> {
         xfer.domain.schema.as_ref().map(|schema| {
             ReferenceOr::Item(RequestBody {
                 content: indexmap! { self.media_type() => MediaType {
@@ -208,7 +208,7 @@ impl Builder {
         })
     }
 
-    fn transfer_response(&self, xfer: &eval::Transfer) -> Option<ReferenceOr<Response>> {
+    fn transfer_response(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<Response>> {
         xfer.range.schema.as_ref().map(|schema| {
             ReferenceOr::Item(Response {
                 content: indexmap! { self.media_type() => MediaType {
@@ -221,7 +221,7 @@ impl Builder {
         })
     }
 
-    fn relation_path_item(&self, rel: &eval::Relation) -> PathItem {
+    fn relation_path_item(&self, rel: &spec::Relation) -> PathItem {
         let parameters = self
             .uri_params(&rel.uri)
             .into_iter()

@@ -29,7 +29,7 @@ fn check_vars(
 }
 
 #[test]
-fn compile_application() {
+fn reduce_application() {
     let code = r#"
         let b = str;
         let g x = b;
@@ -39,23 +39,23 @@ fn compile_application() {
     "#;
     let mut prg = parse(code).expect("parsing failed");
 
-    prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)
+    prg.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut InferenceSet::new();
 
-    prg.scan(cnt, &mut Env::new(), &mut constrain)
+    prg.scan(cnt, &mut Env::new(None), &mut constrain)
         .expect("constraining failed");
 
     let subst = &mut cnt.unify().expect("unification failed");
 
-    prg.transform(subst, &mut Env::new(), &mut substitute)
+    prg.transform(subst, &mut Env::new(None), &mut substitute)
         .expect("substitution failed");
 
-    prg.transform(&mut (), &mut Env::new(), &mut reduce)
+    prg.transform(&mut (), &mut Env::new(None), &mut reduce)
         .expect("compilation failed");
 
-    prg.scan(&mut (), &mut Env::new(), &mut check_vars)
+    prg.scan(&mut (), &mut Env::new(None), &mut check_vars)
         .expect("compilation incomplete");
 
     match prg.stmts.iter().nth(4).unwrap() {

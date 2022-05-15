@@ -8,8 +8,8 @@ use oal_syntax::parse;
 
 fn eval(code: &str) -> anyhow::Result<Program> {
     let mut prg: Program = parse(code)?;
-    prg.transform(&mut None, &mut Env::new(), &mut annotate)?;
-    prg.transform(&mut (), &mut Env::new(), &mut reduce)?;
+    prg.transform(&mut None, &mut Env::new(None), &mut annotate)?;
+    prg.transform(&mut (), &mut Env::new(None), &mut reduce)?;
     Ok(prg)
 }
 

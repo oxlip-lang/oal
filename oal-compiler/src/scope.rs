@@ -1,16 +1,24 @@
-use oal_syntax::ast::{AsExpr, Ident};
+use crate::errors::Result;
+use crate::module::ModuleSet;
+use crate::scan::Scan;
+use oal_syntax::ast::{AsExpr, Ident, Locator, NodeRef};
 use std::collections::HashMap;
 
 pub type Scope<T> = HashMap<Ident, T>;
 
-pub struct Env<T> {
+pub struct Env<'a, T> {
     scopes: Vec<Scope<T>>,
+    modules: Option<&'a ModuleSet<T>>,
 }
 
-impl<T: AsExpr> Env<T> {
-    pub fn new() -> Env<T> {
+impl<'a, T> Env<'a, T>
+where
+    T: AsExpr,
+{
+    pub fn new(mods: Option<&'a ModuleSet<T>>) -> Env<'a, T> {
         Env {
             scopes: vec![Scope::new()],
+            modules: mods,
         }
     }
 
@@ -19,8 +27,8 @@ impl<T: AsExpr> Env<T> {
         self.scopes.last().unwrap()
     }
 
-    pub fn declare(&mut self, n: &Ident, e: &T) {
-        self.scopes.last_mut().unwrap().insert(n.clone(), e.clone());
+    pub fn declare(&mut self, n: Ident, e: T) {
+        self.scopes.last_mut().unwrap().insert(n, e);
     }
 
     pub fn lookup(&self, n: &Ident) -> Option<&T> {
@@ -48,10 +56,33 @@ impl<T: AsExpr> Env<T> {
         r
     }
 
+    pub fn import(&mut self, m: &Locator) -> Result<()> {
+        if let Some(mods) = self.modules {
+            if let Some(m) = mods.get(m) {
+                m.scan(self, &mut Env::new(None), &mut declaration_scan)
+            } else {
+                // All modules that are to be imported must be present in the module-set.
+                panic!("unknown module: {}", m.display())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
     fn open(&mut self) {
         self.scopes.push(Scope::new());
     }
     fn close(&mut self) {
         self.scopes.pop();
     }
+}
+
+fn declaration_scan<T>(acc: &mut Env<T>, _env: &mut Env<T>, node: NodeRef<T>) -> Result<()>
+where
+    T: AsExpr,
+{
+    if let NodeRef::Decl(decl) = node {
+        acc.declare(decl.name.clone(), decl.expr.clone())
+    }
+    Ok(())
 }

@@ -347,3 +347,16 @@ fn parse_inline_annotation() {
         panic!("expected declaration");
     }
 }
+
+#[test]
+fn parse_import() {
+    let d: Program = parse(r#"use "module";"#).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Use(imp) = d.stmts.first().unwrap() {
+        assert_eq!(imp.module.to_str().unwrap(), "module");
+    } else {
+        panic!("expected import");
+    }
+}

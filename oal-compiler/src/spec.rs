@@ -1,12 +1,5 @@
-use crate::annotation::{annotate, Annotated};
+use crate::annotation::Annotated;
 use crate::errors::{Error, Kind, Result};
-use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
-use crate::reduction::{reduce, Semigroup};
-use crate::scan::Scan;
-use crate::scope::Env;
-use crate::tag::Tagged;
-use crate::transform::Transform;
-use crate::typecheck::type_check;
 use enum_map::EnumMap;
 use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
@@ -284,27 +277,4 @@ where
 
         Ok(Spec { rels })
     }
-}
-
-pub fn evaluate<T>(mut prg: ast::Program<T>) -> Result<Spec>
-where
-    T: AsExpr + Tagged + Annotated + Semigroup,
-{
-    prg.transform(&mut TagSeq::new(), &mut Env::new(), &mut tag_type)?;
-
-    let constraint = &mut InferenceSet::new();
-
-    prg.scan(constraint, &mut Env::new(), &mut constrain)?;
-
-    let subst = &mut constraint.unify()?;
-
-    prg.transform(subst, &mut Env::new(), &mut substitute)?;
-
-    prg.scan(&mut (), &mut Env::new(), &mut type_check)?;
-
-    prg.transform(&mut None, &mut Env::new(), &mut annotate)?;
-
-    prg.transform(&mut (), &mut Env::new(), &mut reduce)?;
-
-    Spec::try_from(&prg)
 }
