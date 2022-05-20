@@ -12,7 +12,10 @@ The output is an OpenAPI 3.0.1 specification in YAML format,
 compiled from the resources defined in the source program.
 
 ## Examples of language constructs:
-
+```
+// Importing modules
+use "some/other/module.oal";
+```
 ```
 // Primitive types
 let id1 = num;
