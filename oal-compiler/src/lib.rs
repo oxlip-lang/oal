@@ -5,6 +5,7 @@ mod compile;
 mod errors;
 mod expr;
 mod inference;
+mod locator;
 mod module;
 mod reduction;
 mod scan;
@@ -33,8 +34,8 @@ mod typecheck_tests;
 
 pub use crate::compile::compile;
 pub use crate::errors::Result;
+pub use crate::locator::Locator;
 pub use crate::module::load;
-pub use oal_syntax::ast::Locator;
 
 pub type Program = oal_syntax::ast::Program<expr::TypedExpr>;
 pub type ModuleSet = module::ModuleSet<expr::TypedExpr>;

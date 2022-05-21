@@ -355,7 +355,7 @@ fn parse_import() {
     assert_eq!(d.stmts.len(), 1);
 
     if let Statement::Use(imp) = d.stmts.first().unwrap() {
-        assert_eq!(imp.module.to_str().unwrap(), "module");
+        assert_eq!(imp.module, "module");
     } else {
         panic!("expected import");
     }

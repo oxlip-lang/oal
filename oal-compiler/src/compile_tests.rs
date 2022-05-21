@@ -1,7 +1,8 @@
 use crate::errors::Result;
+use crate::locator::Locator;
 use crate::module::load;
 use crate::{compile, Program};
-use oal_syntax::ast::{AsRefNode, Expr, Locator, Operator, Statement};
+use oal_syntax::ast::{AsRefNode, Expr, Operator, Statement};
 use oal_syntax::parse;
 use std::path::Path;
 

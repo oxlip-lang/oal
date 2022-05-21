@@ -1,7 +1,8 @@
 use crate::errors::{Error, Kind};
+use crate::locator::Locator;
 use crate::scan::Scan;
 use crate::scope::Env;
-use oal_syntax::ast::{AsExpr, Locator, NodeRef, Program};
+use oal_syntax::ast::{AsExpr, NodeRef, Program};
 use std::collections::HashMap;
 
 pub type ModuleSet<T> = HashMap<Locator, Program<T>>;
@@ -84,7 +85,7 @@ where
     T: AsExpr,
 {
     if let NodeRef::Use(import) = node {
-        acc.push(import.module.clone())
+        acc.push(Locator::from(&import.module))
     }
     Ok(())
 }

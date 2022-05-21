@@ -1,7 +1,8 @@
 use crate::errors::Result;
+use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::scan::Scan;
-use oal_syntax::ast::{AsExpr, Ident, Locator, NodeRef};
+use oal_syntax::ast::{AsExpr, Ident, NodeRef};
 use std::collections::HashMap;
 
 pub type Scope<T> = HashMap<Ident, T>;
@@ -62,7 +63,7 @@ where
                 m.scan(self, &mut Env::new(None), &mut declaration_scan)
             } else {
                 // All modules that are to be imported must be present in the module-set.
-                panic!("unknown module: {}", m.display())
+                panic!("unknown module: {:?}", m)
             }
         } else {
             Ok(())

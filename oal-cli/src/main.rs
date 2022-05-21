@@ -15,15 +15,15 @@ struct Args {
 
 /// Loads and parses a source file into a program.
 fn loader(l: &Locator) -> anyhow::Result<Program> {
-    eprintln!("Loading module {}", l.display());
-    let input = std::fs::read_to_string(l)?;
+    eprintln!("Loading module {}", l);
+    let input = l.read_to_string()?;
     let program = oal_syntax::parse(input)?;
     Ok(program)
 }
 
 /// Compiles a program.
 fn compiler(mods: &ModuleSet, l: &Locator, p: Program) -> anyhow::Result<Program> {
-    eprintln!("Compiling module {}", l.display());
+    eprintln!("Compiling module {}", l);
     let program = oal_compiler::compile(mods, l, p)?;
     Ok(program)
 }
@@ -31,7 +31,7 @@ fn compiler(mods: &ModuleSet, l: &Locator, p: Program) -> anyhow::Result<Program
 fn main() -> anyhow::Result<()> {
     let args: Args = Args::parse();
 
-    let main_mod = Locator::from(args.input);
+    let main_mod = Locator::from(&args.input);
 
     let mods = oal_compiler::load(&main_mod, loader, compiler)?;
 

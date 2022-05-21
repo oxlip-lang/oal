@@ -2,13 +2,11 @@ use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
 use std::iter::{empty, once, Once};
-use std::path::Path;
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
-pub type Locator = Rc<Path>;
 
 #[derive(Debug)]
 pub enum NodeRef<'a, T> {
@@ -265,20 +263,20 @@ impl FromPair for Annotation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Import {
-    pub module: Locator,
+    pub module: String,
 }
 
 impl FromPair for Import {
     fn from_pair(p: Pair) -> Self {
-        let loc = p
+        let module = p
             .into_inner()
             .nth(1)
             .unwrap()
             .into_inner()
             .next()
             .unwrap()
-            .as_str();
-        let module = Locator::from(Path::new(loc));
+            .as_str()
+            .to_owned();
         Import { module }
     }
 }

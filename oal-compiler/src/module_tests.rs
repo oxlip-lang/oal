@@ -1,7 +1,7 @@
 use crate::errors::{Kind, Result};
+use crate::locator::Locator;
 use crate::module::load;
 use crate::{ModuleSet, Program};
-use oal_syntax::ast::Locator;
 use oal_syntax::parse;
 use std::path::Path;
 

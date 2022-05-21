@@ -1,6 +1,7 @@
 use crate::annotation::{annotate, Annotated};
 use crate::errors::Result;
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::reduction::{reduce, Semigroup};
 use crate::scan::Scan;
@@ -13,7 +14,7 @@ use oal_syntax::ast::AsExpr;
 
 pub fn compile<T>(
     mods: &ModuleSet<T>,
-    loc: &ast::Locator,
+    loc: &Locator,
     mut prg: ast::Program<T>,
 ) -> Result<ast::Program<T>>
 where

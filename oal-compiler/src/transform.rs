@@ -1,4 +1,5 @@
 use crate::errors::Error;
+use crate::locator::Locator;
 use crate::scope::Env;
 use oal_syntax::ast::*;
 
@@ -92,7 +93,8 @@ impl<T: AsExpr> Transform<T> for Import {
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
         f(acc, env, NodeMut::Use(self))?;
-        env.import(&self.module)?;
+        let loc = Locator::from(&self.module);
+        env.import(&loc)?;
         Ok(())
     }
 }

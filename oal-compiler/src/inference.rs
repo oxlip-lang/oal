@@ -1,9 +1,9 @@
 use crate::errors::{Error, Kind, Result};
+use crate::locator::Locator;
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
-use oal_syntax::ast::{AsExpr, Expr, Locator, NodeMut, NodeRef, Operator};
+use oal_syntax::ast::{AsExpr, Expr, NodeMut, NodeRef, Operator};
 use std::collections::HashMap;
-use std::path::Path;
 
 #[derive(Debug, PartialEq)]
 pub struct TagSeq(Locator, usize);
@@ -22,7 +22,7 @@ impl TagSeq {
 
 impl Default for TagSeq {
     fn default() -> Self {
-        Self::new(Locator::from(Path::new("")))
+        Self::new(Locator::from(""))
     }
 }
 
