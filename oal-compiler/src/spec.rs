@@ -1,10 +1,9 @@
 use crate::annotation::Annotated;
 use crate::errors::{Error, Kind, Result};
 use enum_map::EnumMap;
+use indexmap::IndexMap;
 use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -245,7 +244,7 @@ impl Relation {
 }
 
 pub type PathPattern = String;
-pub type Relations = HashMap<PathPattern, Relation>;
+pub type Relations = IndexMap<PathPattern, Relation>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Spec {
@@ -259,17 +258,19 @@ where
     type Error = Error;
 
     fn try_from(prg: &ast::Program<T>) -> Result<Self> {
-        let mut rels: Relations = HashMap::new();
+        let mut rels: Relations = IndexMap::new();
 
         prg.stmts.iter().try_for_each(|stmt| match stmt {
             ast::Statement::Res(res) => {
                 let rel = Relation::try_from(&res.rel);
                 rel.and_then(|rel| match rels.entry(rel.uri.pattern()) {
-                    Entry::Vacant(v) => {
+                    indexmap::map::Entry::Vacant(v) => {
                         v.insert(rel);
                         Ok(())
                     }
-                    Entry::Occupied(_) => Err(Error::new(Kind::RelationConflict, "").with(&rel)),
+                    indexmap::map::Entry::Occupied(_) => {
+                        Err(Error::new(Kind::RelationConflict, "").with(&rel))
+                    }
                 })
             }
             _ => Ok(()),
