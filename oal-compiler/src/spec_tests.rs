@@ -1,12 +1,13 @@
 use crate::compile::compile;
 use crate::spec::{Expr, Object, Spec, Uri, UriSegment};
-use crate::{Locator, Program};
+use crate::{Locator, ModuleSet, Program};
 use oal_syntax::parse;
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
-    let module = Locator::from("test");
+    let loc = Locator::try_from("test:main")?;
+    let mods = ModuleSet::new(loc.clone());
     let prg: Program = parse(code)?;
-    let prg = compile(&Default::default(), &module, prg)?;
+    let prg = compile(&mods, &loc, prg)?;
     let spec = Spec::try_from(&prg)?;
 
     anyhow::Ok(spec)

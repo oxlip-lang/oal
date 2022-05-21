@@ -1,5 +1,4 @@
 use crate::errors::Result;
-use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::scan::Scan;
 use oal_syntax::ast::{AsExpr, Ident, NodeRef};
@@ -57,13 +56,14 @@ where
         r
     }
 
-    pub fn import(&mut self, m: &Locator) -> Result<()> {
+    pub fn import(&mut self, path: &str) -> Result<()> {
         if let Some(mods) = self.modules {
-            if let Some(m) = mods.get(m) {
+            let loc = mods.base.join(path)?;
+            if let Some(m) = mods.programs.get(&loc) {
                 m.scan(self, &mut Env::new(None), &mut declaration_scan)
             } else {
                 // All modules that are to be imported must be present in the module-set.
-                panic!("unknown module: {:?}", m)
+                panic!("unknown module: {}", loc)
             }
         } else {
             Ok(())

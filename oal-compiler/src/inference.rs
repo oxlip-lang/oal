@@ -5,24 +5,18 @@ use crate::tag::{FuncTag, Tag, Tagged};
 use oal_syntax::ast::{AsExpr, Expr, NodeMut, NodeRef, Operator};
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq)]
-pub struct TagSeq(Locator, usize);
+#[derive(Debug, Default, PartialEq)]
+pub struct TagSeq(Option<Locator>, usize);
 
 impl TagSeq {
     pub fn new(m: Locator) -> Self {
-        TagSeq(m, 0)
+        TagSeq(Some(m), 0)
     }
 
     pub fn next(&mut self) -> usize {
         let n = self.1;
         self.1 += 1;
         n
-    }
-}
-
-impl Default for TagSeq {
-    fn default() -> Self {
-        Self::new(Locator::from(""))
     }
 }
 

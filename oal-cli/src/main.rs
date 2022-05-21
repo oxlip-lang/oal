@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use clap::Parser as ClapParser;
 use oal_compiler::{Locator, ModuleSet, Program};
 
@@ -16,7 +17,11 @@ struct Args {
 /// Loads and parses a source file into a program.
 fn loader(l: &Locator) -> anyhow::Result<Program> {
     eprintln!("Loading module {}", l);
-    let input = l.read_to_string()?;
+    let path = l
+        .url
+        .to_file_path()
+        .map_err(|_| anyhow!("not a file path: {}", l))?;
+    let input = std::fs::read_to_string(path)?;
     let program = oal_syntax::parse(input)?;
     Ok(program)
 }
@@ -31,11 +36,11 @@ fn compiler(mods: &ModuleSet, l: &Locator, p: Program) -> anyhow::Result<Program
 fn main() -> anyhow::Result<()> {
     let args: Args = Args::parse();
 
-    let main_mod = Locator::from(&args.input);
+    let main_mod = Locator::try_from(args.input.as_path())?;
 
     let mods = oal_compiler::load(&main_mod, loader, compiler)?;
 
-    let program = mods.get(&main_mod).unwrap();
+    let program = mods.programs.get(&main_mod).unwrap();
 
     eprintln!("Generating API specification");
 

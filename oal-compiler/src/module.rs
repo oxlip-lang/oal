@@ -5,7 +5,20 @@ use crate::scope::Env;
 use oal_syntax::ast::{AsExpr, NodeRef, Program};
 use std::collections::HashMap;
 
-pub type ModuleSet<T> = HashMap<Locator, Program<T>>;
+#[derive(Clone, Debug)]
+pub struct ModuleSet<T> {
+    pub base: Locator,
+    pub programs: HashMap<Locator, Program<T>>,
+}
+
+impl<T> ModuleSet<T> {
+    pub fn new(base: Locator) -> Self {
+        ModuleSet {
+            base,
+            programs: Default::default(),
+        }
+    }
+}
 
 pub trait Loader<T, E>: Fn(&Locator) -> Result<Program<T>, E>
 where
@@ -42,7 +55,7 @@ where
     L: Loader<T, E>,
     C: Compiler<T, E>,
 {
-    let mut mods = ModuleSet::new();
+    let mut mods = ModuleSet::new(loc.clone());
     recurse(&mut mods, vec![loc.clone()], &loader, &compiler)?;
     Ok(mods)
 }
@@ -59,33 +72,35 @@ where
     L: Loader<T, E>,
     C: Compiler<T, E>,
 {
-    let loc = path.last().unwrap();
-    let prg = loader(loc)?;
+    let base = path.last().unwrap();
+    let prg = loader(base)?;
     let mut deps = Vec::new();
     prg.scan(&mut deps, &mut Env::new(None), &mut dependency_scan)?;
     deps.into_iter().try_for_each(|dep| {
-        if path.contains(&dep) {
+        let module = base.join(dep.as_str())?;
+        if path.contains(&module) {
             Err(Error::new(Kind::CycleDetected, "loading module")
-                .with(&loc)
-                .with(&dep)
+                .with(&base)
+                .with(&module)
                 .into())
         } else {
             let mut next = path.clone();
-            next.push(dep);
+            next.push(module);
             recurse(mods, next, loader, compiler)
         }
     })?;
-    let prog = compiler(mods, loc, prg)?;
-    mods.insert(loc.clone(), prog);
+    let prog = compiler(mods, base, prg)?;
+    mods.programs.insert(base.clone(), prog);
     Ok(())
 }
 
-fn dependency_scan<T, E>(acc: &mut Vec<Locator>, _: &mut Env<T>, node: NodeRef<T>) -> Result<(), E>
+fn dependency_scan<T, E>(acc: &mut Vec<String>, _: &mut Env<T>, node: NodeRef<T>) -> Result<(), E>
 where
     T: AsExpr,
+    E: From<Error>,
 {
     if let NodeRef::Use(import) = node {
-        acc.push(Locator::from(&import.module))
+        acc.push(import.module.clone());
     }
     Ok(())
 }

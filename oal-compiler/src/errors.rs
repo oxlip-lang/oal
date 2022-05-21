@@ -10,6 +10,8 @@ pub enum Kind {
     UnexpectedExpression,
     InvalidYAML,
     CycleDetected,
+    IO,
+    InvalidURL,
 }
 
 impl Default for Kind {
@@ -26,7 +28,7 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn new(kind: Kind, msg: &str) -> Error {
+    pub fn new<S: Into<String>>(kind: Kind, msg: S) -> Error {
         Error {
             kind,
             msg: msg.into(),
@@ -57,7 +59,25 @@ impl std::error::Error for Error {}
 
 impl From<serde_yaml::Error> for Error {
     fn from(e: serde_yaml::Error) -> Self {
-        Error::new(Kind::InvalidYAML, e.to_string().as_str())
+        Error::new(Kind::InvalidYAML, e.to_string())
+    }
+}
+
+impl From<()> for Error {
+    fn from(_: ()) -> Self {
+        Error::new(Kind::Unknown, "")
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::new(Kind::IO, e.to_string())
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(e: url::ParseError) -> Self {
+        Error::new(Kind::InvalidURL, e.to_string())
     }
 }
 

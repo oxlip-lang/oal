@@ -1,4 +1,4 @@
-use "examples/module.oal";
+use "module.oal";
 
 // Function application
 # description: "some other stuff"

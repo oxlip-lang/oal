@@ -12,7 +12,7 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
-pest = "2.1"
-pest_derive = "2.1"
-enum-map = "2.1"
-enum-map-derive = "0.8"
+pest = "2.1.3"
+pest_derive = "2.1.0"
+enum-map = "2.1.0"
+enum-map-derive = "0.8.0"
