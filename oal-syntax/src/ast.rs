@@ -106,7 +106,7 @@ impl<T: AsExpr> FromPair for T {
             Rule::term_type => {
                 let mut inner = p.into_inner();
                 let mut term: T = inner.next().unwrap().into_expr();
-                term.as_node_mut().ann = inner.next().map(|p| Annotation::from_pair(p));
+                term.as_node_mut().ann = inner.next().map(Annotation::from_pair);
                 term
             }
             Rule::prim_type => Expr::Prim(p.into_expr()).into_node().into(),

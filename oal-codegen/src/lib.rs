@@ -100,7 +100,7 @@ impl Builder {
         }
     }
 
-    fn join_schema(&self, schemas: &Vec<spec::Schema>) -> Schema {
+    fn join_schema(&self, schemas: &[spec::Schema]) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AllOf {
@@ -138,7 +138,7 @@ impl Builder {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(Type::Array(ArrayType {
-                items: Some(ReferenceOr::Item(self.schema(array.item.as_ref()).into())),
+                items: Some(ReferenceOr::Item(self.schema(&array.item).into())),
                 min_items: None,
                 max_items: None,
                 unique_items: false,
@@ -146,7 +146,7 @@ impl Builder {
         }
     }
 
-    fn sum_schema(&self, schemas: &Vec<spec::Schema>) -> Schema {
+    fn sum_schema(&self, schemas: &[spec::Schema]) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::OneOf {
@@ -158,7 +158,7 @@ impl Builder {
         }
     }
 
-    fn any_schema(&self, schemas: &Vec<spec::Schema>) -> Schema {
+    fn any_schema(&self, schemas: &[spec::Schema]) -> Schema {
         Schema {
             schema_data: Default::default(),
             schema_kind: SchemaKind::AnyOf {
@@ -237,7 +237,7 @@ impl Builder {
                     schema: Some(ReferenceOr::Item(self.schema(schema))),
                     ..Default::default()
                 }},
-                description: xfer.range.desc.clone().unwrap_or("".to_owned()),
+                description: xfer.range.desc.clone().unwrap_or_else(|| "".to_owned()),
                 ..Default::default()
             })
         })

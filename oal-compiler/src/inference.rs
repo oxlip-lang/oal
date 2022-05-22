@@ -126,9 +126,8 @@ impl Subst {
 }
 
 pub fn substitute<T: Tagged>(subst: &mut Subst, _env: &mut Env<T>, node: NodeMut<T>) -> Result<()> {
-    match node {
-        NodeMut::Expr(e) => e.set_tag(subst.substitute(e.tag().unwrap())),
-        _ => {}
+    if let NodeMut::Expr(e) = node {
+        e.set_tag(subst.substitute(e.tag().unwrap()))
     }
     Ok(())
 }
@@ -178,7 +177,7 @@ fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
         if left_bindings.len() != right_bindings.len() {
             Err(Error::new(Kind::InvalidTypes, "arity").with(&(left_bindings, right_bindings)))
         } else {
-            unify(s, &left_range, &right_range).and_then(|_| {
+            unify(s, left_range, right_range).and_then(|_| {
                 left_bindings
                     .iter()
                     .zip(right_bindings.iter())
@@ -286,24 +285,16 @@ where
                 Ok(())
             }
             Expr::Lambda(lambda) => {
-                let bindings = lambda
-                    .bindings
-                    .iter()
-                    .map(|b| b.unwrap_tag().clone())
-                    .collect();
-                let range = lambda.body.unwrap_tag().clone().into();
+                let bindings = lambda.bindings.iter().map(|b| b.unwrap_tag()).collect();
+                let range = lambda.body.unwrap_tag().into();
                 c.push(e.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
                 Ok(())
             }
             Expr::App(application) => match env.lookup(&application.name) {
                 None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
                 Some(val) => {
-                    let bindings = application
-                        .args
-                        .iter()
-                        .map(|a| a.unwrap_tag().clone())
-                        .collect();
-                    let range = e.unwrap_tag().clone().into();
+                    let bindings = application.args.iter().map(|a| a.unwrap_tag()).collect();
+                    let range = e.unwrap_tag().into();
                     c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
                     Ok(())
                 }

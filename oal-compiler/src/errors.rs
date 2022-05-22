@@ -44,12 +44,12 @@ impl Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}: {}\n", self.kind, self.msg)?;
+        writeln!(f, "{:?}: {}", self.kind, self.msg)?;
         if !self.details.is_empty() {
-            write!(f, "Details:\n")?;
+            writeln!(f, "Details:")?;
             self.details
                 .iter()
-                .try_for_each(|d| write!(f, " {}\n", d))?;
+                .try_for_each(|d| writeln!(f, " {}", d))?;
         }
         Ok(())
     }

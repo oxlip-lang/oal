@@ -23,7 +23,7 @@ impl std::error::Error for Error {}
 impl From<pest::error::Error<Rule>> for Error {
     fn from(e: pest::error::Error<Rule>) -> Self {
         Error {
-            msg: format!("parsing failed\n{}", e.to_string()),
+            msg: format!("parsing failed\n{}", e),
         }
     }
 }

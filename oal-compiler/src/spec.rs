@@ -9,7 +9,7 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(ast::Literal),
-    Variable(Prop),
+    Variable(Box<Prop>),
 }
 
 impl<T> TryFrom<&ast::UriSegment<T>> for UriSegment
@@ -21,7 +21,7 @@ where
     fn try_from(s: &ast::UriSegment<T>) -> Result<Self> {
         match s {
             ast::UriSegment::Literal(l) => Ok(UriSegment::Literal(l.clone())),
-            ast::UriSegment::Variable(p) => p.try_into().map(|p| UriSegment::Variable(p)),
+            ast::UriSegment::Variable(p) => p.try_into().map(|p| UriSegment::Variable(Box::new(p))),
         }
     }
 }
@@ -54,15 +54,13 @@ impl Uri {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Array {
-    pub item: Box<Schema>,
+    pub item: Schema,
 }
 
 impl Array {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Array(a) = e.as_node().as_expr() {
-            Schema::try_from(a.item.as_ref()).map(|item| Array {
-                item: Box::new(item),
-            })
+            Schema::try_from(a.item.as_ref()).map(|item| Array { item })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not an array").with(e))
         }
@@ -95,15 +93,7 @@ pub struct Schema {
 
 impl Schema {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        let expr = match e.as_node().as_expr() {
-            ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
-            ast::Expr::Rel(_) => Relation::try_from(e).map(|r| Expr::Rel(r)),
-            ast::Expr::Uri(_) => Uri::try_from(e).map(|u| Expr::Uri(u)),
-            ast::Expr::Array(_) => Array::try_from(e).map(|a| Expr::Array(a)),
-            ast::Expr::Object(_) => Object::try_from(e).map(|o| Expr::Object(o)),
-            ast::Expr::Op(_) => VariadicOp::try_from(e).map(|o| Expr::Op(o)),
-            _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
-        }?;
+        let expr = Expr::try_from(e)?;
         let desc = e.annotation().and_then(|a| a.get_string("description"));
         let title = e.annotation().and_then(|a| a.get_string("title"));
         Ok(Schema { expr, desc, title })
@@ -113,11 +103,25 @@ impl Schema {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Prim(ast::Primitive),
-    Rel(Relation),
+    Rel(Box<Relation>),
     Uri(Uri),
-    Array(Array),
+    Array(Box<Array>),
     Object(Object),
     Op(VariadicOp),
+}
+
+impl Expr {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        match e.as_node().as_expr() {
+            ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
+            ast::Expr::Rel(_) => Relation::try_from(e).map(|r| Expr::Rel(Box::new(r))),
+            ast::Expr::Uri(_) => Uri::try_from(e).map(Expr::Uri),
+            ast::Expr::Array(_) => Array::try_from(e).map(|a| Expr::Array(Box::new(a))),
+            ast::Expr::Object(_) => Object::try_from(e).map(Expr::Object),
+            ast::Expr::Op(_) => VariadicOp::try_from(e).map(Expr::Op),
+            _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -196,7 +200,7 @@ pub struct Transfer {
 impl Transfer {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Xfer(xfer) = e.as_node().as_expr() {
-            let methods = xfer.methods.clone();
+            let methods = xfer.methods;
             let range = Content::try_from(xfer.range.as_ref())?;
             let domain = match &xfer.domain {
                 Some(d) => Content::try_from(d.as_ref()),

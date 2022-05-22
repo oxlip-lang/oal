@@ -20,17 +20,14 @@ pub enum Tag {
 
 impl Tag {
     pub fn is_variable(&self) -> bool {
-        match self {
-            Tag::Var(_) => true,
-            _ => false,
-        }
+        matches!(self, Tag::Var(_))
     }
 
     pub fn is_schema(&self) -> bool {
-        match self {
-            Tag::Primitive | Tag::Relation | Tag::Object | Tag::Array | Tag::Uri | Tag::Any => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Tag::Primitive | Tag::Relation | Tag::Object | Tag::Array | Tag::Uri | Tag::Any
+        )
     }
 
     pub fn is_schema_like(&self) -> bool {

@@ -129,8 +129,8 @@ impl<T: AsExpr> Transform<T> for Lambda<T> {
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>,
     {
         env.within(|env| {
-            (&mut self.bindings)
-                .into_iter()
+            self.bindings
+                .iter_mut()
                 .try_for_each(|binding| {
                     transform_expr(binding, acc, env, f).and_then(|_| {
                         if let Expr::Binding(name) = binding.as_node().as_expr() {
