@@ -31,6 +31,7 @@ fn typecheck_ok() {
         "let a = { b [bool], c / } ~ num ~ uri;",
         "let a = / ( get -> str );",
         "let a = / ( get -> <{}> );",
+        "let a = /a/{ id num }/b?{ c str };",
     ];
 
     for c in cases {
@@ -44,6 +45,7 @@ fn typecheck_error() {
         "let a = <> ~ {};",
         "let a = / ( num );",
         "let a = / ( get -> ( get -> str ) );",
+        "let a = /a/{ id num }/b?str;",
     ];
 
     for c in cases {
@@ -51,7 +53,7 @@ fn typecheck_error() {
             eval(c)
                 .expect_err(format!("expected error evaluating: {}", c).as_str())
                 .downcast_ref::<Error>()
-                .unwrap()
+                .expect("expected compiler error")
                 .kind,
             Kind::InvalidTypes
         );

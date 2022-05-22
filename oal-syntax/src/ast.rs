@@ -439,9 +439,20 @@ impl<T> UriSegment<T> {
     }
 }
 
+impl<T: AsExpr> FromPair for UriSegment<T> {
+    fn from_pair(p: Pair) -> Self {
+        match p.as_rule() {
+            Rule::uri_var => UriSegment::Variable(p.into_inner().next().unwrap().into_expr()),
+            Rule::uri_lit => UriSegment::Literal(p.as_str().into()),
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Uri<T> {
-    pub spec: Vec<UriSegment<T>>,
+    pub path: Vec<UriSegment<T>>,
+    pub params: Option<Box<T>>,
 }
 
 impl<'a, T> IntoIterator for &'a Uri<T> {
@@ -449,14 +460,18 @@ impl<'a, T> IntoIterator for &'a Uri<T> {
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = self.spec.iter().filter_map(|s| {
+        let path = self.path.iter().filter_map(|s| {
             if let UriSegment::Variable(t) = s {
                 Some(&t.val)
             } else {
                 None
             }
         });
-        Box::new(it)
+        if let Some(params) = &self.params {
+            Box::new(path.chain(once(params.as_ref())))
+        } else {
+            Box::new(path)
+        }
     }
 }
 
@@ -465,36 +480,46 @@ impl<'a, T> IntoIterator for &'a mut Uri<T> {
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = self.spec.iter_mut().filter_map(|s| {
+        let path = self.path.iter_mut().filter_map(|s| {
             if let UriSegment::Variable(t) = s {
                 Some(&mut t.val)
             } else {
                 None
             }
         });
-        Box::new(it)
+        if let Some(params) = &mut self.params {
+            Box::new(path.chain(once(params.as_mut())))
+        } else {
+            Box::new(path)
+        }
     }
 }
 
 impl<T: AsExpr> FromPair for Uri<T> {
     fn from_pair(p: Pair) -> Self {
         let p = p.into_inner().next().unwrap();
-        let spec: Vec<_> = match p.as_rule() {
+        let (path, params) = match p.as_rule() {
             Rule::uri_kw => Default::default(),
-            Rule::uri_root => vec![UriSegment::root()],
-            Rule::uri_tpl => p
-                .into_inner()
-                .map(|p| match p.as_rule() {
-                    Rule::uri_var => {
-                        UriSegment::Variable(p.into_inner().next().unwrap().into_expr())
-                    }
-                    Rule::uri_lit => UriSegment::Literal(p.as_str().into()),
-                    _ => unreachable!(),
-                })
-                .collect(),
+            Rule::uri_root => (vec![UriSegment::root()], None),
+            Rule::uri_tpl => {
+                let mut inner = p.into_inner();
+                let path = inner
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .map(UriSegment::from_pair)
+                    .collect();
+                let params = inner
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .next()
+                    .map(|p| Box::new(p.into_expr()));
+                (path, params)
+            }
             _ => unreachable!(),
         };
-        Uri { spec }
+        Uri { path, params }
     }
 }
 

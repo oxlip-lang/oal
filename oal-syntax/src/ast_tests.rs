@@ -76,8 +76,8 @@ fn parse_root_uri() {
 
     if let Statement::Decl(decl) = s {
         if let Expr::Uri(uri) = decl.expr.as_node().as_expr() {
-            assert_eq!(uri.spec.len(), 1);
-            assert_eq!(*uri.spec.first().unwrap(), UriSegment::root());
+            assert_eq!(uri.path.len(), 1);
+            assert_eq!(*uri.path.first().unwrap(), UriSegment::root());
         } else {
             panic!("expected uri expression");
         }
@@ -96,10 +96,10 @@ fn parse_template_uri() {
 
     if let Statement::Decl(decl) = s {
         if let Expr::Uri(uri) = decl.expr.as_node().as_expr() {
-            assert_eq!(uri.spec.len(), 3);
-            assert_eq!(*uri.spec.get(0).unwrap(), UriSegment::Literal("x".into()));
-            assert_eq!(*uri.spec.get(2).unwrap(), UriSegment::Literal("z".into()));
-            if let UriSegment::Variable(Property { key, val }) = uri.spec.get(1).unwrap() {
+            assert_eq!(uri.path.len(), 3);
+            assert_eq!(*uri.path.get(0).unwrap(), UriSegment::Literal("x".into()));
+            assert_eq!(*uri.path.get(2).unwrap(), UriSegment::Literal("z".into()));
+            if let UriSegment::Variable(Property { key, val }) = uri.path.get(1).unwrap() {
                 assert_eq!(key.as_ref(), "y");
                 assert_eq!(*val.as_node().as_expr(), Expr::Prim(Primitive::Str));
             } else {
@@ -172,7 +172,8 @@ fn parse_simple_relation() {
             assert_eq!(
                 *rel.uri.as_node().as_expr(),
                 Expr::Uri(Uri {
-                    spec: vec![UriSegment::root()]
+                    path: vec![UriSegment::root()],
+                    params: None,
                 })
             );
 
@@ -358,5 +359,29 @@ fn parse_import() {
         assert_eq!(imp.module, "module");
     } else {
         panic!("expected import");
+    }
+}
+
+#[test]
+fn parse_uri_params() {
+    let d: Program = parse("let a = /x/{ y str }/z?{ q str, n num };").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Statement::Decl(decl) = s {
+        if let Expr::Uri(uri) = decl.expr.as_node().as_expr() {
+            let params = uri.params.as_ref().expect("expected params");
+            if let Expr::Object(obj) = params.as_node().as_expr() {
+                assert_eq!(obj.props.len(), 2)
+            } else {
+                panic!("expected object expression");
+            }
+        } else {
+            panic!("expected uri expression");
+        }
+    } else {
+        panic!("expected declaration");
     }
 }

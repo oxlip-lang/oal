@@ -16,7 +16,8 @@ fn eval(code: &str) -> anyhow::Result<Spec> {
 #[test]
 fn uri_pattern() {
     let uri = Uri {
-        spec: vec![UriSegment::Literal("".into())],
+        path: vec![UriSegment::Literal("".into())],
+        params: None,
     };
 
     assert_eq!(uri.pattern(), "/");
@@ -37,8 +38,8 @@ fn evaluate_simple() -> anyhow::Result<()> {
     let (i, p) = s.rels.iter().next().unwrap();
 
     assert_eq!(i, "/");
-    assert_eq!(p.uri.spec.len(), 1);
-    assert_eq!(*p.uri.spec.first().unwrap(), UriSegment::Literal("".into()));
+    assert_eq!(p.uri.path.len(), 1);
+    assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
     if let Some(x) = &p.xfers[oal_syntax::ast::Method::Put] {
         let d = x.domain.schema.as_ref().unwrap();

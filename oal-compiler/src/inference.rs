@@ -2,7 +2,7 @@ use crate::errors::{Error, Kind, Result};
 use crate::locator::Locator;
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
-use oal_syntax::ast::{AsExpr, Expr, NodeMut, NodeRef, Operator};
+use oal_syntax::ast::{AsExpr, Expr, NodeMut, NodeRef, Operator, UriSegment};
 use std::collections::HashMap;
 
 #[derive(Debug, Default, PartialEq)]
@@ -246,8 +246,13 @@ where
                 Ok(())
             }
             Expr::Uri(uri) => {
-                for seg in uri.into_iter() {
-                    c.push(seg.unwrap_tag(), Tag::Primitive);
+                for seg in uri.path.iter() {
+                    if let UriSegment::Variable(var) = seg {
+                        c.push(var.val.unwrap_tag(), Tag::Primitive);
+                    }
+                }
+                if let Some(params) = &uri.params {
+                    c.push(params.unwrap_tag(), Tag::Object);
                 }
                 c.push(e.unwrap_tag(), Tag::Uri);
                 Ok(())

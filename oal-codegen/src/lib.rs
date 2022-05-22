@@ -83,7 +83,7 @@ impl Builder {
     }
 
     fn uri_schema(&self, uri: &spec::Uri) -> Schema {
-        let pattern = if uri.spec.is_empty() {
+        let pattern = if uri.path.is_empty() {
             None
         } else {
             Some(self.uri_pattern(uri).into())
@@ -188,7 +188,7 @@ impl Builder {
         sch
     }
 
-    fn prop_param(&self, prop: &spec::Prop) -> Parameter {
+    fn prop_param(&self, prop: &spec::Property) -> Parameter {
         Parameter::Path {
             parameter_data: ParameterData {
                 name: prop.name.as_ref().into(),
@@ -208,7 +208,7 @@ impl Builder {
     }
 
     fn uri_params(&self, uri: &spec::Uri) -> Vec<Parameter> {
-        uri.spec
+        uri.path
             .iter()
             .flat_map(|s| match s {
                 spec::UriSegment::Variable(p) => Some(self.prop_param(p)),

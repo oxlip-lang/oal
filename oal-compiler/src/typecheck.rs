@@ -62,14 +62,18 @@ impl<T: AsExpr + Tagged> TypeChecked for Relation<T> {
 
 impl<T: AsExpr + Tagged> TypeChecked for Uri<T> {
     fn type_check(&self) -> Result<()> {
-        let vars_check = self.spec.iter().all(|s| {
+        let vars_check = self.path.iter().all(|s| {
             if let UriSegment::Variable(v) = s {
                 v.val.unwrap_tag() == Tag::Primitive
             } else {
                 true
             }
         });
-        if vars_check {
+        let params_check = self
+            .params
+            .as_ref()
+            .map_or(true, |p| p.unwrap_tag() == Tag::Object);
+        if vars_check && params_check {
             Ok(())
         } else {
             Err(Error::new(Kind::InvalidTypes, "ill-formed URI").with(self))

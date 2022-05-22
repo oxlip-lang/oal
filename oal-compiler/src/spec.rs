@@ -9,7 +9,7 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(ast::Literal),
-    Variable(Box<Prop>),
+    Variable(Box<Property>),
 }
 
 impl<T> TryFrom<&ast::UriSegment<T>> for UriSegment
@@ -28,12 +28,13 @@ where
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Uri {
-    pub spec: Vec<UriSegment>,
+    pub path: Vec<UriSegment>,
+    pub params: Option<Object>,
 }
 
 impl Uri {
     pub fn pattern(&self) -> String {
-        self.spec
+        self.path
             .iter()
             .map(|s| match s {
                 UriSegment::Literal(l) => format!("/{}", l),
@@ -44,8 +45,18 @@ impl Uri {
 
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Uri(uri) = e.as_node().as_expr() {
-            let spec: Result<Vec<UriSegment>> = uri.spec.iter().map(|s| s.try_into()).collect();
-            spec.map(|spec| Uri { spec })
+            let path = uri
+                .path
+                .iter()
+                .map(UriSegment::try_from)
+                .collect::<Result<Vec<UriSegment>>>()?;
+            let params = if let Some(p) = &uri.params {
+                let obj = Object::try_from(p.as_ref())?;
+                Some(obj)
+            } else {
+                None
+            };
+            Ok(Uri { path, params })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not a URI").with(e))
         }
@@ -125,19 +136,19 @@ impl Expr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Prop {
+pub struct Property {
     pub name: ast::Ident,
     pub schema: Schema,
 }
 
-impl<T> TryFrom<&ast::Property<T>> for Prop
+impl<T> TryFrom<&ast::Property<T>> for Property
 where
     T: AsExpr + Annotated,
 {
     type Error = Error;
 
     fn try_from(p: &ast::Property<T>) -> Result<Self> {
-        Schema::try_from(&p.val).map(|s| Prop {
+        Schema::try_from(&p.val).map(|s| Property {
             name: p.key.clone(),
             schema: s,
         })
@@ -146,7 +157,7 @@ where
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Object {
-    pub props: Vec<Prop>,
+    pub props: Vec<Property>,
 }
 
 impl Object {

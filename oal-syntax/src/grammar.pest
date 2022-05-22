@@ -35,7 +35,9 @@ var = { ident }
 
 uri_lit = @{ ( ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" )+ }
 uri_var = { "{" ~ prop ~ "}" }
-uri_tpl = { ( "/" ~ ( uri_lit | uri_var ) )+ ~ "/"? }
+uri_path = { ( "/" ~ ( uri_lit | uri_var ) )+ }
+uri_params = { ( "?" ~ expr_type )? }
+uri_tpl = { uri_path ~ "/"? ~ uri_params }
 uri_root = @{ "/" }
 
 uri_type = { uri_kw | uri_tpl | uri_root }

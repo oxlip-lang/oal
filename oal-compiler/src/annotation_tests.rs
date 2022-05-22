@@ -29,7 +29,7 @@ fn annotate_simple() -> anyhow::Result<()> {
     if let Statement::Res(res) = prg.stmts.iter().nth(4).unwrap() {
         if let Expr::Rel(rel) = res.rel.as_node().as_expr() {
             if let Expr::Uri(uri) = rel.uri.as_node().as_expr() {
-                if let UriSegment::Variable(p) = uri.spec.first().expect("expected URI segment") {
+                if let UriSegment::Variable(p) = uri.path.first().expect("expected URI segment") {
                     let ann = p.val.annotation().expect("expected annotation");
                     let desc = ann.get_str("description").expect("expected description");
                     let req = ann.get_bool("required").expect("expected required");
