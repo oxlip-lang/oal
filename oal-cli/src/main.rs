@@ -9,9 +9,13 @@ struct Args {
     #[clap(short = 'i', long = "input", parse(from_os_str))]
     input: std::path::PathBuf,
 
-    /// The path to the OpenAPI description
+    /// The path to the output OpenAPI description
     #[clap(short = 'o', long = "output", parse(from_os_str))]
     output: std::path::PathBuf,
+
+    /// The path to a base OpenAPI description
+    #[clap(short = 'b', long = "base", parse(from_os_str))]
+    base: Option<std::path::PathBuf>,
 }
 
 /// Loads and parses a source file into a program.
@@ -42,15 +46,23 @@ fn main() -> anyhow::Result<()> {
 
     let program = mods.programs.get(&main_mod).unwrap();
 
-    eprintln!("Generating API specification");
+    eprintln!("Generating API definition");
 
     let spec = oal_compiler::spec::Spec::try_from(program)?;
 
-    let api = oal_codegen::Builder::new(spec).open_api();
+    let mut builder = oal_codegen::Builder::new().with_spec(spec);
+
+    if let Some(path) = args.base {
+        let file = std::fs::File::open(path)?;
+        let base = serde_yaml::from_reader(file)?;
+        builder = builder.with_base(base);
+    }
+
+    let api = builder.into_openapi();
 
     let output = serde_yaml::to_string(&api)?;
 
-    eprintln!("Writing OpenAPI definition as {}", args.output.display());
+    eprintln!("Writing OpenAPI definition to {}", args.output.display());
 
     std::fs::write(args.output, output)?;
 

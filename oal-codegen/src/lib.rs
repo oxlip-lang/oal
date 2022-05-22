@@ -7,20 +7,43 @@ use openapiv3::{
     Schema, SchemaData, SchemaKind, Server, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
+#[derive(Default)]
 pub struct Builder {
-    spec: spec::Spec,
+    spec: Option<spec::Spec>,
+    base: Option<OpenAPI>,
 }
 
 impl Builder {
-    pub fn new(s: spec::Spec) -> Builder {
-        Builder { spec: s }
+    pub fn new() -> Builder {
+        Builder::default()
     }
 
-    pub fn open_api(&self) -> OpenAPI {
+    pub fn with_base(mut self, base: OpenAPI) -> Self {
+        self.base = Some(base);
+        self
+    }
+
+    pub fn with_spec(mut self, spec: spec::Spec) -> Self {
+        self.spec = Some(spec);
+        self
+    }
+
+    pub fn into_openapi(self) -> OpenAPI {
+        let paths = self.all_paths();
+        let mut definition = if let Some(base) = self.base {
+            base
+        } else {
+            self.default_base()
+        };
+        definition.paths = paths;
+        definition
+    }
+
+    fn default_base(&self) -> OpenAPI {
         OpenAPI {
-            openapi: "3.0.1".into(),
+            openapi: "3.0.3".into(),
             info: Info {
-                title: "Test OpenAPI specification".into(),
+                title: "OpenAPI definition".into(),
                 version: "0.1.0".into(),
                 ..Default::default()
             },
@@ -28,7 +51,6 @@ impl Builder {
                 url: "/".to_owned(),
                 ..Default::default()
             }],
-            paths: self.all_paths(),
             ..Default::default()
         }
     }
@@ -264,10 +286,8 @@ impl Builder {
     }
 
     fn all_paths(&self) -> Paths {
-        Paths {
-            paths: self
-                .spec
-                .rels
+        let paths = if let Some(spec) = &self.spec {
+            spec.rels
                 .iter()
                 .map(|(pattern, rel)| {
                     (
@@ -275,8 +295,19 @@ impl Builder {
                         ReferenceOr::Item(self.relation_path_item(rel)),
                     )
                 })
-                .collect(),
+                .collect()
+        } else {
+            Default::default()
+        };
+        Paths {
+            paths,
             extensions: Default::default(),
         }
+    }
+}
+
+impl From<Builder> for OpenAPI {
+    fn from(b: Builder) -> Self {
+        b.into_openapi()
     }
 }

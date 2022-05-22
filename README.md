@@ -1,15 +1,30 @@
 # OpenAPI Language
 
-An experiment on a high-level functional programming language for designing OpenAPI specifications.
+An experiment on a high-level functional programming language for designing
+OpenAPI specifications.
 This is not a general purpose language.
-The motivation is to play with language abstractions on top of OpenAPI in a similar fashion as Sass over CSS.
+The motivation is to play with algebraic language abstractions on top of OpenAPI
+in a similar fashion as Sass/SCSS over CSS.
 The ambition of the author is to consider OpenAPI as the assembly language of API design. 
 
 The language is statically typed with global type inference.
 Due to the experimental nature of this project, error handling is rudimentary.
-The main compiler program takes two arguments: a source and target file names.
-The output is an OpenAPI 3.0.1 specification in YAML format,
-compiled from the resources defined in the source program.
+The CLI generates OpenAPI 3.0.3 definitions in YAML format from the resources defined
+in the source program.
+
+## Installation
+
+This step requires a [local Rust and Cargo installation](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+
+```
+cargo install --path oal-cli
+```
+
+## Usage
+
+```
+oal-cli -b examples/base.yaml -i examples/main.oal -o openapi.yaml
+```
 
 ## Examples of language constructs:
 ```
@@ -88,11 +103,11 @@ res /something ( get -> rec3 );
 ```
 
 <details>
-  <summary>Example of OpenAPI specification generated from the program above</summary>
+  <summary>OpenAPI definition generated from the program above</summary>
 
 ```yaml
 ---
-openapi: 3.0.1
+openapi: 3.0.3
 info:
   title: Test OpenAPI specification
   version: 0.1.0
