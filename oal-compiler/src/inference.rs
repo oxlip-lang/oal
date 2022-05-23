@@ -265,7 +265,10 @@ where
                 c.push(e.unwrap_tag(), Tag::Content);
                 Ok(())
             }
-            Expr::Xfer(_) => {
+            Expr::Xfer(xfer) => {
+                if let Some(params) = &xfer.params {
+                    c.push(params.unwrap_tag(), Tag::Object);
+                }
                 c.push(e.unwrap_tag(), Tag::Transfer);
                 Ok(())
             }

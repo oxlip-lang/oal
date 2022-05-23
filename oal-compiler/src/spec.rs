@@ -205,6 +205,7 @@ pub struct Transfer {
     pub methods: EnumMap<ast::Method, bool>,
     pub domain: Content,
     pub range: Content,
+    pub params: Option<Object>,
     pub summary: Option<String>,
 }
 
@@ -217,11 +218,16 @@ impl Transfer {
                 Some(d) => Content::try_from(d.as_ref()),
                 None => Ok(Content::default()),
             }?;
+            let params = match &xfer.params {
+                Some(x) => Object::try_from(x.as_ref()).map(Some),
+                None => Ok(None),
+            }?;
             let summary = e.annotation().and_then(|a| a.get_string("summary"));
             Ok(Transfer {
                 methods,
-                range,
                 domain,
+                range,
+                params,
                 summary,
             })
         } else {

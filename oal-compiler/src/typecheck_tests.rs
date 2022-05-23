@@ -32,6 +32,9 @@ fn typecheck_ok() {
         "let a = / ( get -> str );",
         "let a = / ( get -> <{}> );",
         "let a = /a/{ id num }/b?{ c str };",
+        "let a = patch, put { n num } : {} -> {};",
+        "let a = get { q str } -> {};",
+        "let a = /something?{ q str } ( get -> {} );",
     ];
 
     for c in cases {
@@ -45,7 +48,6 @@ fn typecheck_error() {
         "let a = <> ~ {};",
         "let a = / ( num );",
         "let a = / ( get -> ( get -> str ) );",
-        "let a = /a/{ id num }/b?str;",
     ];
 
     for c in cases {

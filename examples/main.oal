@@ -6,7 +6,7 @@ let rec3 = f { height num } { stuff any1 };
 
 // Resources
 res rel1;
-res /something ( get -> rec3 );
+res /something?{ q str } ( get -> rec3 );
 
 /*
  * Block

@@ -1,7 +1,7 @@
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
-use std::iter::{empty, once, Once};
+use std::iter::{empty, once, Flatten, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
@@ -333,6 +333,7 @@ pub struct Transfer<T> {
     pub methods: EnumMap<Method, bool>,
     pub domain: Option<Box<T>>,
     pub range: Box<T>,
+    pub params: Option<Box<T>>,
 }
 
 impl<T: AsExpr> FromPair for Transfer<T> {
@@ -345,6 +346,13 @@ impl<T: AsExpr> FromPair for Transfer<T> {
             .into_inner()
             .map(|p| (p.into_expr(), true))
             .collect();
+
+        let params: Option<Box<T>> = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .next()
+            .map(|p| Box::new(p.into_expr()));
 
         let domain = inner
             .next()
@@ -359,35 +367,38 @@ impl<T: AsExpr> FromPair for Transfer<T> {
             methods,
             domain,
             range,
+            params,
         }
     }
 }
 
 impl<'a, T> IntoIterator for &'a Transfer<T> {
     type Item = &'a T;
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 3>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = once(self.range.as_ref());
-        if let Some(d) = self.domain.as_ref() {
-            Box::new(it.chain(once(d.as_ref())))
-        } else {
-            Box::new(it)
-        }
+        [
+            Some(self.range.as_ref()),
+            self.domain.as_ref().map(AsRef::as_ref),
+            self.params.as_ref().map(AsRef::as_ref),
+        ]
+        .into_iter()
+        .flatten()
     }
 }
 
 impl<'a, T> IntoIterator for &'a mut Transfer<T> {
     type Item = &'a mut T;
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 3>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let it = once(self.range.as_mut());
-        if let Some(d) = self.domain.as_mut() {
-            Box::new(it.chain(once(d.as_mut())))
-        } else {
-            Box::new(it)
-        }
+        [
+            Some(self.range.as_mut()),
+            self.domain.as_mut().map(AsMut::as_mut),
+            self.params.as_mut().map(AsMut::as_mut),
+        ]
+        .into_iter()
+        .flatten()
     }
 }
 

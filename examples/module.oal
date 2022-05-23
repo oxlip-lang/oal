@@ -21,10 +21,10 @@ let cnt1 = <rec1>;
 
 // Operations
 # summary: "does something"
-let op1 = patch, put : cnt1 -> cnt1;
+let op1 = patch, put { n num } : cnt1 -> cnt1;
 
 # summary: "does something else"
-let op2 = get -> cnt1;
+let op2 = get { q str } -> cnt1;
 
 // Relations
 let rel1 = uri1 ( op1, op2 );

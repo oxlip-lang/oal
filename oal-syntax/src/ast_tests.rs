@@ -385,3 +385,27 @@ fn parse_uri_params() {
         panic!("expected declaration");
     }
 }
+
+#[test]
+fn parse_transfer_params() {
+    let d: Program = parse("let a = get { q str, n num } -> {};").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Statement::Decl(decl) = s {
+        if let Expr::Xfer(xfer) = decl.expr.as_node().as_expr() {
+            let params = xfer.params.as_ref().expect("expected params");
+            if let Expr::Object(obj) = params.as_node().as_expr() {
+                assert_eq!(obj.props.len(), 2)
+            } else {
+                panic!("expected object expression");
+            }
+        } else {
+            panic!("expected xfer expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
