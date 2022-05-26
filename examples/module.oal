@@ -1,7 +1,7 @@
 // Primitive types
 let id1 = num;
 
-// Property types
+// Properties
 # description: "some parameter"
 let prop1 = 'id id1 `title: "some identifier"`;
 let prop2 = 'n num;

@@ -35,7 +35,7 @@ oal-cli -b examples/base.yaml -i examples/main.oal -o openapi.yaml
 use "some/other/module.oal";
 ```
 ```
-// Property types
+// Properties
 # description: "some parameter"
 let prop1 = 'id id1 `title: "some identifier"`;
 let prop2 = 'n num;
