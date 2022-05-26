@@ -188,33 +188,58 @@ impl Builder {
         sch
     }
 
-    fn prop_param(&self, prop: &spec::Property) -> Parameter {
+    fn prop_param_data(&self, prop: &spec::Property) -> ParameterData {
+        ParameterData {
+            name: prop.name.as_ref().into(),
+            description: prop.desc.clone(),
+            required: true,
+            deprecated: None,
+            format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(self.schema(&prop.schema))),
+            example: None,
+            examples: Default::default(),
+            explode: None,
+            extensions: Default::default(),
+        }
+    }
+
+    fn prop_path_param(&self, prop: &spec::Property) -> Parameter {
         Parameter::Path {
-            parameter_data: ParameterData {
-                name: prop.name.as_ref().into(),
-                description: None,
-                required: true,
-                deprecated: None,
-                format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(
-                    self.schema(&prop.schema),
-                )),
-                example: None,
-                examples: Default::default(),
-                explode: None,
-                extensions: Default::default(),
-            },
+            parameter_data: self.prop_param_data(prop),
             style: Default::default(),
         }
     }
 
-    fn uri_params(&self, uri: &spec::Uri) -> Vec<Parameter> {
-        uri.path
+    fn prop_query_param(&self, prop: &spec::Property) -> Parameter {
+        Parameter::Query {
+            parameter_data: self.prop_param_data(prop),
+            allow_reserved: false,
+            style: Default::default(),
+            allow_empty_value: None,
+        }
+    }
+
+    fn xfer_params(&self, xfer: &spec::Transfer) -> Vec<ReferenceOr<Parameter>> {
+        xfer.params
             .iter()
-            .flat_map(|s| match s {
-                spec::UriSegment::Variable(p) => Some(self.prop_param(p)),
-                _ => None,
+            .flat_map(|o| {
+                o.props
+                    .iter()
+                    .map(|p| ReferenceOr::Item(self.prop_query_param(p)))
             })
             .collect()
+    }
+
+    fn uri_params(&self, uri: &spec::Uri) -> Vec<ReferenceOr<Parameter>> {
+        let path = uri.path.iter().flat_map(|s| match s {
+            spec::UriSegment::Variable(p) => Some(ReferenceOr::Item(self.prop_path_param(p))),
+            _ => None,
+        });
+        let query = uri.params.iter().flat_map(|o| {
+            o.props
+                .iter()
+                .map(|p| ReferenceOr::Item(self.prop_query_param(p)))
+        });
+        path.chain(query).collect()
     }
 
     fn transfer_request(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<RequestBody>> {
@@ -244,14 +269,8 @@ impl Builder {
     }
 
     fn relation_path_item(&self, rel: &spec::Relation) -> PathItem {
-        let parameters = self
-            .uri_params(&rel.uri)
-            .into_iter()
-            .map(ReferenceOr::Item)
-            .collect();
-
         let mut path_item = PathItem {
-            parameters,
+            parameters: self.uri_params(&rel.uri),
             ..Default::default()
         };
 
@@ -263,6 +282,7 @@ impl Builder {
         for (method, xfer) in xfers {
             let op = Operation {
                 summary: xfer.summary.clone(),
+                parameters: self.xfer_params(xfer),
                 request_body: self.transfer_request(xfer),
                 responses: Responses {
                     default: self.transfer_response(xfer),

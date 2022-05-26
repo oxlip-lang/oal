@@ -36,6 +36,7 @@ macro_rules! scan_expr_node {
 
 scan_expr_node!(Relation);
 scan_expr_node!(Uri);
+scan_expr_node!(Property);
 scan_expr_node!(Object);
 scan_expr_node!(Content);
 scan_expr_node!(Transfer);
@@ -147,6 +148,7 @@ impl<T: AsExpr> Scan<T> for Expr<T> {
         match self {
             Expr::Rel(rel) => rel.scan(acc, env, f),
             Expr::Uri(uri) => uri.scan(acc, env, f),
+            Expr::Property(prop) => prop.scan(acc, env, f),
             Expr::Object(obj) => obj.scan(acc, env, f),
             Expr::Content(cnt) => cnt.scan(acc, env, f),
             Expr::Xfer(xfer) => xfer.scan(acc, env, f),

@@ -8,6 +8,7 @@ pub struct FuncTag {
 pub enum Tag {
     Primitive,
     Relation,
+    Property,
     Object,
     Content,
     Transfer,

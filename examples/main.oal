@@ -2,11 +2,11 @@ use "module.oal";
 
 // Function application
 # description: "some other stuff"
-let rec3 = f { height num } { stuff any1 };
+let obj3 = f { 'height num } { 'stuff any1 };
 
 // Resources
 res rel1;
-res /something?{ q str } ( get -> rec3 );
+res /something?{ 'q str } ( get -> obj3 );
 
 /*
  * Block

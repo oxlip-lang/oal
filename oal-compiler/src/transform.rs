@@ -42,6 +42,7 @@ macro_rules! transform_expr_node {
 
 transform_expr_node!(Relation);
 transform_expr_node!(Uri);
+transform_expr_node!(Property);
 transform_expr_node!(Object);
 transform_expr_node!(Content);
 transform_expr_node!(Transfer);
@@ -155,6 +156,7 @@ impl<T: AsExpr> Transform<T> for Expr<T> {
         match self {
             Expr::Rel(rel) => rel.transform(acc, env, f),
             Expr::Uri(uri) => uri.transform(acc, env, f),
+            Expr::Property(prop) => prop.transform(acc, env, f),
             Expr::Object(obj) => obj.transform(acc, env, f),
             Expr::Content(cnt) => cnt.transform(acc, env, f),
             Expr::Xfer(xfer) => xfer.transform(acc, env, f),

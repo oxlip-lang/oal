@@ -2,7 +2,8 @@ use crate::errors::{Error, Kind, Result};
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use oal_syntax::ast::{
-    Array, AsExpr, Expr, NodeRef, Object, Operator, Relation, Transfer, Uri, UriSegment, VariadicOp,
+    Array, AsExpr, Expr, NodeRef, Object, Operator, Property, Relation, Transfer, Uri, UriSegment,
+    VariadicOp,
 };
 
 trait TypeChecked {
@@ -67,8 +68,12 @@ impl<T: AsExpr + Tagged> TypeChecked for Relation<T> {
 impl<T: AsExpr + Tagged> TypeChecked for Uri<T> {
     fn type_check(&self) -> Result<()> {
         let vars_check = self.path.iter().all(|s| {
-            if let UriSegment::Variable(v) = s {
-                v.val.unwrap_tag() == Tag::Primitive
+            if let UriSegment::Variable(var) = s {
+                if let Expr::Property(prop) = var.as_node().as_expr() {
+                    prop.val.unwrap_tag() == Tag::Primitive
+                } else {
+                    false
+                }
             } else {
                 true
             }
@@ -95,9 +100,19 @@ impl<T: AsExpr + Tagged> TypeChecked for Array<T> {
     }
 }
 
+impl<T: AsExpr + Tagged> TypeChecked for Property<T> {
+    fn type_check(&self) -> Result<()> {
+        if self.val.unwrap_tag().is_schema() {
+            Ok(())
+        } else {
+            Err(Error::new(Kind::InvalidTypes, "ill-formed property").with(self))
+        }
+    }
+}
+
 impl<T: AsExpr + Tagged> TypeChecked for Object<T> {
     fn type_check(&self) -> Result<()> {
-        if self.props.iter().all(|p| p.val.unwrap_tag().is_schema()) {
+        if self.props.iter().all(|p| p.unwrap_tag() == Tag::Property) {
             Ok(())
         } else {
             Err(Error::new(Kind::InvalidTypes, "ill-formed object").with(self))
@@ -115,6 +130,7 @@ where
             Expr::Rel(rel) => rel.type_check(),
             Expr::Uri(uri) => uri.type_check(),
             Expr::Array(arr) => arr.type_check(),
+            Expr::Property(prop) => prop.type_check(),
             Expr::Object(obj) => obj.type_check(),
             Expr::Xfer(xfer) => xfer.type_check(),
             _ => Ok(()),

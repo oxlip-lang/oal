@@ -88,7 +88,7 @@ fn parse_root_uri() {
 
 #[test]
 fn parse_template_uri() {
-    let d: Program = parse("let a = /x/{ y str }/z/;").expect("parsing failed");
+    let d: Program = parse("let a = /x/{ 'y str }/z/;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -99,9 +99,13 @@ fn parse_template_uri() {
             assert_eq!(uri.path.len(), 3);
             assert_eq!(*uri.path.get(0).unwrap(), UriSegment::Literal("x".into()));
             assert_eq!(*uri.path.get(2).unwrap(), UriSegment::Literal("z".into()));
-            if let UriSegment::Variable(Property { key, val }) = uri.path.get(1).unwrap() {
-                assert_eq!(key.as_ref(), "y");
-                assert_eq!(*val.as_node().as_expr(), Expr::Prim(Primitive::Str));
+            if let UriSegment::Variable(var) = uri.path.get(1).unwrap() {
+                if let Expr::Property(prop) = var.as_node().as_expr() {
+                    assert_eq!(prop.name.as_ref(), "y");
+                    assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::Str));
+                } else {
+                    panic!("expected property expression");
+                }
             } else {
                 panic!("expected uri segment variable");
             }
@@ -292,7 +296,7 @@ fn parse_annotation() {
         let id = num;
         # description: "some record"
         let r = {};
-        let a = /{ n id } ( put : <r> -> <r> );
+        let a = /{ 'n id } ( put : <r> -> <r> );
     "#;
     let d: Program = parse(code).expect("parsing failed");
 
@@ -364,7 +368,7 @@ fn parse_import() {
 
 #[test]
 fn parse_uri_params() {
-    let d: Program = parse("let a = /x/{ y str }/z?{ q str, n num };").expect("parsing failed");
+    let d: Program = parse("let a = /x/{ 'y str }/z?{ 'q str, 'n num };").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -388,13 +392,11 @@ fn parse_uri_params() {
 
 #[test]
 fn parse_transfer_params() {
-    let d: Program = parse("let a = get { q str, n num } -> {};").expect("parsing failed");
+    let d: Program = parse("let a = get { 'q str, 'n num } -> {};").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
-    let s = d.stmts.first().unwrap();
-
-    if let Statement::Decl(decl) = s {
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
         if let Expr::Xfer(xfer) = decl.expr.as_node().as_expr() {
             let params = xfer.params.as_ref().expect("expected params");
             if let Expr::Object(obj) = params.as_node().as_expr() {
@@ -404,6 +406,24 @@ fn parse_transfer_params() {
             }
         } else {
             panic!("expected xfer expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_property_decl() {
+    let d: Program = parse("let a = 'q str;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        if let Expr::Property(prop) = decl.expr.as_node().as_expr() {
+            assert_eq!(prop.name.as_ref(), "q");
+            assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::Str));
+        } else {
+            panic!("expected property expression");
         }
     } else {
         panic!("expected declaration");

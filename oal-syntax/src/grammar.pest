@@ -34,7 +34,7 @@ keyword = { stmt_kw | type_kw | method_kw }
 var = { ident }
 
 uri_lit = @{ ( ASCII_ALPHANUMERIC | "-" | "." | "_" | "~" | "%" )+ }
-uri_var = { "{" ~ prop ~ "}" }
+uri_var = { "{" ~ expr_type ~ "}" }
 uri_path = { ( "/" ~ ( uri_lit | uri_var ) )+ }
 uri_params = { ( "?" ~ object_type )? }
 uri_tpl = { uri_path ~ "/"? ~ uri_params }
@@ -44,8 +44,10 @@ uri_type = { uri_kw | uri_tpl | uri_root }
 
 prim_type = { num_kw | str_kw | bool_kw  }
 
-prop = { ident ~ expr_type }
-object_type = { "{" ~ ( prop ~ ( "," ~ prop )* )? ~ "}" }
+prop_name = ${ "'" ~ ident }
+prop_type = { prop_name ~ term_type }
+
+object_type = { "{" ~ ( expr_type ~ ( "," ~ expr_type )* )? ~ "}" }
 
 array_type = { "[" ~ expr_type ~ "]" }
 
@@ -53,7 +55,8 @@ paren_type = { "(" ~ expr_type ~ ")" }
 
 content_type = { "<" ~ expr_type? ~ ">" }
 
-term_type = { ( prim_type | uri_type | array_type | object_type | content_type | paren_type | var ) ~ inline_ann? }
+term_type = { ( prim_type | uri_type | array_type | prop_type | object_type | content_type | paren_type | var ) ~ inline_ann? }
+
 apply = { ident ~ term_type+ }
 app_type = { apply | term_type }
 

@@ -1,5 +1,6 @@
 use crate::errors::{Error, Kind};
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
@@ -20,6 +21,8 @@ fn eval(code: &str) -> anyhow::Result<()> {
 
     prg.transform(subst, &mut Env::new(None), &mut substitute)?;
 
+    prg.transform(&mut (), &mut Env::new(None), &mut reduce)?;
+
     prg.scan(&mut (), &mut Env::new(None), &mut type_check)?;
 
     anyhow::Ok(())
@@ -28,13 +31,14 @@ fn eval(code: &str) -> anyhow::Result<()> {
 #[test]
 fn typecheck_ok() {
     let cases = [
-        "let a = { b [bool], c / } ~ num ~ uri;",
+        "let a = { 'b [bool], 'c / } ~ num ~ uri;",
         "let a = / ( get -> str );",
         "let a = / ( get -> <{}> );",
-        "let a = /a/{ id num }/b?{ c str };",
-        "let a = patch, put { n num } : {} -> {};",
-        "let a = get { q str } -> {};",
-        "let a = /something?{ q str } ( get -> {} );",
+        "let a = /a/{ 'id num }/b?{ 'c str };",
+        "let a = patch, put { 'n num } : {} -> {};",
+        "let a = get { 'q str } -> {};",
+        "let a = /something?{ 'q str } ( get -> {} );",
+        "let a = 'q str; let b = /path/{a};",
     ];
 
     for c in cases {
@@ -48,6 +52,7 @@ fn typecheck_error() {
         "let a = <> ~ {};",
         "let a = / ( num );",
         "let a = / ( get -> ( get -> str ) );",
+        "let a = /wrong/{ 'n [num] };",
     ];
 
     for c in cases {

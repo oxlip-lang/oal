@@ -20,7 +20,7 @@ fn annotate_simple() -> anyhow::Result<()> {
         let id = num | str;
         # description: "some record"
         let r = {};
-        res /{ n id } ( put : <r> -> <r> );
+        res /{ 'n id } ( put : <r> -> <r> );
     "#;
     let prg = eval(code)?;
 
@@ -29,11 +29,15 @@ fn annotate_simple() -> anyhow::Result<()> {
     if let Statement::Res(res) = prg.stmts.iter().nth(4).unwrap() {
         if let Expr::Rel(rel) = res.rel.as_node().as_expr() {
             if let Expr::Uri(uri) = rel.uri.as_node().as_expr() {
-                if let UriSegment::Variable(p) = uri.path.first().expect("expected URI segment") {
-                    let ann = p.val.annotation().expect("expected annotation");
-                    let desc = ann.get_str("description").expect("expected description");
-                    let req = ann.get_bool("required").expect("expected required");
-                    assert_eq!((desc, req), ("some identifier", true));
+                if let UriSegment::Variable(var) = uri.path.first().expect("expected URI segment") {
+                    if let Expr::Property(prop) = var.as_node().as_expr() {
+                        let ann = prop.val.annotation().expect("expected annotation");
+                        let desc = ann.get_str("description").expect("expected description");
+                        let req = ann.get_bool("required").expect("expected required");
+                        assert_eq!((desc, req), ("some identifier", true));
+                    } else {
+                        panic!("expected property");
+                    }
                 } else {
                     panic!("expected URI segment variable");
                 }

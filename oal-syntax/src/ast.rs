@@ -32,6 +32,7 @@ pub enum Expr<T> {
     Rel(Relation<T>),
     Uri(Uri<T>),
     Array(Array<T>),
+    Property(Property<T>),
     Object(Object<T>),
     Content(Content<T>),
     Xfer(Transfer<T>),
@@ -113,6 +114,7 @@ impl<T: AsExpr> FromPair for T {
             Rule::rel_type => Expr::Rel(p.into_expr()).into_node().into(),
             Rule::uri_type => Expr::Uri(p.into_expr()).into_node().into(),
             Rule::array_type => Expr::Array(p.into_expr()).into_node().into(),
+            Rule::prop_type => Expr::Property(p.into_expr()).into_node().into(),
             Rule::object_type => Expr::Object(p.into_expr()).into_node().into(),
             Rule::content_type => Expr::Content(p.into_expr()).into_node().into(),
             Rule::var => Expr::Var(p.as_str().into()).into_node().into(),
@@ -441,7 +443,7 @@ impl<'a, T> IntoIterator for &'a mut Relation<T> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment<T> {
     Literal(Literal),
-    Variable(Property<T>),
+    Variable(T),
 }
 
 impl<T> UriSegment<T> {
@@ -473,7 +475,7 @@ impl<'a, T> IntoIterator for &'a Uri<T> {
     fn into_iter(self) -> Self::IntoIter {
         let path = self.path.iter().filter_map(|s| {
             if let UriSegment::Variable(t) = s {
-                Some(&t.val)
+                Some(t)
             } else {
                 None
             }
@@ -493,7 +495,7 @@ impl<'a, T> IntoIterator for &'a mut Uri<T> {
     fn into_iter(self) -> Self::IntoIter {
         let path = self.path.iter_mut().filter_map(|s| {
             if let UriSegment::Variable(t) = s {
-                Some(&mut t.val)
+                Some(t)
             } else {
                 None
             }
@@ -566,22 +568,47 @@ impl<'a, T> IntoIterator for &'a mut Array<T> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Property<T> {
-    pub key: Ident,
-    pub val: T,
+    pub name: Ident,
+    pub val: Box<T>,
 }
 
 impl<T: AsExpr> FromPair for Property<T> {
     fn from_pair(p: Pair) -> Self {
         let mut inner = p.into_inner();
-        let key = inner.next().unwrap().as_str().into();
-        let val = inner.next().unwrap().into_expr();
-        Property { key, val }
+        let name = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .next()
+            .unwrap()
+            .as_str()
+            .into();
+        let val = Box::new(inner.next().unwrap().into_expr());
+        Property { name, val }
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Property<T> {
+    type Item = &'a T;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(self.val.as_ref())
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Property<T> {
+    type Item = &'a mut T;
+    type IntoIter = Once<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        once(self.val.as_mut())
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Object<T> {
-    pub props: Vec<Property<T>>,
+    pub props: Vec<T>,
 }
 
 impl<T> Default for Object<T> {
@@ -599,19 +626,19 @@ impl<T: AsExpr> FromPair for Object<T> {
 
 impl<'a, T> IntoIterator for &'a Object<T> {
     type Item = &'a T;
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+    type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.props.iter().map(|p| &p.val))
+        self.props.iter()
     }
 }
 
 impl<'a, T> IntoIterator for &'a mut Object<T> {
     type Item = &'a mut T;
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+    type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.props.iter_mut().map(|p| &mut p.val))
+        self.props.iter_mut()
     }
 }
 

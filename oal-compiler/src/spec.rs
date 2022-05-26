@@ -21,7 +21,9 @@ where
     fn try_from(s: &ast::UriSegment<T>) -> Result<Self> {
         match s {
             ast::UriSegment::Literal(l) => Ok(UriSegment::Literal(l.clone())),
-            ast::UriSegment::Variable(p) => p.try_into().map(|p| UriSegment::Variable(Box::new(p))),
+            ast::UriSegment::Variable(p) => {
+                Property::try_from(p).map(|p| UriSegment::Variable(Box::new(p)))
+            }
         }
     }
 }
@@ -139,19 +141,21 @@ impl Expr {
 pub struct Property {
     pub name: ast::Ident,
     pub schema: Schema,
+    pub desc: Option<String>,
 }
 
-impl<T> TryFrom<&ast::Property<T>> for Property
-where
-    T: AsExpr + Annotated,
-{
-    type Error = Error;
-
-    fn try_from(p: &ast::Property<T>) -> Result<Self> {
-        Schema::try_from(&p.val).map(|s| Property {
-            name: p.key.clone(),
-            schema: s,
-        })
+impl Property {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        if let ast::Expr::Property(prop) = e.as_node().as_expr() {
+            let desc = e.annotation().and_then(|a| a.get_string("description"));
+            Schema::try_from(prop.val.as_ref()).map(|s| Property {
+                name: prop.name.clone(),
+                schema: s,
+                desc,
+            })
+        } else {
+            Err(Error::new(Kind::UnexpectedExpression, "not a property").with(e))
+        }
     }
 }
 
@@ -163,7 +167,7 @@ pub struct Object {
 impl Object {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Object(o) = e.as_node().as_expr() {
-            let props: Result<Vec<_>> = o.props.iter().map(|p| p.try_into()).collect();
+            let props: Result<Vec<_>> = o.props.iter().map(Property::try_from).collect();
             props.map(|props| Object { props })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not an object").with(e))

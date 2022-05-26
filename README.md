@@ -35,21 +35,24 @@ oal-cli -b examples/base.yaml -i examples/main.oal -o openapi.yaml
 use "some/other/module.oal";
 ```
 ```
-// Primitive types
-let id1 = num;
+// Property types
+# description: "some parameter"
+let prop1 = 'id id1 `title: "some identifier"`;
+let prop2 = 'n num;
+let prop3 = 'age num;
 ```
 ```
 // Objects
 # description: "some stuff"
-let rec1 = {
-  firstName str     `title: "First name"`
-, lastName str      `title: "Last name"`
-, middleNames [str] `title: "Middle names"`
+let obj1 = {
+  'firstName str     `title: "First name"`
+, 'lastName str      `title: "Last name"`
+, 'middleNames [str] `title: "Middle names"`
 };
 ```
 ```
 // Templated URIs
-let uri1 = /some/path/{ id id1 }/template;
+let uri1 = /some/path/{ prop1 }/template;
 ```
 ```
 // Undefined URIs
@@ -58,45 +61,45 @@ let uri2 = uri;
 ```
 // Contents
 # description: "some content"
-let cnt1 = <rec1>;
+let cnt1 = <obj1>;
 ```
 ```
 // Operations
 # summary: "does something"
-let op1 = patch, put : cnt1 -> cnt1;
+let op1 = patch, put { prop2 } : cnt1 -> cnt1;
 
 # summary: "does something else"
-let op2 = get -> cnt1;
+let op2 = get { 'q str } -> cnt1;
 ```
 ```
 // Relations
 let rel1 = uri1 ( op1, op2 );
 ```
 ```
-// Joining schemas (allOf)
-let rec2 = rec1 & { age num };
+// Joining schemas
+let obj2 = obj1 & { prop3 };
 ```
 ```
-// Typed alternative (oneOf)
+// Typed alternative
 let id2 = id1 | str;
 ```
 ```
-// Untyped alternative (anyOf)
-let any1 = id2 ~ rec2 ~ uri1;
+// Untyped alternative
+let any1 = id2 ~ obj2 ~ uri1;
 ```
 ```
 // Function declaration
-let f x y = rec2 & ( x | y );
+let f x y = obj2 & ( x | y );
 ```
 ```
 // Function application
 # description: "some other stuff"
-let rec3 = f { height num } { stuff any1 };
+let obj3 = f { 'height num } { 'stuff any1 };
 ```
 ```
 // Resources
 res rel1;
-res /something ( get -> rec3 );
+res /something?{ 'q str } ( get -> obj3 );
 ```
 ```
 /*
@@ -112,14 +115,22 @@ res /something ( get -> rec3 );
 ---
 openapi: 3.0.3
 info:
-  title: Test OpenAPI specification
-  version: 0.1.0
+  title: Example
+  description: Example
+  version: 1.0.0
 servers:
   - url: /
 paths:
   "/some/path/{id}/template":
     get:
       summary: does something else
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          style: form
       responses:
         default:
           description: some content
@@ -142,6 +153,13 @@ paths:
                       type: string
     put:
       summary: does something
+      parameters:
+        - in: query
+          name: n
+          required: true
+          schema:
+            type: number
+          style: form
       requestBody:
         description: some content
         content:
@@ -183,6 +201,13 @@ paths:
                       type: string
     patch:
       summary: does something
+      parameters:
+        - in: query
+          name: n
+          required: true
+          schema:
+            type: number
+          style: form
       requestBody:
         description: some content
         content:
@@ -225,8 +250,10 @@ paths:
     parameters:
       - in: path
         name: id
+        description: some parameter
         required: true
         schema:
+          title: some identifier
           type: number
         style: simple
   /something:
@@ -292,5 +319,12 @@ paths:
                               - example: "/some/path/{id}/template"
                                 type: string
                                 format: uri-reference
+    parameters:
+      - in: query
+        name: q
+        required: true
+        schema:
+          type: string
+        style: form
 ```
 </details>

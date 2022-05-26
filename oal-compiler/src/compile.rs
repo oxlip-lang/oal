@@ -32,11 +32,11 @@ where
 
     prg.transform(subst, &mut new_env(), &mut substitute)?;
 
-    prg.scan(&mut (), &mut new_env(), &mut type_check)?;
-
     prg.transform(&mut None, &mut new_env(), &mut annotate)?;
 
     prg.transform(&mut (), &mut new_env(), &mut reduce)?;
+
+    prg.scan(&mut (), &mut new_env(), &mut type_check)?;
 
     Ok(prg)
 }

@@ -38,6 +38,10 @@ where
                 e.set_tag(Tag::Uri);
                 Ok(())
             }
+            Expr::Property(_) => {
+                e.set_tag(Tag::Property);
+                Ok(())
+            }
             Expr::Object(_) => {
                 e.set_tag(Tag::Object);
                 Ok(())
@@ -248,7 +252,7 @@ where
             Expr::Uri(uri) => {
                 for seg in uri.path.iter() {
                     if let UriSegment::Variable(var) = seg {
-                        c.push(var.val.unwrap_tag(), Tag::Primitive);
+                        c.push(var.unwrap_tag(), Tag::Property);
                     }
                 }
                 if let Some(params) = &uri.params {
@@ -257,7 +261,14 @@ where
                 c.push(e.unwrap_tag(), Tag::Uri);
                 Ok(())
             }
-            Expr::Object(_) => {
+            Expr::Property(_) => {
+                c.push(e.unwrap_tag(), Tag::Property);
+                Ok(())
+            }
+            Expr::Object(obj) => {
+                for prop in obj.props.iter() {
+                    c.push(prop.unwrap_tag(), Tag::Property);
+                }
                 c.push(e.unwrap_tag(), Tag::Object);
                 Ok(())
             }
