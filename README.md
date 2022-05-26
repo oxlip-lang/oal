@@ -31,8 +31,12 @@ oal-cli -b examples/base.yaml -i examples/main.oal -o openapi.yaml
 
 ## Examples of language constructs:
 ```
-// Importing modules
+// Modules
 use "some/other/module.oal";
+```
+```
+// Primitives
+let id1 = num;
 ```
 ```
 // Properties
@@ -55,7 +59,7 @@ let obj1 = {
 let uri1 = /some/path/{ prop1 }/template;
 ```
 ```
-// Undefined URIs
+// Unspecified URIs
 let uri2 = uri;
 ```
 ```
