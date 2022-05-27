@@ -250,6 +250,20 @@ impl Content {
 
 pub type Ranges = IndexMap<(Option<HttpStatus>, Option<MediaType>), Content>;
 
+fn try_into_ranges<T: AsExpr + Annotated>(ranges: &mut Ranges, e: &T) -> Result<()> {
+    match e.as_node().as_expr() {
+        ast::Expr::Content(_) => {
+            let c = Content::try_from(e)?;
+            ranges.insert((c.status, c.media.clone()), c);
+            Ok(())
+        }
+        ast::Expr::Op(op) if op.op == ast::Operator::Range => {
+            op.exprs.iter().try_for_each(|r| try_into_ranges(ranges, r))
+        }
+        _ => Err(Error::new(Kind::UnexpectedExpression, "not a ranges expression").with(e)),
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Transfer {
     pub methods: EnumMap<ast::Method, bool>,
@@ -263,11 +277,8 @@ impl Transfer {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Xfer(xfer) = e.as_node().as_expr() {
             let methods = xfer.methods;
-            let ranges = xfer
-                .ranges
-                .iter()
-                .map(|r| Content::try_from(r).map(|c| ((c.status, c.media.clone()), c)))
-                .collect::<Result<_>>()?;
+            let mut ranges = IndexMap::new();
+            try_into_ranges(&mut ranges, xfer.ranges.as_ref())?;
             let domain = match &xfer.domain {
                 Some(d) => Content::try_from(d.as_ref()),
                 None => Ok(Content::default()),

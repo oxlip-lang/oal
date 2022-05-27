@@ -4,12 +4,14 @@ use "module.oal";
 # description: "some other stuff"
 let obj3 = f { 'height num } { 'stuff any1 };
 
+// Joining contents in ranges
+let with_err c = c :: <application/problem+json,500,{}> `description: "went wrong"`;
+
 // Resources
-// res rel1;
+res rel1;
 res /something?{ 'q str } (
-  get -> < 200, application/vnd.blah+json, obj3 > `description: "all good"`
-      -> < 500, application/problem+json, {} >    `description: "went wrong"`
-      -> <>                                       `description: "no content"`
+  get -> with_err <application/vnd.blah+json,200,obj3> `description: "all good"`
+      :: <>                                            `description: "no content"`
 );
 
 /*

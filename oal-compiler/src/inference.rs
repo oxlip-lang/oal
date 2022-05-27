@@ -63,6 +63,7 @@ where
                     Operator::Join => Tag::Object,
                     Operator::Any => Tag::Any,
                     Operator::Sum => Tag::Var(seq.next()),
+                    Operator::Range => Tag::Content,
                 };
                 e.set_tag(tag);
                 Ok(())
@@ -293,13 +294,14 @@ where
                     match operator {
                         Operator::Join => c.push(op.unwrap_tag(), Tag::Object),
                         Operator::Sum => c.push(e.unwrap_tag(), op.unwrap_tag()),
-                        _ => {}
+                        Operator::Any | Operator::Range => {}
                     }
                 }
                 match operator {
                     Operator::Join => c.push(e.unwrap_tag(), Tag::Object),
                     Operator::Any => c.push(e.unwrap_tag(), Tag::Any),
-                    _ => {}
+                    Operator::Range => c.push(e.unwrap_tag(), Tag::Content),
+                    Operator::Sum => {}
                 }
                 Ok(())
             }

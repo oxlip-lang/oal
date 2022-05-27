@@ -29,6 +29,13 @@ impl<T: AsExpr + Tagged> TypeChecked for VariadicOp<T> {
                     Err(Error::new(Kind::InvalidTypes, "ill-formed alternative").with(self))
                 }
             }
+            Operator::Range => {
+                if self.exprs.iter().all(|e| e.unwrap_tag().is_schema_like()) {
+                    Ok(())
+                } else {
+                    Err(Error::new(Kind::InvalidTypes, "ill-formed ranges").with(self))
+                }
+            }
         }
     }
 }
@@ -40,7 +47,7 @@ impl<T: AsExpr + Tagged> TypeChecked for Transfer<T> {
         } else {
             true
         };
-        let ranges_check = self.ranges.iter().all(|r| r.unwrap_tag().is_schema_like());
+        let ranges_check = self.ranges.unwrap_tag().is_schema_like();
         let params_check = self
             .params
             .as_ref()

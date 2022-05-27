@@ -195,7 +195,7 @@ fn parse_simple_relation() {
                     panic!("expected domain expression");
                 }
 
-                if let Expr::Content(cnt) = xfer.ranges.first().unwrap().as_node().as_expr() {
+                if let Expr::Content(cnt) = xfer.ranges.as_node().as_expr() {
                     assert_eq!(
                         *cnt.schema.as_ref().unwrap().as_node().as_expr(),
                         Expr::Object(Default::default())
@@ -334,7 +334,7 @@ fn parse_empty_content() {
 
 #[test]
 fn parse_complete_content() {
-    let d: Program = parse("let c = <200,application/json,{}>;").expect("parsing failed");
+    let d: Program = parse("let c = <application/json,200,{}>;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -437,13 +437,18 @@ fn parse_transfer_params() {
 
 #[test]
 fn parse_nondeterministic_transfer() {
-    let d: Program = parse("let a = get -> <{}> -> <{}>;").expect("parsing failed");
+    let d: Program = parse("let a = get -> <{}> :: <{}>;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
         if let Expr::Xfer(xfer) = decl.expr.as_node().as_expr() {
-            assert_eq!(xfer.ranges.len(), 2);
+            if let Expr::Op(op) = xfer.ranges.as_node().as_expr() {
+                assert_eq!(op.op, Operator::Range);
+                assert_eq!(op.exprs.len(), 2);
+            } else {
+                panic!("expected ranges");
+            }
         } else {
             panic!("expected xfer expression");
         }

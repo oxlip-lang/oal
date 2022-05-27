@@ -1,7 +1,7 @@
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
-use std::iter::{empty, once, Chain, Flatten, Once};
+use std::iter::{empty, once, Flatten, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
@@ -119,7 +119,7 @@ impl<T: AsExpr> FromPair for T {
             Rule::content_type => Expr::Content(p.into_expr()).into_node().into(),
             Rule::var => Expr::Var(p.as_str().into()).into_node().into(),
             Rule::binding => Expr::Binding(p.as_str().into()).into_node().into(),
-            Rule::join_type | Rule::any_type | Rule::sum_type => {
+            Rule::join_type | Rule::any_type | Rule::sum_type | Rule::range_type => {
                 let mut op = VariadicOp::from_pair(p);
                 if op.exprs.len() == 1 {
                     op.exprs.remove(0)
@@ -334,7 +334,7 @@ impl FromPair for Method {
 pub struct Transfer<T> {
     pub methods: EnumMap<Method, bool>,
     pub domain: Option<Box<T>>,
-    pub ranges: Vec<T>,
+    pub ranges: Box<T>,
     pub params: Option<Box<T>>,
 }
 
@@ -363,7 +363,7 @@ impl<T: AsExpr> FromPair for Transfer<T> {
             .next()
             .map(|p| Box::new(p.into_expr()));
 
-        let ranges = inner.map(T::from_pair).collect();
+        let ranges = T::from_pair(inner.next().unwrap()).into();
 
         Transfer {
             methods,
@@ -376,31 +376,31 @@ impl<T: AsExpr> FromPair for Transfer<T> {
 
 impl<'a, T> IntoIterator for &'a Transfer<T> {
     type Item = &'a T;
-    type IntoIter = Chain<Flatten<std::array::IntoIter<Option<&'a T>, 2>>, Iter<'a, T>>;
+    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 3>>;
 
     fn into_iter(self) -> Self::IntoIter {
         [
+            Some(self.ranges.as_ref()),
             self.domain.as_ref().map(AsRef::as_ref),
             self.params.as_ref().map(AsRef::as_ref),
         ]
         .into_iter()
         .flatten()
-        .chain(self.ranges.iter())
     }
 }
 
 impl<'a, T> IntoIterator for &'a mut Transfer<T> {
     type Item = &'a mut T;
-    type IntoIter = Chain<Flatten<std::array::IntoIter<Option<&'a mut T>, 2>>, IterMut<'a, T>>;
+    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 3>>;
 
     fn into_iter(self) -> Self::IntoIter {
         [
+            Some(self.ranges.as_mut()),
             self.domain.as_mut().map(AsMut::as_mut),
             self.params.as_mut().map(AsMut::as_mut),
         ]
         .into_iter()
         .flatten()
-        .chain(self.ranges.iter_mut())
     }
 }
 
@@ -697,6 +697,7 @@ pub enum Operator {
     Join,
     Any,
     Sum,
+    Range,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -711,6 +712,7 @@ impl<T: AsExpr> FromPair for VariadicOp<T> {
             Rule::join_type => Operator::Join,
             Rule::any_type => Operator::Any,
             Rule::sum_type => Operator::Sum,
+            Rule::range_type => Operator::Range,
             _ => unreachable!(),
         };
         let exprs = p.into_inner().map(|p| p.into_expr()).collect();

@@ -1,7 +1,7 @@
 use crate::compile::compile;
 use crate::spec::{Expr, Object, Spec, Uri, UriSegment};
 use crate::{Locator, ModuleSet, Program};
-use oal_syntax::parse;
+use oal_syntax::{ast, parse};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let loc = Locator::try_from("test:main")?;
@@ -65,6 +65,25 @@ fn evaluate_content() -> anyhow::Result<()> {
     let s = eval(code)?;
 
     assert_eq!(s.rels.len(), 1);
+
+    anyhow::Ok(())
+}
+
+#[test]
+fn evaluate_ranges() -> anyhow::Result<()> {
+    let code = r#"
+        res / ( get -> <200,{}> :: <500,{}> );
+    "#;
+
+    let spec = eval(code)?;
+
+    let rel = spec.rels.values().next().expect("expected relation");
+
+    let xfer = rel.xfers[ast::Method::Get]
+        .as_ref()
+        .expect("expected get transfer");
+
+    assert_eq!(xfer.ranges.len(), 2);
 
     anyhow::Ok(())
 }

@@ -181,6 +181,7 @@ impl Builder {
                 ast::Operator::Join => self.join_schema(&operation.schemas),
                 ast::Operator::Sum => self.sum_schema(&operation.schemas),
                 ast::Operator::Any => self.any_schema(&operation.schemas),
+                ast::Operator::Range => unreachable!(),
             },
         };
         sch.schema_data.description = s.desc.clone();
