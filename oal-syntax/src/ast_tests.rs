@@ -169,9 +169,7 @@ fn parse_simple_relation() {
 
     assert_eq!(d.stmts.len(), 1);
 
-    let s = d.stmts.first().unwrap();
-
-    if let Statement::Decl(decl) = s {
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
         if let Expr::Rel(rel) = decl.expr.as_node().as_expr() {
             assert_eq!(
                 *rel.uri.as_node().as_expr(),
@@ -197,7 +195,7 @@ fn parse_simple_relation() {
                     panic!("expected domain expression");
                 }
 
-                if let Expr::Content(cnt) = xfer.range.as_node().as_expr() {
+                if let Expr::Content(cnt) = xfer.ranges.first().unwrap().as_node().as_expr() {
                     assert_eq!(
                         *cnt.schema.as_ref().unwrap().as_node().as_expr(),
                         Expr::Object(Default::default())
@@ -335,6 +333,31 @@ fn parse_empty_content() {
 }
 
 #[test]
+fn parse_complete_content() {
+    let d: Program = parse("let c = <200,application/json,{}>;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    let s = d.stmts.first().unwrap();
+
+    if let Statement::Decl(decl) = s {
+        assert_eq!(decl.name.as_ref(), "c");
+        if let Expr::Content(cnt) = decl.expr.as_node().as_expr() {
+            assert!(cnt.schema.is_some());
+            assert_eq!(cnt.status.expect("expected status"), 200);
+            assert_eq!(
+                cnt.media.as_ref().expect("expected media"),
+                "application/json"
+            );
+        } else {
+            panic!("expected content expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
 fn parse_inline_annotation() {
     let d: Program = parse(r#"let a = num `title: "number"`;"#).expect("parsing failed");
 
@@ -404,6 +427,23 @@ fn parse_transfer_params() {
             } else {
                 panic!("expected object expression");
             }
+        } else {
+            panic!("expected xfer expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_nondeterministic_transfer() {
+    let d: Program = parse("let a = get -> <{}> -> <{}>;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        if let Expr::Xfer(xfer) = decl.expr.as_node().as_expr() {
+            assert_eq!(xfer.ranges.len(), 2);
         } else {
             panic!("expected xfer expression");
         }

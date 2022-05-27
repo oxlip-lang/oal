@@ -45,7 +45,7 @@ fn evaluate_simple() -> anyhow::Result<()> {
         let d = x.domain.schema.as_ref().unwrap();
         assert_eq!(d.expr, Expr::Object(Object::default()));
         assert_eq!(d.desc, Some("some record".to_owned()));
-        let r = x.range.schema.as_ref().unwrap();
+        let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
         assert_eq!(r.expr, Expr::Object(Object::default()));
         assert_eq!(r.desc, Some("some record".to_owned()));
     } else {

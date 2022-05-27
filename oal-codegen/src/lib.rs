@@ -1,10 +1,10 @@
-use indexmap::indexmap;
+use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
 use oal_syntax::ast;
 use openapiv3::{
     ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
-    Schema, SchemaData, SchemaKind, Server, StringType, Type, VariantOrUnknownOrEmpty,
+    Schema, SchemaData, SchemaKind, Server, StatusCode, StringType, Type, VariantOrUnknownOrEmpty,
 };
 
 #[derive(Default)]
@@ -56,7 +56,7 @@ impl Builder {
     }
 
     fn media_type(&self) -> String {
-        "application/json".into()
+        "application/json".to_owned()
     }
 
     fn uri_pattern(&self, uri: &spec::Uri) -> String {
@@ -242,30 +242,56 @@ impl Builder {
         path.chain(query).collect()
     }
 
-    fn transfer_request(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<RequestBody>> {
-        xfer.domain.schema.as_ref().map(|schema| {
+    fn domain_request(&self, domain: &spec::Content) -> Option<ReferenceOr<RequestBody>> {
+        let media = domain.media.clone().unwrap_or_else(|| self.media_type());
+        domain.schema.as_ref().map(|schema| {
             ReferenceOr::Item(RequestBody {
-                content: indexmap! { self.media_type() => MediaType {
+                content: indexmap! { media => MediaType {
                     schema: Some(ReferenceOr::Item(self.schema(schema))),
                     ..Default::default()
                 }},
-                description: xfer.domain.desc.clone(),
+                description: domain.desc.clone(),
                 ..Default::default()
             })
         })
     }
 
-    fn transfer_response(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<Response>> {
-        xfer.range.schema.as_ref().map(|schema| {
-            ReferenceOr::Item(Response {
-                content: indexmap! { self.media_type() => MediaType {
-                    schema: Some(ReferenceOr::Item(self.schema(schema))),
-                    ..Default::default()
-                }},
-                description: xfer.range.desc.clone().unwrap_or_else(|| "".to_owned()),
-                ..Default::default()
-            })
-        })
+    fn transfer_request(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<RequestBody>> {
+        self.domain_request(&xfer.domain)
+    }
+
+    fn transfer_responses(&self, xfer: &spec::Transfer) -> Responses {
+        let mut default = None;
+        let mut responses = IndexMap::new();
+
+        for ((status, media), content) in xfer.ranges.iter() {
+            let response = if let Some(s) = status {
+                responses
+                    .entry(StatusCode::Code((*s).into()))
+                    .or_insert(ReferenceOr::Item(Response::default()))
+            } else {
+                default.insert(ReferenceOr::Item(Response::default()))
+            };
+            if let ReferenceOr::Item(res) = response {
+                if let Some(schema) = content.schema.as_ref() {
+                    let media_type = media.clone().unwrap_or_else(|| self.media_type());
+                    let media_schema = MediaType {
+                        schema: Some(ReferenceOr::Item(self.schema(schema))),
+                        ..Default::default()
+                    };
+                    res.content.insert(media_type, media_schema);
+                }
+                res.description = content.desc.clone().unwrap_or_else(|| "".to_owned());
+            } else {
+                unreachable!();
+            }
+        }
+
+        Responses {
+            default,
+            responses,
+            ..Default::default()
+        }
     }
 
     fn relation_path_item(&self, rel: &spec::Relation) -> PathItem {
@@ -284,10 +310,7 @@ impl Builder {
                 summary: xfer.summary.clone(),
                 parameters: self.xfer_params(xfer),
                 request_body: self.transfer_request(xfer),
-                responses: Responses {
-                    default: self.transfer_response(xfer),
-                    ..Default::default()
-                },
+                responses: self.transfer_responses(xfer),
                 ..Default::default()
             };
 

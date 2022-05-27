@@ -5,8 +5,12 @@ use "module.oal";
 let obj3 = f { 'height num } { 'stuff any1 };
 
 // Resources
-res rel1;
-res /something?{ 'q str } ( get -> obj3 );
+// res rel1;
+res /something?{ 'q str } (
+  get -> < 200, application/vnd.blah+json, obj3 > `description: "all good"`
+      -> < 500, application/problem+json, {} >    `description: "went wrong"`
+      -> <>                                       `description: "no content"`
+);
 
 /*
  * Block

@@ -1,7 +1,7 @@
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
-use std::iter::{empty, once, Flatten, Once};
+use std::iter::{empty, once, Chain, Flatten, Once};
 use std::rc::Rc;
 use std::slice::{Iter, IterMut};
 
@@ -334,7 +334,7 @@ impl FromPair for Method {
 pub struct Transfer<T> {
     pub methods: EnumMap<Method, bool>,
     pub domain: Option<Box<T>>,
-    pub range: Box<T>,
+    pub ranges: Vec<T>,
     pub params: Option<Box<T>>,
 }
 
@@ -363,12 +363,12 @@ impl<T: AsExpr> FromPair for Transfer<T> {
             .next()
             .map(|p| Box::new(p.into_expr()));
 
-        let range = T::from_pair(inner.next().unwrap()).into();
+        let ranges = inner.map(T::from_pair).collect();
 
         Transfer {
             methods,
             domain,
-            range,
+            ranges,
             params,
         }
     }
@@ -376,31 +376,31 @@ impl<T: AsExpr> FromPair for Transfer<T> {
 
 impl<'a, T> IntoIterator for &'a Transfer<T> {
     type Item = &'a T;
-    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 3>>;
+    type IntoIter = Chain<Flatten<std::array::IntoIter<Option<&'a T>, 2>>, Iter<'a, T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         [
-            Some(self.range.as_ref()),
             self.domain.as_ref().map(AsRef::as_ref),
             self.params.as_ref().map(AsRef::as_ref),
         ]
         .into_iter()
         .flatten()
+        .chain(self.ranges.iter())
     }
 }
 
 impl<'a, T> IntoIterator for &'a mut Transfer<T> {
     type Item = &'a mut T;
-    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 3>>;
+    type IntoIter = Chain<Flatten<std::array::IntoIter<Option<&'a mut T>, 2>>, IterMut<'a, T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         [
-            Some(self.range.as_mut()),
             self.domain.as_mut().map(AsMut::as_mut),
             self.params.as_mut().map(AsMut::as_mut),
         ]
         .into_iter()
         .flatten()
+        .chain(self.ranges.iter_mut())
     }
 }
 
@@ -456,7 +456,7 @@ impl<T: AsExpr> FromPair for UriSegment<T> {
     fn from_pair(p: Pair) -> Self {
         match p.as_rule() {
             Rule::uri_var => UriSegment::Variable(p.into_inner().next().unwrap().into_expr()),
-            Rule::uri_lit => UriSegment::Literal(p.as_str().into()),
+            Rule::uri_literal => UriSegment::Literal(p.as_str().into()),
             _ => unreachable!(),
         }
     }
@@ -514,7 +514,7 @@ impl<T: AsExpr> FromPair for Uri<T> {
         let (path, params) = match p.as_rule() {
             Rule::uri_kw => Default::default(),
             Rule::uri_root => (vec![UriSegment::root()], None),
-            Rule::uri_tpl => {
+            Rule::uri_template => {
                 let mut inner = p.into_inner();
                 let path = inner
                     .next()
@@ -645,13 +645,26 @@ impl<'a, T> IntoIterator for &'a mut Object<T> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Content<T> {
     pub schema: Option<Box<T>>,
+    pub status: Option<u16>,
+    pub media: Option<String>,
 }
 
 impl<T: AsExpr> FromPair for Content<T> {
     fn from_pair(p: Pair) -> Self {
-        let mut inner = p.into_inner();
-        let schema = inner.next().map(|s| Box::new(s.into_expr()));
-        Content { schema }
+        let (mut schema, mut status, mut media) = (None, None, None);
+        for p in p.into_inner() {
+            match p.as_rule() {
+                Rule::http_status => status = Some(p.as_str().parse().unwrap()),
+                Rule::http_media_range => media = Some(p.as_str().to_owned()),
+                Rule::expr_type => schema = Some(Box::new(p.into_expr())),
+                _ => unreachable!(),
+            }
+        }
+        Content {
+            schema,
+            status,
+            media,
+        }
     }
 }
 

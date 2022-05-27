@@ -40,12 +40,12 @@ impl<T: AsExpr + Tagged> TypeChecked for Transfer<T> {
         } else {
             true
         };
-        let range_check = self.range.unwrap_tag().is_schema_like();
+        let ranges_check = self.ranges.iter().all(|r| r.unwrap_tag().is_schema_like());
         let params_check = self
             .params
             .as_ref()
             .map_or(true, |p| p.unwrap_tag() == Tag::Object);
-        if domain_check && range_check && params_check {
+        if domain_check && ranges_check && params_check {
             Ok(())
         } else {
             Err(Error::new(Kind::InvalidTypes, "ill-formed transfer").with(self))

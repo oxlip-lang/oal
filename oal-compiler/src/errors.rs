@@ -12,6 +12,7 @@ pub enum Kind {
     CycleDetected,
     IO,
     InvalidURL,
+    InvalidHttpStatus,
 }
 
 impl Default for Kind {

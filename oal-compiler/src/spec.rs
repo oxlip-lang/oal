@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
 use std::fmt::Debug;
+use std::num::NonZeroU16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
@@ -175,9 +176,35 @@ impl Object {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct HttpStatus(NonZeroU16);
+
+impl From<HttpStatus> for u16 {
+    fn from(s: HttpStatus) -> Self {
+        s.0.into()
+    }
+}
+
+impl TryFrom<u16> for HttpStatus {
+    type Error = Error;
+
+    fn try_from(value: u16) -> Result<Self> {
+        if value >= 100 && value <= 599 {
+            let status = unsafe { NonZeroU16::new_unchecked(value) };
+            Ok(HttpStatus(status))
+        } else {
+            Err(Error::new(Kind::InvalidHttpStatus, "not in range").with(&value))
+        }
+    }
+}
+
+pub type MediaType = String;
+
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Content {
     pub schema: Option<Box<Schema>>,
+    pub status: Option<HttpStatus>,
+    pub media: Option<MediaType>,
     pub desc: Option<String>,
 }
 
@@ -185,7 +212,14 @@ impl From<Schema> for Content {
     fn from(s: Schema) -> Self {
         let desc = s.desc.clone();
         let schema = Some(s.into());
-        Content { schema, desc }
+        let status = None;
+        let media = None;
+        Content {
+            schema,
+            status,
+            media,
+            desc,
+        }
     }
 }
 
@@ -196,19 +230,31 @@ impl Content {
                 Some(s) => Schema::try_from(s.as_ref()).map(|s| Some(Box::new(s))),
                 None => Ok(None),
             }?;
+            let status = match c.status {
+                Some(s) => HttpStatus::try_from(s).map(Some),
+                None => Ok(None),
+            }?;
+            let media = c.media.clone();
             let desc = e.annotation().and_then(|a| a.get_string("description"));
-            Ok(Content { schema, desc })
+            Ok(Content {
+                schema,
+                status,
+                media,
+                desc,
+            })
         } else {
             Schema::try_from(e).map(Content::from)
         }
     }
 }
 
+pub type Ranges = IndexMap<(Option<HttpStatus>, Option<MediaType>), Content>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Transfer {
     pub methods: EnumMap<ast::Method, bool>,
     pub domain: Content,
-    pub range: Content,
+    pub ranges: Ranges,
     pub params: Option<Object>,
     pub summary: Option<String>,
 }
@@ -217,7 +263,11 @@ impl Transfer {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Xfer(xfer) = e.as_node().as_expr() {
             let methods = xfer.methods;
-            let range = Content::try_from(xfer.range.as_ref())?;
+            let ranges = xfer
+                .ranges
+                .iter()
+                .map(|r| Content::try_from(r).map(|c| ((c.status, c.media.clone()), c)))
+                .collect::<Result<_>>()?;
             let domain = match &xfer.domain {
                 Some(d) => Content::try_from(d.as_ref()),
                 None => Ok(Content::default()),
@@ -230,7 +280,7 @@ impl Transfer {
             Ok(Transfer {
                 methods,
                 domain,
-                range,
+                ranges,
                 params,
                 summary,
             })
