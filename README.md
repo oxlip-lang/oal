@@ -35,23 +35,25 @@ oal-cli -b examples/base.yaml -i examples/main.oal -o openapi.yaml
 use "some/other/module.oal";
 ```
 ```
-// Primitives
-let id1 = num;
+// Primitives with inline annotations
+let id1 = num  `title: "some identifier"`;
+let name = str `pattern: "^[a-z]+$"`;
 ```
 ```
-// Properties
+// Properties with both statement and inline annotations
 # description: "some parameter"
-let prop1 = 'id id1 `title: "some identifier"`;
-let prop2 = 'n num;
-let prop3 = 'age num;
+let prop1 = 'id id1;
+
+let prop2 = 'n num   `minimum: 0, maximum: 99.99`;
+let prop3 = 'age int `minimum: 0, maximum: 999`;
 ```
 ```
 // Objects
 # description: "some stuff"
 let obj1 = {
-  'firstName str     `title: "First name"`
-, 'lastName str      `title: "Last name"`
-, 'middleNames [str] `title: "Middle names"`
+  'firstName name     `title: "First name", required: true`
+, 'lastName name      `title: "Last name", required: true`
+, 'middleNames [name] `title: "Middle names"`
 };
 ```
 ```
@@ -72,7 +74,7 @@ let cnt1 = <obj1>;
 # summary: "does something"
 let op1 = patch, put { prop2 } : cnt1 -> cnt1;
 
-# summary: "does something else"
+# summary: "does something else", tags: [blah]
 let op2 = get { 'q str } -> cnt1;
 ```
 ```
@@ -80,15 +82,15 @@ let op2 = get { 'q str } -> cnt1;
 let rel1 = uri1 ( op1, op2 );
 ```
 ```
-// Joining schemas
+// Combining schemas
 let obj2 = obj1 & { prop3 };
 ```
 ```
-// Typed alternative
+// Typed schema alternative
 let id2 = id1 | str;
 ```
 ```
-// Untyped alternative
+// Untyped schema alternative
 let any1 = id2 ~ obj2 ~ uri1;
 ```
 ```
@@ -101,9 +103,16 @@ let f x y = obj2 & ( x | y );
 let obj3 = f { 'height num } { 'stuff any1 };
 ```
 ```
-// Resources
+// Combining contents into ranges
+let with_err c = c :: <application/problem+json,500,{}> `description: "went wrong"`;
+```
+```
+// Binding everything together as resources
 res rel1;
-res /something?{ 'q str } ( get -> obj3 );
+res /something?{ 'q str } (
+  get -> with_err <application/vnd.blah+json,200,obj3> `description: "all good"`
+      :: <>                                            `description: "no content"`
+);
 ```
 ```
 /*
@@ -127,11 +136,12 @@ servers:
 paths:
   "/some/path/{id}/template":
     get:
+      tags:
+        - blah
       summary: does something else
       parameters:
         - in: query
           name: q
-          required: true
           schema:
             type: string
           style: form
@@ -147,22 +157,29 @@ paths:
                   firstName:
                     title: First name
                     type: string
+                    pattern: "^[a-z]+$"
                   lastName:
                     title: Last name
                     type: string
+                    pattern: "^[a-z]+$"
                   middleNames:
                     title: Middle names
                     type: array
                     items:
                       type: string
+                      pattern: "^[a-z]+$"
+                required:
+                  - firstName
+                  - lastName
     put:
       summary: does something
       parameters:
         - in: query
           name: n
-          required: true
           schema:
             type: number
+            minimum: 0.0
+            maximum: 99.99
           style: form
       requestBody:
         description: some content
@@ -175,14 +192,20 @@ paths:
                 firstName:
                   title: First name
                   type: string
+                  pattern: "^[a-z]+$"
                 lastName:
                   title: Last name
                   type: string
+                  pattern: "^[a-z]+$"
                 middleNames:
                   title: Middle names
                   type: array
                   items:
                     type: string
+                    pattern: "^[a-z]+$"
+              required:
+                - firstName
+                - lastName
       responses:
         default:
           description: some content
@@ -195,22 +218,29 @@ paths:
                   firstName:
                     title: First name
                     type: string
+                    pattern: "^[a-z]+$"
                   lastName:
                     title: Last name
                     type: string
+                    pattern: "^[a-z]+$"
                   middleNames:
                     title: Middle names
                     type: array
                     items:
                       type: string
+                      pattern: "^[a-z]+$"
+                required:
+                  - firstName
+                  - lastName
     patch:
       summary: does something
       parameters:
         - in: query
           name: n
-          required: true
           schema:
             type: number
+            minimum: 0.0
+            maximum: 99.99
           style: form
       requestBody:
         description: some content
@@ -223,14 +253,20 @@ paths:
                 firstName:
                   title: First name
                   type: string
+                  pattern: "^[a-z]+$"
                 lastName:
                   title: Last name
                   type: string
+                  pattern: "^[a-z]+$"
                 middleNames:
                   title: Middle names
                   type: array
                   items:
                     type: string
+                    pattern: "^[a-z]+$"
+              required:
+                - firstName
+                - lastName
       responses:
         default:
           description: some content
@@ -243,14 +279,20 @@ paths:
                   firstName:
                     title: First name
                     type: string
+                    pattern: "^[a-z]+$"
                   lastName:
                     title: Last name
                     type: string
+                    pattern: "^[a-z]+$"
                   middleNames:
                     title: Middle names
                     type: array
                     items:
                       type: string
+                      pattern: "^[a-z]+$"
+                required:
+                  - firstName
+                  - lastName
     parameters:
       - in: path
         name: id
@@ -264,9 +306,11 @@ paths:
     get:
       responses:
         default:
-          description: some other stuff
+          description: no content
+        "200":
+          description: all good
           content:
-            application/json:
+            application/vnd.blah+json:
               schema:
                 description: some other stuff
                 allOf:
@@ -277,18 +321,26 @@ paths:
                           firstName:
                             title: First name
                             type: string
+                            pattern: "^[a-z]+$"
                           lastName:
                             title: Last name
                             type: string
+                            pattern: "^[a-z]+$"
                           middleNames:
                             title: Middle names
                             type: array
                             items:
                               type: string
+                              pattern: "^[a-z]+$"
+                        required:
+                          - firstName
+                          - lastName
                       - type: object
                         properties:
                           age:
-                            type: number
+                            type: integer
+                            minimum: 0
+                            maximum: 999
                   - oneOf:
                       - type: object
                         properties:
@@ -308,25 +360,38 @@ paths:
                                       firstName:
                                         title: First name
                                         type: string
+                                        pattern: "^[a-z]+$"
                                       lastName:
                                         title: Last name
                                         type: string
+                                        pattern: "^[a-z]+$"
                                       middleNames:
                                         title: Middle names
                                         type: array
                                         items:
                                           type: string
+                                          pattern: "^[a-z]+$"
+                                    required:
+                                      - firstName
+                                      - lastName
                                   - type: object
                                     properties:
                                       age:
-                                        type: number
+                                        type: integer
+                                        minimum: 0
+                                        maximum: 999
                               - example: "/some/path/{id}/template"
                                 type: string
                                 format: uri-reference
+        "500":
+          description: went wrong
+          content:
+            application/problem+json:
+              schema:
+                type: object
     parameters:
       - in: query
         name: q
-        required: true
         schema:
           type: string
         style: form

@@ -1,18 +1,20 @@
-// Primitives
-let id1 = num;
+// Primitives with inline annotations
+let id1 = num  `title: "some identifier"`;
+let name = str `pattern: "^[a-z]+$"`;
 
-// Properties
+// Properties with both statement and inline annotations
 # description: "some parameter"
-let prop1 = 'id id1 `title: "some identifier"`;
-let prop2 = 'n num;
-let prop3 = 'age num;
+let prop1 = 'id id1;
+
+let prop2 = 'n num   `minimum: 0, maximum: 99.99`;
+let prop3 = 'age int `minimum: 0, maximum: 999`;
 
 // Objects
 # description: "some stuff"
 let obj1 = {
-  'firstName str     `title: "First name"`
-, 'lastName str      `title: "Last name"`
-, 'middleNames [str] `title: "Middle names"`
+  'firstName name     `title: "First name", required: true`
+, 'lastName name      `title: "Last name", required: true`
+, 'middleNames [name] `title: "Middle names"`
 };
 
 // Templated URIs
@@ -29,19 +31,19 @@ let cnt1 = <obj1>;
 # summary: "does something"
 let op1 = patch, put { prop2 } : cnt1 -> cnt1;
 
-# summary: "does something else"
+# summary: "does something else", tags: [blah]
 let op2 = get { 'q str } -> cnt1;
 
 // Relations
 let rel1 = uri1 ( op1, op2 );
 
-// Joining schemas
+// Combining schemas
 let obj2 = obj1 & { prop3 };
 
-// Typed alternative
+// Typed schema alternative
 let id2 = id1 | str;
 
-// Untyped alternative
+// Untyped schema alternative
 let any1 = id2 ~ obj2 ~ uri1;
 
 // Function declaration

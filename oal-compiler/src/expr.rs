@@ -62,11 +62,15 @@ impl AsMutNode for TypedExpr {
 }
 
 impl Semigroup for TypedExpr {
-    /// Combines two expressions retaining the top-most annotation.
+    /// Combines two expressions retaining annotations.
     fn combine(&mut self, with: Self) {
         self.inner = with.inner;
         self.tag = with.tag;
-        if self.ann.is_none() {
+        if let Some(ann) = &mut self.ann {
+            if let Some(other) = with.ann {
+                ann.extend(other);
+            }
+        } else {
             self.ann = with.ann;
         }
     }

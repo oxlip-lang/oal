@@ -90,3 +90,21 @@ fn annotate_inline() {
         panic!("expected declaration");
     }
 }
+
+#[test]
+fn annotate_reduction() {
+    let code = r#"
+        let a = int `minimum: 0`;
+        let b = a   `maximum: 10`;
+    "#;
+    let prg = eval(code).expect("evaluation failed");
+
+    if let Statement::Decl(decl) = prg.stmts.iter().nth(1).unwrap() {
+        let ann = decl.expr.annotation().expect("expected annotation");
+        let min = ann.get_int("minimum").expect("expected minimum");
+        let max = ann.get_int("maximum").expect("expected maximum");
+        assert_eq!((min, max), (0, 10));
+    } else {
+        panic!("expected declaration");
+    }
+}

@@ -2,9 +2,10 @@ use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
 use oal_syntax::ast;
 use openapiv3::{
-    ArrayType, Info, MediaType, ObjectType, OpenAPI, Operation, Parameter, ParameterData,
-    ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
-    Schema, SchemaData, SchemaKind, Server, StatusCode, StringType, Type, VariantOrUnknownOrEmpty,
+    ArrayType, Info, IntegerType, MediaType, NumberType, ObjectType, OpenAPI, Operation, Parameter,
+    ParameterData, ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response,
+    Responses, Schema, SchemaData, SchemaKind, Server, StatusCode, StringType, Type,
+    VariantOrUnknownOrEmpty,
 };
 
 #[derive(Default)]
@@ -63,19 +64,44 @@ impl Builder {
         uri.pattern()
     }
 
-    fn prim_type(&self, prim: &ast::Primitive) -> Type {
-        match prim {
-            ast::Primitive::Num => Type::Number(Default::default()),
-            ast::Primitive::Str => Type::String(Default::default()),
-            ast::Primitive::Bool => Type::Boolean {},
-            ast::Primitive::Int => Type::Integer(Default::default()),
+    fn number_schema(&self, p: &spec::PrimNumber) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::Type(Type::Number(NumberType {
+                minimum: p.minimum,
+                maximum: p.maximum,
+                multiple_of: p.multiple_of,
+                ..Default::default()
+            })),
         }
     }
 
-    fn prim_schema(&self, prim: &ast::Primitive) -> Schema {
+    fn string_schema(&self, p: &spec::PrimString) -> Schema {
         Schema {
             schema_data: Default::default(),
-            schema_kind: SchemaKind::Type(self.prim_type(prim)),
+            schema_kind: SchemaKind::Type(Type::String(StringType {
+                pattern: p.pattern.clone(),
+                ..Default::default()
+            })),
+        }
+    }
+
+    fn boolean_schema(&self, _: &spec::PrimBoolean) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::Type(Type::Boolean {}),
+        }
+    }
+
+    fn integer_schema(&self, p: &spec::PrimInteger) -> Schema {
+        Schema {
+            schema_data: Default::default(),
+            schema_kind: SchemaKind::Type(Type::Integer(IntegerType {
+                minimum: p.minimum,
+                maximum: p.maximum,
+                multiple_of: p.multiple_of,
+                ..Default::default()
+            })),
         }
     }
 
@@ -114,16 +140,29 @@ impl Builder {
     }
 
     fn object_type(&self, obj: &spec::Object) -> Type {
+        let properties = obj
+            .props
+            .iter()
+            .map(|p| {
+                let ident = p.name.as_ref().into();
+                let expr = ReferenceOr::Item(self.schema(&p.schema).into());
+                (ident, expr)
+            })
+            .collect();
+        let required = obj
+            .props
+            .iter()
+            .filter_map(|p| {
+                if p.schema.required.unwrap_or(false) {
+                    Some(p.name.as_ref().to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
         Type::Object(ObjectType {
-            properties: obj
-                .props
-                .iter()
-                .map(|p| {
-                    let ident = p.name.as_ref().into();
-                    let expr = ReferenceOr::Item(self.schema(&p.schema).into());
-                    (ident, expr)
-                })
-                .collect(),
+            properties,
+            required,
             ..Default::default()
         })
     }
@@ -173,7 +212,10 @@ impl Builder {
 
     fn schema(&self, s: &spec::Schema) -> Schema {
         let mut sch = match &s.expr {
-            spec::Expr::Prim(prim) => self.prim_schema(prim),
+            spec::Expr::Num(p) => self.number_schema(p),
+            spec::Expr::Str(p) => self.string_schema(p),
+            spec::Expr::Bool(p) => self.boolean_schema(p),
+            spec::Expr::Int(p) => self.integer_schema(p),
             spec::Expr::Rel(rel) => self.rel_schema(rel),
             spec::Expr::Uri(uri) => self.uri_schema(uri),
             spec::Expr::Object(obj) => self.object_schema(obj),
@@ -190,11 +232,11 @@ impl Builder {
         sch
     }
 
-    fn prop_param_data(&self, prop: &spec::Property) -> ParameterData {
+    fn prop_param_data(&self, prop: &spec::Property, required: bool) -> ParameterData {
         ParameterData {
             name: prop.name.as_ref().into(),
             description: prop.desc.clone(),
-            required: true,
+            required,
             deprecated: None,
             format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(self.schema(&prop.schema))),
             example: None,
@@ -206,14 +248,14 @@ impl Builder {
 
     fn prop_path_param(&self, prop: &spec::Property) -> Parameter {
         Parameter::Path {
-            parameter_data: self.prop_param_data(prop),
+            parameter_data: self.prop_param_data(prop, true),
             style: Default::default(),
         }
     }
 
     fn prop_query_param(&self, prop: &spec::Property) -> Parameter {
         Parameter::Query {
-            parameter_data: self.prop_param_data(prop),
+            parameter_data: self.prop_param_data(prop, prop.required.unwrap_or(false)),
             allow_reserved: false,
             style: Default::default(),
             allow_empty_value: None,
@@ -313,6 +355,7 @@ impl Builder {
                 parameters: self.xfer_params(xfer),
                 request_body: self.transfer_request(xfer),
                 responses: self.transfer_responses(xfer),
+                tags: xfer.tags.clone(),
                 ..Default::default()
             };
 

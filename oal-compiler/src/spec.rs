@@ -104,20 +104,95 @@ pub struct Schema {
     pub expr: Expr,
     pub desc: Option<String>,
     pub title: Option<String>,
+    pub required: Option<bool>,
 }
 
 impl Schema {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         let expr = Expr::try_from(e)?;
-        let desc = e.annotation().and_then(|a| a.get_string("description"));
-        let title = e.annotation().and_then(|a| a.get_string("title"));
-        Ok(Schema { expr, desc, title })
+        let ann = e.annotation();
+        let desc = ann.and_then(|a| a.get_string("description"));
+        let title = ann.and_then(|a| a.get_string("title"));
+        let required = ann.and_then(|a| a.get_bool("required"));
+        Ok(Schema {
+            expr,
+            desc,
+            title,
+            required,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrimNumber {
+    pub minimum: Option<f64>,
+    pub maximum: Option<f64>,
+    pub multiple_of: Option<f64>,
+}
+
+impl PrimNumber {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        let ann = e.annotation();
+        let minimum = ann.and_then(|a| a.get_num("minimum"));
+        let maximum = ann.and_then(|a| a.get_num("maximum"));
+        let multiple_of = ann.and_then(|a| a.get_num("multipleOf"));
+        Ok(PrimNumber {
+            minimum,
+            maximum,
+            multiple_of,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrimString {
+    pub pattern: Option<String>,
+}
+
+impl PrimString {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        let ann = e.annotation();
+        let pattern = ann.and_then(|a| a.get_string("pattern"));
+        Ok(PrimString { pattern })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrimBoolean {}
+
+impl PrimBoolean {
+    fn try_from<T: AsExpr + Annotated>(_: &T) -> Result<Self> {
+        Ok(PrimBoolean {})
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrimInteger {
+    pub minimum: Option<i64>,
+    pub maximum: Option<i64>,
+    pub multiple_of: Option<i64>,
+}
+
+impl PrimInteger {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        let ann = e.annotation();
+        let minimum = ann.and_then(|a| a.get_int("minimum"));
+        let maximum = ann.and_then(|a| a.get_int("maximum"));
+        let multiple_of = ann.and_then(|a| a.get_int("multipleOf"));
+        Ok(PrimInteger {
+            minimum,
+            maximum,
+            multiple_of,
+        })
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    Prim(ast::Primitive),
+    Num(PrimNumber),
+    Str(PrimString),
+    Bool(PrimBoolean),
+    Int(PrimInteger),
     Rel(Box<Relation>),
     Uri(Uri),
     Array(Box<Array>),
@@ -128,7 +203,10 @@ pub enum Expr {
 impl Expr {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         match e.as_node().as_expr() {
-            ast::Expr::Prim(prim) => Ok(Expr::Prim(*prim)),
+            ast::Expr::Prim(ast::Primitive::Num) => PrimNumber::try_from(e).map(Expr::Num),
+            ast::Expr::Prim(ast::Primitive::Str) => PrimString::try_from(e).map(Expr::Str),
+            ast::Expr::Prim(ast::Primitive::Bool) => PrimBoolean::try_from(e).map(Expr::Bool),
+            ast::Expr::Prim(ast::Primitive::Int) => PrimInteger::try_from(e).map(Expr::Int),
             ast::Expr::Rel(_) => Relation::try_from(e).map(|r| Expr::Rel(Box::new(r))),
             ast::Expr::Uri(_) => Uri::try_from(e).map(Expr::Uri),
             ast::Expr::Array(_) => Array::try_from(e).map(|a| Expr::Array(Box::new(a))),
@@ -143,17 +221,25 @@ impl Expr {
 pub struct Property {
     pub name: Ident,
     pub schema: Schema,
+    /// The property description when used as a parameter
     pub desc: Option<String>,
+    /// Whether the property is required when used as a parameter
+    pub required: Option<bool>,
 }
 
 impl Property {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         if let ast::Expr::Property(prop) = e.as_node().as_expr() {
-            let desc = e.annotation().and_then(|a| a.get_string("description"));
-            Schema::try_from(prop.val.as_ref()).map(|s| Property {
-                name: prop.name.clone(),
-                schema: s,
+            let name = prop.name.clone();
+            let schema = Schema::try_from(prop.val.as_ref())?;
+            let ann = e.annotation();
+            let desc = ann.and_then(|a| a.get_string("description"));
+            let required = ann.and_then(|a| a.get_bool("required"));
+            Ok(Property {
+                name,
+                schema,
                 desc,
+                required,
             })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not a property").with(e))
@@ -190,7 +276,7 @@ impl TryFrom<u16> for HttpStatus {
     type Error = Error;
 
     fn try_from(value: u16) -> Result<Self> {
-        if value >= 100 && value <= 599 {
+        if (100..=599).contains(&value) {
             let status = unsafe { NonZeroU16::new_unchecked(value) };
             Ok(HttpStatus(status))
         } else {
@@ -271,7 +357,9 @@ pub struct Transfer {
     pub domain: Content,
     pub ranges: Ranges,
     pub params: Option<Object>,
+    pub desc: Option<String>,
     pub summary: Option<String>,
+    pub tags: Vec<String>,
 }
 
 impl Transfer {
@@ -288,13 +376,18 @@ impl Transfer {
                 Some(x) => Object::try_from(x.as_ref()).map(Some),
                 None => Ok(None),
             }?;
-            let summary = e.annotation().and_then(|a| a.get_string("summary"));
+            let ann = e.annotation();
+            let desc = ann.and_then(|a| a.get_string("description"));
+            let summary = ann.and_then(|a| a.get_string("summary"));
+            let tags = ann.and_then(|a| a.get_enum("tags")).unwrap_or_default();
             Ok(Transfer {
                 methods,
                 domain,
                 ranges,
                 params,
+                desc,
                 summary,
+                tags,
             })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not a transfer").with(e))

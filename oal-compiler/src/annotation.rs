@@ -2,7 +2,7 @@ use crate::errors::Result;
 use crate::node::NodeMut;
 use crate::scope::Env;
 use oal_syntax::ast::AsExpr;
-use serde_yaml::Mapping;
+use serde_yaml::{Mapping, Value};
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Annotation {
@@ -16,18 +16,42 @@ impl Annotation {
 
     pub fn get_str(&self, s: &str) -> Option<&str> {
         self.props
-            .get(&serde_yaml::Value::String(s.to_owned()))
-            .and_then(|a| a.as_str())
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_str)
     }
 
     pub fn get_string(&self, s: &str) -> Option<String> {
-        self.get_str(s).map(|a| a.to_owned())
+        self.get_str(s).map(ToOwned::to_owned)
     }
 
     pub fn get_bool(&self, s: &str) -> Option<bool> {
         self.props
-            .get(&serde_yaml::Value::String(s.to_owned()))
-            .and_then(|a| a.as_bool())
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_bool)
+    }
+
+    pub fn get_num(&self, s: &str) -> Option<f64> {
+        self.props
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_f64)
+    }
+
+    pub fn get_int(&self, s: &str) -> Option<i64> {
+        self.props
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_i64)
+    }
+
+    pub fn get_enum(&self, s: &str) -> Option<Vec<String>> {
+        self.props
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_sequence)
+            .map(|seq| {
+                seq.iter()
+                    .flat_map(Value::as_str)
+                    .map(ToOwned::to_owned)
+                    .collect()
+            })
     }
 }
 

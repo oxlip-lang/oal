@@ -51,7 +51,7 @@ uri_root = @{ "/" }
 
 uri_type = { uri_kw | uri_template | uri_root }
 
-prim_type = { num_kw | str_kw | bool_kw  }
+prim_type = { num_kw | str_kw | bool_kw | int_kw }
 
 prop_name = ${ "'" ~ ident }
 prop_type = { prop_name ~ term_type }
