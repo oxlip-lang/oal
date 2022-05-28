@@ -1,12 +1,9 @@
+use crate::terminal::{Ident, Literal};
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
 use std::iter::{empty, once, Flatten, Once};
-use std::rc::Rc;
 use std::slice::{Iter, IterMut};
-
-pub type Literal = Rc<str>;
-pub type Ident = Rc<str>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<T> {

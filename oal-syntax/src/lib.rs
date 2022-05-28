@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod errors;
 mod parser;
+pub mod terminal;
 
 #[cfg(test)]
 mod ast_tests;

@@ -4,12 +4,13 @@ use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
+use oal_syntax::terminal::{Ident, Literal};
 use std::fmt::Debug;
 use std::num::NonZeroU16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
-    Literal(ast::Literal),
+    Literal(Literal),
     Variable(Box<Property>),
 }
 
@@ -140,7 +141,7 @@ impl Expr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Property {
-    pub name: ast::Ident,
+    pub name: Ident,
     pub schema: Schema,
     pub desc: Option<String>,
 }

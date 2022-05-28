@@ -1,7 +1,8 @@
 use crate::expr::TypedExpr;
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
-use oal_syntax::ast::{Expr, Ident, Primitive};
+use oal_syntax::ast::{Expr, Primitive};
+use oal_syntax::terminal::Ident;
 
 #[test]
 fn environment_scopes() {
