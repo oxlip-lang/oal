@@ -722,6 +722,7 @@ pub enum Primitive {
     Num,
     Str,
     Bool,
+    Int,
 }
 
 impl FromPair for Primitive {
@@ -730,6 +731,7 @@ impl FromPair for Primitive {
             Rule::num_kw => Primitive::Num,
             Rule::str_kw => Primitive::Str,
             Rule::bool_kw => Primitive::Bool,
+            Rule::int_kw => Primitive::Int,
             _ => unreachable!(),
         }
     }

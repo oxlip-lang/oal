@@ -23,8 +23,9 @@ num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
 str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
 uri_kw  = @{ "uri"  ~ !ASCII_ALPHANUMERIC }
 bool_kw = @{ "bool" ~ !ASCII_ALPHANUMERIC }
+int_kw =  @{ "int" ~ !ASCII_ALPHANUMERIC }
 
-type_kw = { num_kw | str_kw | uri_kw | bool_kw }
+type_kw = { num_kw | str_kw | uri_kw | bool_kw | int_kw }
 
 get_kw     = @{ "get"     ~ !ASCII_ALPHANUMERIC }
 put_kw     = @{ "put"     ~ !ASCII_ALPHANUMERIC }

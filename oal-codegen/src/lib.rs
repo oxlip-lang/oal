@@ -68,6 +68,7 @@ impl Builder {
             ast::Primitive::Num => Type::Number(Default::default()),
             ast::Primitive::Str => Type::String(Default::default()),
             ast::Primitive::Bool => Type::Boolean {},
+            ast::Primitive::Int => Type::Integer(Default::default()),
         }
     }
 
