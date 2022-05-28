@@ -7,6 +7,7 @@ mod expr;
 mod inference;
 mod locator;
 mod module;
+mod node;
 mod reduction;
 mod scan;
 mod scope;

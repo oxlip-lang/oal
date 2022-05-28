@@ -1,11 +1,12 @@
 use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::node::NodeRef;
 use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{AsRefNode, Expr, NodeRef, Operator, Primitive, Statement};
+use oal_syntax::ast::{AsRefNode, Expr, Operator, Primitive, Statement};
 use oal_syntax::parse;
 
 fn check_vars(

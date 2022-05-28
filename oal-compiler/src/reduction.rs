@@ -1,7 +1,8 @@
 use crate::errors::{Error, Kind, Result};
+use crate::node::NodeMut;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{AsExpr, Expr, NodeMut};
+use oal_syntax::ast::{AsExpr, Expr};
 
 pub trait Semigroup: Sized {
     fn combine(&mut self, with: Self) {

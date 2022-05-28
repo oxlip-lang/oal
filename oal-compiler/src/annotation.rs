@@ -1,6 +1,7 @@
 use crate::errors::Result;
+use crate::node::NodeMut;
 use crate::scope::Env;
-use oal_syntax::ast::{AsExpr, NodeMut};
+use oal_syntax::ast::AsExpr;
 use serde_yaml::Mapping;
 
 #[derive(Clone, Debug, PartialEq, Default)]

@@ -1,8 +1,9 @@
 use crate::errors::{Error, Kind};
 use crate::locator::Locator;
+use crate::node::NodeRef;
 use crate::scan::Scan;
 use crate::scope::Env;
-use oal_syntax::ast::{AsExpr, NodeRef, Program};
+use oal_syntax::ast::{AsExpr, Program};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]

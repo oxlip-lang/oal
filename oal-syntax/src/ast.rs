@@ -8,24 +8,6 @@ use std::slice::{Iter, IterMut};
 pub type Literal = Rc<str>;
 pub type Ident = Rc<str>;
 
-#[derive(Debug)]
-pub enum NodeRef<'a, T> {
-    Expr(&'a T),
-    Decl(&'a Declaration<T>),
-    Res(&'a Resource<T>),
-    Ann(&'a Annotation),
-    Use(&'a Import),
-}
-
-#[derive(Debug)]
-pub enum NodeMut<'a, T> {
-    Expr(&'a mut T),
-    Decl(&'a mut Declaration<T>),
-    Res(&'a mut Resource<T>),
-    Ann(&'a mut Annotation),
-    Use(&'a mut Import),
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<T> {
     Prim(Primitive),

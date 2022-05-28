@@ -1,12 +1,13 @@
 use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::node::NodeRef;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use crate::transform::Transform;
 use crate::Program;
-use oal_syntax::ast::{AsRefNode, Expr, Lambda, NodeRef, Statement};
+use oal_syntax::ast::{AsRefNode, Expr, Lambda, Statement};
 use oal_syntax::parse;
 
 #[test]

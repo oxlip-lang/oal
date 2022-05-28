@@ -1,8 +1,9 @@
 use crate::errors::{Error, Kind, Result};
 use crate::locator::Locator;
+use crate::node::{NodeMut, NodeRef};
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
-use oal_syntax::ast::{AsExpr, Expr, NodeMut, NodeRef, Operator, UriSegment};
+use oal_syntax::ast::{AsExpr, Expr, Operator, UriSegment};
 use std::collections::HashMap;
 
 #[derive(Debug, Default, PartialEq)]

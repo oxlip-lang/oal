@@ -1,7 +1,8 @@
 use crate::errors::Result;
 use crate::module::ModuleSet;
+use crate::node::NodeRef;
 use crate::scan::Scan;
-use oal_syntax::ast::{AsExpr, Ident, NodeRef};
+use oal_syntax::ast::{AsExpr, Ident};
 use std::collections::HashMap;
 
 pub type Scope<T> = HashMap<Ident, T>;

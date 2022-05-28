@@ -1,8 +1,9 @@
 use crate::errors::{Error, Kind, Result};
+use crate::node::NodeRef;
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use oal_syntax::ast::{
-    Array, AsExpr, Expr, NodeRef, Object, Operator, Property, Relation, Transfer, Uri, UriSegment,
+    Array, AsExpr, Expr, Object, Operator, Property, Relation, Transfer, Uri, UriSegment,
     VariadicOp,
 };
 
