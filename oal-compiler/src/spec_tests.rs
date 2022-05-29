@@ -1,7 +1,7 @@
 use crate::compile::compile;
 use crate::spec::{Expr, Object, Spec, Uri, UriSegment};
 use crate::{Locator, ModuleSet, Program};
-use oal_syntax::{ast, parse};
+use oal_syntax::{atom, parse};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let loc = Locator::try_from("test:main")?;
@@ -41,7 +41,7 @@ fn evaluate_simple() -> anyhow::Result<()> {
     assert_eq!(p.uri.path.len(), 1);
     assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
-    if let Some(x) = &p.xfers[oal_syntax::ast::Method::Put] {
+    if let Some(x) = &p.xfers[oal_syntax::atom::Method::Put] {
         let d = x.domain.schema.as_ref().unwrap();
         assert_eq!(d.expr, Expr::Object(Object::default()));
         assert_eq!(d.desc, Some("some record".to_owned()));
@@ -79,7 +79,7 @@ fn evaluate_ranges() -> anyhow::Result<()> {
 
     let rel = spec.rels.values().next().expect("expected relation");
 
-    let xfer = rel.xfers[ast::Method::Get]
+    let xfer = rel.xfers[atom::Method::Get]
         .as_ref()
         .expect("expected get transfer");
 

@@ -6,7 +6,8 @@ use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use oal_syntax::ast::{AsRefNode, Expr, Operator, Primitive, Statement};
+use oal_syntax::ast::{AsRefNode, Expr, Operator, Statement};
+use oal_syntax::atom::Primitive;
 use oal_syntax::parse;
 
 fn check_vars(
@@ -68,15 +69,15 @@ fn reduce_application() {
                     let mut i = o.exprs.iter();
                     assert_eq!(
                         *i.next().unwrap().as_node().as_expr(),
-                        Expr::Prim(Primitive::Bool)
+                        Expr::Prim(Primitive::Boolean)
                     );
                     assert_eq!(
                         *i.next().unwrap().as_node().as_expr(),
-                        Expr::Prim(Primitive::Num)
+                        Expr::Prim(Primitive::Number)
                     );
                     assert_eq!(
                         *i.next().unwrap().as_node().as_expr(),
-                        Expr::Prim(Primitive::Str)
+                        Expr::Prim(Primitive::String)
                     );
                 }
                 _ => panic!("expected operation"),

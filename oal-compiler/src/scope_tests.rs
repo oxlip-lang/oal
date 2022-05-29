@@ -1,16 +1,17 @@
 use crate::expr::TypedExpr;
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
-use oal_syntax::ast::{Expr, Primitive};
-use oal_syntax::terminal::Ident;
+use oal_syntax::ast::Expr;
+use oal_syntax::atom::{Ident, Primitive};
 
 #[test]
 fn environment_scopes() {
     let mut e = Env::new(None);
     let id = Ident::from("a");
     let bool_expr =
-        TypedExpr::from(Expr::Prim(Primitive::Bool).into_node()).with_tag(Tag::Primitive);
-    let num_expr = TypedExpr::from(Expr::Prim(Primitive::Num).into_node()).with_tag(Tag::Primitive);
+        TypedExpr::from(Expr::Prim(Primitive::Boolean).into_node()).with_tag(Tag::Primitive);
+    let num_expr =
+        TypedExpr::from(Expr::Prim(Primitive::Number).into_node()).with_tag(Tag::Primitive);
 
     assert!(!e.exists(&id));
 

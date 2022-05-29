@@ -1,6 +1,6 @@
-use crate::terminal::{HttpStatus, HttpStatusRange, Ident, Literal};
+use crate::atom::{HttpStatus, HttpStatusRange, Ident, Literal, Method, Primitive};
 use crate::{Pair, Rule};
-use enum_map::{Enum, EnumMap};
+use enum_map::EnumMap;
 use std::fmt::Debug;
 use std::iter::{empty, once, Flatten, Once};
 use std::slice::{Iter, IterMut};
@@ -281,17 +281,6 @@ impl<T: AsExpr> FromPair for Statement<T> {
             _ => unreachable!(),
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Enum)]
-pub enum Method {
-    Get,
-    Put,
-    Post,
-    Patch,
-    Delete,
-    Options,
-    Head,
 }
 
 impl FromPair for Method {
@@ -739,21 +728,13 @@ impl<'a, T: AsExpr> IntoIterator for &'a mut VariadicOp<T> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Primitive {
-    Num,
-    Str,
-    Bool,
-    Int,
-}
-
 impl FromPair for Primitive {
     fn from_pair(p: Pair) -> Self {
         match p.into_inner().next().unwrap().as_rule() {
-            Rule::num_kw => Primitive::Num,
-            Rule::str_kw => Primitive::Str,
-            Rule::bool_kw => Primitive::Bool,
-            Rule::int_kw => Primitive::Int,
+            Rule::num_kw => Primitive::Number,
+            Rule::str_kw => Primitive::String,
+            Rule::bool_kw => Primitive::Boolean,
+            Rule::int_kw => Primitive::Integer,
             _ => unreachable!(),
         }
     }

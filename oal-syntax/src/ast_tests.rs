@@ -1,6 +1,6 @@
 use crate::ast::*;
+use crate::atom::{HttpStatus, HttpStatusRange, Method, Primitive};
 use crate::parse;
-use crate::terminal::{HttpStatus, HttpStatusRange};
 use enum_map::enum_map;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -36,7 +36,10 @@ fn parse_variable_decl() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "a");
-        assert_eq!(*decl.expr.as_node().as_expr(), Expr::Prim(Primitive::Num));
+        assert_eq!(
+            *decl.expr.as_node().as_expr(),
+            Expr::Prim(Primitive::Number)
+        );
     } else {
         panic!("expected declaration");
     }
@@ -58,7 +61,10 @@ fn parse_array() {
 
     if let Statement::Decl(decl) = s {
         if let Expr::Array(array) = decl.expr.as_node().as_expr() {
-            assert_eq!(*array.item.as_node().as_expr(), Expr::Prim(Primitive::Str));
+            assert_eq!(
+                *array.item.as_node().as_expr(),
+                Expr::Prim(Primitive::String)
+            );
         } else {
             panic!("expected array expression");
         }
@@ -103,7 +109,7 @@ fn parse_template_uri() {
             if let UriSegment::Variable(var) = uri.path.get(1).unwrap() {
                 if let Expr::Property(prop) = var.as_node().as_expr() {
                     assert_eq!(prop.name.as_ref(), "y");
-                    assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::Str));
+                    assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::String));
                 } else {
                     panic!("expected property expression");
                 }
@@ -279,7 +285,7 @@ fn parse_lambda_decl() {
                 })
                 .collect();
             assert_eq!(bindings, vec!["x", "y", "z"]);
-            assert_eq!(*body.as_node().as_expr(), Expr::Prim(Primitive::Num));
+            assert_eq!(*body.as_node().as_expr(), Expr::Prim(Primitive::Number));
         } else {
             panic!("expected lambda expression");
         }
@@ -491,7 +497,7 @@ fn parse_property_decl() {
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
         if let Expr::Property(prop) = decl.expr.as_node().as_expr() {
             assert_eq!(prop.name.as_ref(), "q");
-            assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::Str));
+            assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::String));
         } else {
             panic!("expected property expression");
         }

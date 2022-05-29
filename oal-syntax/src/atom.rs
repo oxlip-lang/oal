@@ -1,3 +1,4 @@
+use enum_map::Enum;
 use std::num::NonZeroU16;
 use std::rc::Rc;
 
@@ -17,4 +18,23 @@ pub enum HttpStatusRange {
 pub enum HttpStatus {
     Code(NonZeroU16),
     Range(HttpStatusRange),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Primitive {
+    Number,
+    String,
+    Boolean,
+    Integer,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Enum)]
+pub enum Method {
+    Get,
+    Put,
+    Post,
+    Patch,
+    Delete,
+    Options,
+    Head,
 }

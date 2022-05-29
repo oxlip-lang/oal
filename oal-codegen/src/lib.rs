@@ -1,7 +1,7 @@
 use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
-use oal_syntax::terminal::HttpStatusRange;
-use oal_syntax::{ast, terminal};
+use oal_syntax::atom::HttpStatusRange;
+use oal_syntax::{ast, atom};
 use openapiv3::{
     ArrayType, Info, IntegerType, MediaType, NumberType, ObjectType, OpenAPI, Operation, Parameter,
     ParameterData, ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response,
@@ -306,10 +306,10 @@ impl Builder {
         self.domain_request(&xfer.domain)
     }
 
-    fn http_status_code(&self, status: &terminal::HttpStatus) -> StatusCode {
+    fn http_status_code(&self, status: &atom::HttpStatus) -> StatusCode {
         match *status {
-            terminal::HttpStatus::Code(code) => StatusCode::Code(code.into()),
-            terminal::HttpStatus::Range(range) => StatusCode::Range(match range {
+            atom::HttpStatus::Code(code) => StatusCode::Code(code.into()),
+            atom::HttpStatus::Range(range) => StatusCode::Range(match range {
                 HttpStatusRange::Info => 1,
                 HttpStatusRange::Success => 2,
                 HttpStatusRange::Redirect => 3,
@@ -353,22 +353,22 @@ impl Builder {
         }
     }
 
-    fn method_label(&self, m: ast::Method) -> &str {
+    fn method_label(&self, m: atom::Method) -> &str {
         match m {
-            ast::Method::Get => "get",
-            ast::Method::Put => "put",
-            ast::Method::Post => "post",
-            ast::Method::Patch => "patch",
-            ast::Method::Delete => "delete",
-            ast::Method::Options => "options",
-            ast::Method::Head => "head",
+            atom::Method::Get => "get",
+            atom::Method::Put => "put",
+            atom::Method::Post => "post",
+            atom::Method::Patch => "patch",
+            atom::Method::Delete => "delete",
+            atom::Method::Options => "options",
+            atom::Method::Head => "head",
         }
     }
 
     fn xfer_id(
         &self,
         xfer: &spec::Transfer,
-        method: ast::Method,
+        method: atom::Method,
         uri: &spec::Uri,
     ) -> Option<String> {
         if xfer.id.is_some() {
@@ -417,13 +417,13 @@ impl Builder {
             };
 
             match method {
-                ast::Method::Get => path_item.get = Some(op),
-                ast::Method::Put => path_item.put = Some(op),
-                ast::Method::Post => path_item.post = Some(op),
-                ast::Method::Patch => path_item.patch = Some(op),
-                ast::Method::Delete => path_item.delete = Some(op),
-                ast::Method::Options => path_item.options = Some(op),
-                ast::Method::Head => path_item.head = Some(op),
+                atom::Method::Get => path_item.get = Some(op),
+                atom::Method::Put => path_item.put = Some(op),
+                atom::Method::Post => path_item.post = Some(op),
+                atom::Method::Patch => path_item.patch = Some(op),
+                atom::Method::Delete => path_item.delete = Some(op),
+                atom::Method::Options => path_item.options = Some(op),
+                atom::Method::Head => path_item.head = Some(op),
             }
         }
 

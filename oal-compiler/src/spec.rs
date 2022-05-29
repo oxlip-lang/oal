@@ -2,9 +2,9 @@ use crate::annotation::Annotated;
 use crate::errors::{Error, Kind, Result};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
-use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
-use oal_syntax::terminal::{HttpStatus, Ident, Literal};
+use oal_syntax::atom::{HttpStatus, Ident, Literal};
+use oal_syntax::{ast, atom};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -202,10 +202,10 @@ pub enum Expr {
 impl Expr {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         match e.as_node().as_expr() {
-            ast::Expr::Prim(ast::Primitive::Num) => PrimNumber::try_from(e).map(Expr::Num),
-            ast::Expr::Prim(ast::Primitive::Str) => PrimString::try_from(e).map(Expr::Str),
-            ast::Expr::Prim(ast::Primitive::Bool) => PrimBoolean::try_from(e).map(Expr::Bool),
-            ast::Expr::Prim(ast::Primitive::Int) => PrimInteger::try_from(e).map(Expr::Int),
+            ast::Expr::Prim(atom::Primitive::Number) => PrimNumber::try_from(e).map(Expr::Num),
+            ast::Expr::Prim(atom::Primitive::String) => PrimString::try_from(e).map(Expr::Str),
+            ast::Expr::Prim(atom::Primitive::Boolean) => PrimBoolean::try_from(e).map(Expr::Bool),
+            ast::Expr::Prim(atom::Primitive::Integer) => PrimInteger::try_from(e).map(Expr::Int),
             ast::Expr::Rel(_) => Relation::try_from(e).map(|r| Expr::Rel(Box::new(r))),
             ast::Expr::Uri(_) => Uri::try_from(e).map(Expr::Uri),
             ast::Expr::Array(_) => Array::try_from(e).map(|a| Expr::Array(Box::new(a))),
@@ -333,7 +333,7 @@ fn try_into_ranges<T: AsExpr + Annotated>(ranges: &mut Ranges, e: &T) -> Result<
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Transfer {
-    pub methods: EnumMap<ast::Method, bool>,
+    pub methods: EnumMap<atom::Method, bool>,
     pub domain: Content,
     pub ranges: Ranges,
     pub params: Option<Object>,
@@ -378,7 +378,7 @@ impl Transfer {
     }
 }
 
-pub type Transfers = EnumMap<ast::Method, Option<Transfer>>;
+pub type Transfers = EnumMap<atom::Method, Option<Transfer>>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Relation {
