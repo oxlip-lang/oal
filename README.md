@@ -104,16 +104,16 @@ let obj3 = f { 'height num } { 'stuff any1 };
 ```
 ```
 // Combining contents into ranges
-let with_err c = c :: <application/problem+json, 5XX, {}> `description: "internal error"`
-                   :: <application/problem+json, 4XX, {}> `description: "bad request"`;
+let with_err s = <application/vnd.blah+json, 200, s>  `description: "all good"`
+              :: <application/problem+json,  5XX, {}> `description: "internal error"`
+              :: <application/problem+json,  4XX, {}> `description: "bad request"`;
 ```
 ```
 // Binding everything together as resources
 res rel1;
 
 res /something?{ 'q str } (
-  get -> with_err <application/vnd.blah+json, 200, obj3> `description: "all good"`
-      :: <>                                              `description: "no content"`
+  get -> with_err obj3 :: <> `description: "no content"`
 );
 ```
 ```
