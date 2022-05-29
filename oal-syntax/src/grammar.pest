@@ -6,7 +6,10 @@
 
 http_token_char = @{ ASCII_ALPHANUMERIC | "!" | "#" | "$" | "%" | "&" | "'" | "*" | "+" | "-" | "." | "^" | "_" | "`" | "|" | "~" }
 http_token = @{ http_token_char+ }
-http_status = @{ ASCII_DIGIT{3} }
+http_status_category = @{ '1'..'5' }
+http_status_range = @{ http_status_category ~ "XX" }
+http_status_code = @{ http_status_category ~ ASCII_DIGIT{2} }
+http_status = @{ http_status_range | http_status_code }
 http_type = @{ "*" | http_token }
 http_media_range = @{ http_type ~ "/" ~ http_type }
 

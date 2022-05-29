@@ -1,4 +1,4 @@
-use crate::terminal::{Ident, Literal};
+use crate::terminal::{HttpStatus, HttpStatusRange, Ident, Literal};
 use crate::{Pair, Rule};
 use enum_map::{Enum, EnumMap};
 use std::fmt::Debug;
@@ -621,10 +621,32 @@ impl<'a, T> IntoIterator for &'a mut Object<T> {
     }
 }
 
+impl FromPair for HttpStatus {
+    fn from_pair(p: Pair) -> Self {
+        let mut s = p.as_str().chars();
+        let category = s.next().unwrap();
+        let code_high = s.next().unwrap();
+        let code_low = s.next().unwrap();
+        if code_high == 'X' || code_low == 'X' {
+            let range = match category {
+                '1' => HttpStatusRange::Info,
+                '2' => HttpStatusRange::Success,
+                '3' => HttpStatusRange::Redirect,
+                '4' => HttpStatusRange::ClientError,
+                '5' => HttpStatusRange::ServerError,
+                _ => unreachable!(),
+            };
+            HttpStatus::Range(range)
+        } else {
+            HttpStatus::Code(p.as_str().parse().unwrap())
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Content<T> {
     pub schema: Option<Box<T>>,
-    pub status: Option<u16>,
+    pub status: Option<HttpStatus>,
     pub media: Option<String>,
 }
 
@@ -633,7 +655,7 @@ impl<T: AsExpr> FromPair for Content<T> {
         let (mut schema, mut status, mut media) = (None, None, None);
         for p in p.into_inner() {
             match p.as_rule() {
-                Rule::http_status => status = Some(p.as_str().parse().unwrap()),
+                Rule::http_status => status = Some(p.into_expr()),
                 Rule::http_media_range => media = Some(p.as_str().to_owned()),
                 Rule::expr_type => schema = Some(Box::new(p.into_expr())),
                 _ => unreachable!(),

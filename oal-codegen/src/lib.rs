@@ -1,6 +1,7 @@
 use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
-use oal_syntax::ast;
+use oal_syntax::terminal::HttpStatusRange;
+use oal_syntax::{ast, terminal};
 use openapiv3::{
     ArrayType, Info, IntegerType, MediaType, NumberType, ObjectType, OpenAPI, Operation, Parameter,
     ParameterData, ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response,
@@ -305,6 +306,19 @@ impl Builder {
         self.domain_request(&xfer.domain)
     }
 
+    fn http_status_code(&self, status: &terminal::HttpStatus) -> StatusCode {
+        match *status {
+            terminal::HttpStatus::Code(code) => StatusCode::Code(code.into()),
+            terminal::HttpStatus::Range(range) => StatusCode::Range(match range {
+                HttpStatusRange::Info => 1,
+                HttpStatusRange::Success => 2,
+                HttpStatusRange::Redirect => 3,
+                HttpStatusRange::ClientError => 4,
+                HttpStatusRange::ServerError => 5,
+            }),
+        }
+    }
+
     fn xfer_responses(&self, xfer: &spec::Transfer) -> Responses {
         let mut default = None;
         let mut responses = IndexMap::new();
@@ -312,7 +326,7 @@ impl Builder {
         for ((status, media), content) in xfer.ranges.iter() {
             let response = if let Some(s) = status {
                 responses
-                    .entry(StatusCode::Code((*s).into()))
+                    .entry(self.http_status_code(s))
                     .or_insert(ReferenceOr::Item(Response::default()))
             } else {
                 default.insert(ReferenceOr::Item(Response::default()))

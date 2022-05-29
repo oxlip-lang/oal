@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::parse;
+use crate::terminal::{HttpStatus, HttpStatusRange};
 use enum_map::enum_map;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -344,10 +345,34 @@ fn parse_complete_content() {
         assert_eq!(decl.name.as_ref(), "c");
         if let Expr::Content(cnt) = decl.expr.as_node().as_expr() {
             assert!(cnt.schema.is_some());
-            assert_eq!(cnt.status.expect("expected status"), 200);
+            assert_eq!(
+                cnt.status.expect("expected status"),
+                HttpStatus::Code(200.try_into().unwrap())
+            );
             assert_eq!(
                 cnt.media.as_ref().expect("expected media"),
                 "application/json"
+            );
+        } else {
+            panic!("expected content expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_status_range() {
+    let d: Program = parse("let c = <4XX,{}>;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        assert_eq!(decl.name.as_ref(), "c");
+        if let Expr::Content(cnt) = decl.expr.as_node().as_expr() {
+            assert_eq!(
+                cnt.status.expect("expected status"),
+                HttpStatus::Range(HttpStatusRange::ClientError)
             );
         } else {
             panic!("expected content expression");

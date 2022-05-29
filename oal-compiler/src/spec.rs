@@ -4,9 +4,8 @@ use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_syntax::ast;
 use oal_syntax::ast::AsExpr;
-use oal_syntax::terminal::{Ident, Literal};
+use oal_syntax::terminal::{HttpStatus, Ident, Literal};
 use std::fmt::Debug;
-use std::num::NonZeroU16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
@@ -263,28 +262,6 @@ impl Object {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct HttpStatus(NonZeroU16);
-
-impl From<HttpStatus> for u16 {
-    fn from(s: HttpStatus) -> Self {
-        s.0.into()
-    }
-}
-
-impl TryFrom<u16> for HttpStatus {
-    type Error = Error;
-
-    fn try_from(value: u16) -> Result<Self> {
-        if (100..=599).contains(&value) {
-            let status = unsafe { NonZeroU16::new_unchecked(value) };
-            Ok(HttpStatus(status))
-        } else {
-            Err(Error::new(Kind::InvalidHttpStatus, "not in range").with(&value))
-        }
-    }
-}
-
 pub type MediaType = String;
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -317,10 +294,13 @@ impl Content {
                 Some(s) => Schema::try_from(s.as_ref()).map(|s| Some(Box::new(s))),
                 None => Ok(None),
             }?;
-            let status = match c.status {
-                Some(s) => HttpStatus::try_from(s).map(Some),
-                None => Ok(None),
-            }?;
+            let status = c.status.or_else(|| {
+                if schema.is_none() {
+                    Some(HttpStatus::Code(204.try_into().unwrap()))
+                } else {
+                    None
+                }
+            });
             let media = c.media.clone();
             let desc = e.annotation().and_then(|a| a.get_string("description"));
             Ok(Content {
