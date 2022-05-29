@@ -360,6 +360,7 @@ pub struct Transfer {
     pub desc: Option<String>,
     pub summary: Option<String>,
     pub tags: Vec<String>,
+    pub id: Option<String>,
 }
 
 impl Transfer {
@@ -380,6 +381,7 @@ impl Transfer {
             let desc = ann.and_then(|a| a.get_string("description"));
             let summary = ann.and_then(|a| a.get_string("summary"));
             let tags = ann.and_then(|a| a.get_enum("tags")).unwrap_or_default();
+            let id = ann.and_then(|a| a.get_string("operationId"));
             Ok(Transfer {
                 methods,
                 domain,
@@ -388,6 +390,7 @@ impl Transfer {
                 desc,
                 summary,
                 tags,
+                id,
             })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not a transfer").with(e))

@@ -3,6 +3,9 @@ info:
   title: Example
   description: Example
   version: 1.0.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 servers:
   - url: '/'
 paths: {}

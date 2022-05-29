@@ -7,6 +7,7 @@ use openapiv3::{
     Responses, Schema, SchemaData, SchemaKind, Server, StatusCode, StringType, Type,
     VariantOrUnknownOrEmpty,
 };
+use std::iter::once;
 
 #[derive(Default)]
 pub struct Builder {
@@ -300,11 +301,11 @@ impl Builder {
         })
     }
 
-    fn transfer_request(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<RequestBody>> {
+    fn xfer_request(&self, xfer: &spec::Transfer) -> Option<ReferenceOr<RequestBody>> {
         self.domain_request(&xfer.domain)
     }
 
-    fn transfer_responses(&self, xfer: &spec::Transfer) -> Responses {
+    fn xfer_responses(&self, xfer: &spec::Transfer) -> Responses {
         let mut default = None;
         let mut responses = IndexMap::new();
 
@@ -338,6 +339,38 @@ impl Builder {
         }
     }
 
+    fn method_label(&self, m: ast::Method) -> &str {
+        match m {
+            ast::Method::Get => "get",
+            ast::Method::Put => "put",
+            ast::Method::Post => "post",
+            ast::Method::Patch => "patch",
+            ast::Method::Delete => "delete",
+            ast::Method::Options => "options",
+            ast::Method::Head => "head",
+        }
+    }
+
+    fn xfer_id(
+        &self,
+        xfer: &spec::Transfer,
+        method: ast::Method,
+        uri: &spec::Uri,
+    ) -> Option<String> {
+        if xfer.id.is_some() {
+            return xfer.id.clone();
+        }
+        let prefix = self.method_label(method).to_owned();
+        let label = once(prefix)
+            .chain(uri.path.iter().map(|s| match s {
+                spec::UriSegment::Literal(l) => l.to_lowercase(),
+                spec::UriSegment::Variable(t) => t.name.to_lowercase(),
+            }))
+            .collect::<Vec<_>>()
+            .join("-");
+        Some(label)
+    }
+
     fn relation_path_item(&self, rel: &spec::Relation) -> PathItem {
         let mut path_item = PathItem {
             parameters: self.uri_params(&rel.uri),
@@ -350,11 +383,21 @@ impl Builder {
             .filter_map(|(m, x)| x.as_ref().map(|x| (m, x)));
 
         for (method, xfer) in xfers {
+            let operation_id = self.xfer_id(xfer, method, &rel.uri);
+            let summary = xfer
+                .summary
+                .clone()
+                .or_else(|| xfer.desc.clone())
+                .or_else(|| operation_id.clone());
+            let description = xfer.desc.clone();
+
             let op = Operation {
-                summary: xfer.summary.clone(),
+                summary,
+                description,
+                operation_id,
                 parameters: self.xfer_params(xfer),
-                request_body: self.transfer_request(xfer),
-                responses: self.transfer_responses(xfer),
+                request_body: self.xfer_request(xfer),
+                responses: self.xfer_responses(xfer),
                 tags: xfer.tags.clone(),
                 ..Default::default()
             };
