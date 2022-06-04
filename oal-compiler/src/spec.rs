@@ -201,7 +201,9 @@ pub enum Expr {
 
 impl Expr {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        match e.as_node().as_expr() {
+        let node = e.as_node();
+        let span = node.span;
+        match node.as_expr() {
             ast::Expr::Prim(atom::Primitive::Number) => PrimNumber::try_from(e).map(Expr::Num),
             ast::Expr::Prim(atom::Primitive::String) => PrimString::try_from(e).map(Expr::Str),
             ast::Expr::Prim(atom::Primitive::Boolean) => PrimBoolean::try_from(e).map(Expr::Bool),
@@ -213,6 +215,7 @@ impl Expr {
             ast::Expr::Op(_) => VariadicOp::try_from(e).map(Expr::Op),
             _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
         }
+        .map_err(|err| err.at(span))
     }
 }
 

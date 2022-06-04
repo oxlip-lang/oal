@@ -154,12 +154,14 @@ impl<T: AsExpr + Tagged> TypeChecked for Object<T> {
     }
 }
 
-pub fn type_check<T>(_acc: &mut (), _env: &mut Env<T>, node: NodeRef<T>) -> Result<()>
+pub fn type_check<T>(_acc: &mut (), _env: &mut Env<T>, node_ref: NodeRef<T>) -> Result<()>
 where
     T: AsExpr + Tagged,
 {
-    if let NodeRef::Expr(e) = node {
-        match e.as_node().as_expr() {
+    if let NodeRef::Expr(expr) = node_ref {
+        let node = expr.as_node();
+        let span = node.span;
+        match node.as_expr() {
             Expr::Op(op) => op.type_check(),
             Expr::Rel(rel) => rel.type_check(),
             Expr::Uri(uri) => uri.type_check(),
@@ -170,6 +172,7 @@ where
             Expr::Xfer(xfer) => xfer.type_check(),
             _ => Ok(()),
         }
+        .map_err(|err| err.at(span))
     } else {
         Ok(())
     }

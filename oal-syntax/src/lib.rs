@@ -2,6 +2,7 @@ pub mod ast;
 pub mod atom;
 pub mod errors;
 mod parser;
+pub mod span;
 
 #[cfg(test)]
 mod ast_tests;

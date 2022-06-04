@@ -1,3 +1,4 @@
+use oal_syntax::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -27,6 +28,7 @@ pub struct Error {
     pub kind: Kind,
     msg: String,
     details: Vec<String>,
+    span: Option<Span>,
 }
 
 impl Error {
@@ -35,6 +37,7 @@ impl Error {
             kind,
             msg: msg.into(),
             details: Vec::new(),
+            span: None,
         }
     }
 
@@ -42,11 +45,19 @@ impl Error {
         self.details.push(format!("{:?}", e));
         self
     }
+
+    pub fn at(mut self, span: Option<Span>) -> Self {
+        self.span = span;
+        self
+    }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         writeln!(f, "{:?}: {}", self.kind, self.msg)?;
+        if let Some(span) = &self.span {
+            writeln!(f, "Location: {}", span)?;
+        }
         if !self.details.is_empty() {
             writeln!(f, "Details:")?;
             self.details

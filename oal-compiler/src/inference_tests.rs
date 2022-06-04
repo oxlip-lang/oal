@@ -124,9 +124,9 @@ fn constraint_lambda() {
 fn unify_simple() {
     let mut c = InferenceSet::new();
 
-    c.push(Tag::Var(0), Tag::Primitive);
-    c.push(Tag::Var(2), Tag::Var(1));
-    c.push(Tag::Var(1), Tag::Var(0));
+    c.push(Tag::Var(0), Tag::Primitive, None);
+    c.push(Tag::Var(2), Tag::Var(1), None);
+    c.push(Tag::Var(1), Tag::Var(0), None);
 
     let u = c.unify().expect("unification failed");
 

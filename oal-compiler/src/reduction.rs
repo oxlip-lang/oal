@@ -10,24 +10,26 @@ pub trait Semigroup: Sized {
     }
 }
 
-pub fn reduce<T>(_acc: &mut (), env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
+pub fn reduce<T>(_acc: &mut (), env: &mut Env<T>, node_ref: NodeMut<T>) -> Result<()>
 where
     T: AsExpr + Semigroup,
 {
-    match node {
-        NodeMut::Expr(e) => match e.as_node_mut().as_expr_mut() {
+    if let NodeMut::Expr(expr) = node_ref {
+        let node = expr.as_node_mut();
+        let span = node.span;
+        match node.as_expr_mut() {
             Expr::Var(var) => match env.lookup(var) {
-                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(expr)),
                 Some(val) => {
                     match val.as_node().as_expr() {
                         Expr::Binding(_) => {}
-                        _ => e.combine(val.clone()),
+                        _ => expr.combine(val.clone()),
                     };
                     Ok(())
                 }
             },
             Expr::App(application) => match env.lookup(&application.name) {
-                None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(e)),
+                None => Err(Error::new(Kind::IdentifierNotAFunction, "").with(expr)),
                 Some(val) => {
                     if let Expr::Lambda(lambda) = val.as_node().as_expr() {
                         let app_env = &mut Env::new(None);
@@ -42,15 +44,17 @@ where
                         app.as_node_mut()
                             .as_expr_mut()
                             .transform(&mut (), app_env, &mut reduce)?;
-                        e.combine(app);
+                        expr.combine(app);
                         Ok(())
                     } else {
-                        Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
+                        Err(Error::new(Kind::IdentifierNotAFunction, "").with(expr))
                     }
                 }
             },
             _ => Ok(()),
-        },
-        _ => Ok(()),
+        }
+        .map_err(|err| err.at(span))
+    } else {
+        Ok(())
     }
 }

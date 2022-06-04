@@ -1,28 +1,10 @@
 use crate::atom::{HttpStatus, HttpStatusRange, Ident, Method, Primitive, Text};
+use crate::span::Span;
 use crate::{Pair, Rule};
 use enum_map::EnumMap;
 use std::fmt::Debug;
 use std::iter::{once, Flatten, Once};
 use std::slice::{Iter, IterMut};
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Literal {
-    Text(Text),
-    Number(u64),
-    Status(HttpStatus),
-}
-
-impl FromPair for Literal {
-    fn from_pair(p: Pair) -> Self {
-        let inner = p.into_inner().next().unwrap();
-        match inner.as_rule() {
-            Rule::literal_num => Literal::Number(inner.as_str().parse().unwrap()),
-            Rule::literal_str => Literal::Text(inner.into_inner().next().unwrap().as_str().into()),
-            Rule::http_status_range => Literal::Status(inner.into_expr()),
-            _ => unreachable!(),
-        }
-    }
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr<T> {
@@ -47,6 +29,7 @@ impl<T> Expr<T> {
         NodeExpr {
             inner: self,
             ann: None,
+            span: None,
         }
     }
 }
@@ -55,6 +38,7 @@ impl<T> Expr<T> {
 pub struct NodeExpr<T> {
     pub inner: Expr<T>,
     pub ann: Option<Annotation>,
+    pub span: Option<Span>,
 }
 
 impl<T> NodeExpr<T> {
@@ -99,7 +83,8 @@ impl<T: FromPair> IntoExpr<T> for Pair<'_> {
 
 impl<T: AsExpr> FromPair for T {
     fn from_pair(p: Pair) -> T {
-        match p.as_rule() {
+        let span = Span::from(&p);
+        let mut expr = match p.as_rule() {
             Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::xfer_type => {
                 p.into_inner().next().unwrap().into_expr()
             }
@@ -130,7 +115,9 @@ impl<T: AsExpr> FromPair for T {
             Rule::xfer => Expr::Xfer(p.into_expr()).into_node().into(),
             Rule::literal_type => Expr::Lit(p.into_expr()).into_node().into(),
             _ => unreachable!(),
-        }
+        };
+        expr.as_node_mut().span = Some(span);
+        expr
     }
 }
 
@@ -834,5 +821,24 @@ impl<'a, T> IntoIterator for &'a mut Application<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.args.iter_mut()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Literal {
+    Text(Text),
+    Number(u64),
+    Status(HttpStatus),
+}
+
+impl FromPair for Literal {
+    fn from_pair(p: Pair) -> Self {
+        let inner = p.into_inner().next().unwrap();
+        match inner.as_rule() {
+            Rule::literal_num => Literal::Number(inner.as_str().parse().unwrap()),
+            Rule::literal_str => Literal::Text(inner.into_inner().next().unwrap().as_str().into()),
+            Rule::http_status_range => Literal::Status(inner.into_expr()),
+            _ => unreachable!(),
+        }
     }
 }

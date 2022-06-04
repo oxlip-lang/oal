@@ -4,6 +4,7 @@ use crate::node::{NodeMut, NodeRef};
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
 use oal_syntax::ast::{AsExpr, Expr, Operator, UriSegment};
+use oal_syntax::span::Span;
 use std::collections::HashMap;
 
 #[derive(Debug, Default, PartialEq)]
@@ -205,6 +206,7 @@ fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
 pub struct TypeEquation {
     pub left: Tag,
     pub right: Tag,
+    pub span: Option<Span>,
 }
 
 impl TypeEquation {
@@ -221,15 +223,15 @@ impl InferenceSet {
         Default::default()
     }
 
-    pub fn push(&mut self, left: Tag, right: Tag) {
-        self.0.push(TypeEquation { left, right });
+    pub fn push(&mut self, left: Tag, right: Tag, span: Option<Span>) {
+        self.0.push(TypeEquation { left, right, span });
     }
 
     pub fn unify(&self) -> Result<Subst> {
         let mut s = Subst::new();
         self.0
             .iter()
-            .try_for_each(|eq| eq.unify(&mut s).map_err(|e| e.with(eq)))?;
+            .try_for_each(|eq| eq.unify(&mut s).map_err(|err| err.at(eq.span)))?;
         Ok(s)
     }
 
@@ -239,86 +241,90 @@ impl InferenceSet {
     }
 }
 
-pub fn constrain<T>(c: &mut InferenceSet, env: &mut Env<T>, node: NodeRef<T>) -> Result<()>
+pub fn constrain<T>(c: &mut InferenceSet, env: &mut Env<T>, node_ref: NodeRef<T>) -> Result<()>
 where
     T: AsExpr + Tagged,
 {
-    match node {
-        NodeRef::Expr(e) => match e.as_node().as_expr() {
-            Expr::Lit(l) => {
-                let t = Tag::from(l);
-                c.push(e.unwrap_tag(), t);
+    if let NodeRef::Expr(expr) = node_ref {
+        let node = expr.as_node();
+        let span = node.span;
+        match node.as_expr() {
+            Expr::Lit(lit) => {
+                let tag = Tag::from(lit);
+                c.push(expr.unwrap_tag(), tag, span);
                 Ok(())
             }
             Expr::Prim(_) => {
-                c.push(e.unwrap_tag(), Tag::Primitive);
+                c.push(expr.unwrap_tag(), Tag::Primitive, span);
                 Ok(())
             }
             Expr::Rel(rel) => {
-                c.push(rel.uri.unwrap_tag(), Tag::Uri);
+                c.push(rel.uri.unwrap_tag(), Tag::Uri, rel.uri.as_node().span);
                 for xfer in rel.xfers.iter() {
-                    c.push(xfer.unwrap_tag(), Tag::Transfer);
+                    c.push(xfer.unwrap_tag(), Tag::Transfer, xfer.as_node().span);
                 }
-                c.push(e.unwrap_tag(), Tag::Relation);
+                c.push(expr.unwrap_tag(), Tag::Relation, span);
                 Ok(())
             }
             Expr::Uri(uri) => {
                 for seg in uri.path.iter() {
                     if let UriSegment::Variable(var) = seg {
-                        c.push(var.unwrap_tag(), Tag::Property);
+                        c.push(var.unwrap_tag(), Tag::Property, var.as_node().span);
                     }
                 }
                 if let Some(params) = &uri.params {
-                    c.push(params.unwrap_tag(), Tag::Object);
+                    c.push(params.unwrap_tag(), Tag::Object, params.as_node().span);
                 }
-                c.push(e.unwrap_tag(), Tag::Uri);
+                c.push(expr.unwrap_tag(), Tag::Uri, span);
                 Ok(())
             }
             Expr::Property(_) => {
-                c.push(e.unwrap_tag(), Tag::Property);
+                c.push(expr.unwrap_tag(), Tag::Property, span);
                 Ok(())
             }
             Expr::Object(obj) => {
                 for prop in obj.props.iter() {
-                    c.push(prop.unwrap_tag(), Tag::Property);
+                    c.push(prop.unwrap_tag(), Tag::Property, prop.as_node().span);
                 }
-                c.push(e.unwrap_tag(), Tag::Object);
+                c.push(expr.unwrap_tag(), Tag::Object, span);
                 Ok(())
             }
             Expr::Content(cnt) => {
                 cnt.headers
                     .iter()
-                    .for_each(|h| c.push(h.unwrap_tag(), Tag::Object));
+                    .for_each(|h| c.push(h.unwrap_tag(), Tag::Object, h.as_node().span));
                 cnt.media
                     .iter()
-                    .for_each(|m| c.push(m.unwrap_tag(), Tag::Text));
-                c.push(e.unwrap_tag(), Tag::Content);
+                    .for_each(|m| c.push(m.unwrap_tag(), Tag::Text, m.as_node().span));
+                c.push(expr.unwrap_tag(), Tag::Content, span);
                 Ok(())
             }
             Expr::Xfer(xfer) => {
                 if let Some(params) = &xfer.params {
-                    c.push(params.unwrap_tag(), Tag::Object);
+                    c.push(params.unwrap_tag(), Tag::Object, params.as_node().span);
                 }
-                c.push(e.unwrap_tag(), Tag::Transfer);
+                c.push(expr.unwrap_tag(), Tag::Transfer, span);
                 Ok(())
             }
             Expr::Array(_) => {
-                c.push(e.unwrap_tag(), Tag::Array);
+                c.push(expr.unwrap_tag(), Tag::Array, span);
                 Ok(())
             }
             Expr::Op(operation) => {
                 let operator = operation.op;
                 for op in operation.into_iter() {
                     match operator {
-                        Operator::Join => c.push(op.unwrap_tag(), Tag::Object),
-                        Operator::Sum => c.push(e.unwrap_tag(), op.unwrap_tag()),
+                        Operator::Join => c.push(op.unwrap_tag(), Tag::Object, op.as_node().span),
+                        Operator::Sum => {
+                            c.push(expr.unwrap_tag(), op.unwrap_tag(), op.as_node().span)
+                        }
                         Operator::Any | Operator::Range => {}
                     }
                 }
                 match operator {
-                    Operator::Join => c.push(e.unwrap_tag(), Tag::Object),
-                    Operator::Any => c.push(e.unwrap_tag(), Tag::Any),
-                    Operator::Range => c.push(e.unwrap_tag(), Tag::Content),
+                    Operator::Join => c.push(expr.unwrap_tag(), Tag::Object, span),
+                    Operator::Any => c.push(expr.unwrap_tag(), Tag::Any, span),
+                    Operator::Range => c.push(expr.unwrap_tag(), Tag::Content, span),
                     Operator::Sum => {}
                 }
                 Ok(())
@@ -326,21 +332,31 @@ where
             Expr::Lambda(lambda) => {
                 let bindings = lambda.bindings.iter().map(|b| b.unwrap_tag()).collect();
                 let range = lambda.body.unwrap_tag().into();
-                c.push(e.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+                c.push(
+                    expr.unwrap_tag(),
+                    Tag::Func(FuncTag { bindings, range }),
+                    span,
+                );
                 Ok(())
             }
             Expr::App(application) => match env.lookup(&application.name) {
-                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(expr)),
                 Some(val) => {
                     let bindings = application.args.iter().map(|a| a.unwrap_tag()).collect();
-                    let range = e.unwrap_tag().into();
-                    c.push(val.unwrap_tag(), Tag::Func(FuncTag { bindings, range }));
+                    let range = expr.unwrap_tag().into();
+                    c.push(
+                        val.unwrap_tag(),
+                        Tag::Func(FuncTag { bindings, range }),
+                        val.as_node().span,
+                    );
                     Ok(())
                 }
             },
             Expr::Var(_) => Ok(()),
             Expr::Binding(_) => Ok(()),
-        },
-        _ => Ok(()),
+        }
+        .map_err(|err| err.at(span))
+    } else {
+        Ok(())
     }
 }
