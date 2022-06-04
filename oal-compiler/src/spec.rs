@@ -3,13 +3,13 @@ use crate::errors::{Error, Kind, Result};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_syntax::ast::AsExpr;
-use oal_syntax::atom::{HttpStatus, Ident, Literal};
+use oal_syntax::atom::{HttpStatus, Ident, Text};
 use oal_syntax::{ast, atom};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
-    Literal(Literal),
+    Literal(Text),
     Variable(Box<Property>),
 }
 
@@ -262,6 +262,24 @@ impl Object {
     }
 }
 
+fn try_into_status<T: AsExpr + Annotated>(e: &T) -> Result<HttpStatus> {
+    match e.as_node().as_expr() {
+        ast::Expr::Lit(ast::Literal::Status(s)) => Ok(*s),
+        ast::Expr::Lit(ast::Literal::Number(n)) => {
+            let s = HttpStatus::try_from(*n)?;
+            Ok(s)
+        }
+        _ => Err(Error::new(Kind::UnexpectedExpression, "not a status expression").with(e)),
+    }
+}
+
+fn try_into_media<T: AsExpr + Annotated>(e: &T) -> Result<MediaType> {
+    match e.as_node().as_expr() {
+        ast::Expr::Lit(ast::Literal::Text(t)) => Ok(t.as_ref().to_owned()),
+        _ => Err(Error::new(Kind::UnexpectedExpression, "not a media expression").with(e)),
+    }
+}
+
 pub type MediaType = String;
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -269,6 +287,7 @@ pub struct Content {
     pub schema: Option<Box<Schema>>,
     pub status: Option<HttpStatus>,
     pub media: Option<MediaType>,
+    pub headers: Option<Object>,
     pub desc: Option<String>,
 }
 
@@ -278,10 +297,12 @@ impl From<Schema> for Content {
         let schema = Some(s.into());
         let status = None;
         let media = None;
+        let headers = None;
         Content {
             schema,
             status,
             media,
+            headers,
             desc,
         }
     }
@@ -289,24 +310,35 @@ impl From<Schema> for Content {
 
 impl Content {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        if let ast::Expr::Content(c) = e.as_node().as_expr() {
-            let schema = match &c.schema {
+        if let ast::Expr::Content(content) = e.as_node().as_expr() {
+            let schema = match &content.schema {
                 Some(s) => Schema::try_from(s.as_ref()).map(|s| Some(Box::new(s))),
                 None => Ok(None),
             }?;
-            let status = c.status.or_else(|| {
-                if schema.is_none() {
-                    Some(HttpStatus::Code(204.try_into().unwrap()))
-                } else {
-                    None
-                }
-            });
-            let media = c.media.clone();
+            let status = content.status.as_ref().map_or_else(
+                || {
+                    if schema.is_none() {
+                        Ok(Some(HttpStatus::Code(204.try_into().unwrap())))
+                    } else {
+                        Ok(None)
+                    }
+                },
+                |e| try_into_status(e.as_ref()).map(Some),
+            )?;
+            let media = content
+                .media
+                .as_ref()
+                .map_or(Ok(None), |e| try_into_media(e.as_ref()).map(Some))?;
+            let headers = content
+                .headers
+                .as_ref()
+                .map_or(Ok(None), |h| Object::try_from(h.as_ref()).map(Some))?;
             let desc = e.annotation().and_then(|a| a.get_string("description"));
             Ok(Content {
                 schema,
                 status,
                 media,
+                headers,
                 desc,
             })
         } else {

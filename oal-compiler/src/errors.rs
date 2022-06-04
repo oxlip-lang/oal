@@ -13,6 +13,7 @@ pub enum Kind {
     IO,
     InvalidURL,
     InvalidHttpStatus,
+    InvalidSyntax,
 }
 
 impl Default for Kind {
@@ -79,6 +80,12 @@ impl From<std::io::Error> for Error {
 impl From<url::ParseError> for Error {
     fn from(e: url::ParseError) -> Self {
         Error::new(Kind::InvalidURL, e.to_string())
+    }
+}
+
+impl From<oal_syntax::errors::Error> for Error {
+    fn from(e: oal_syntax::errors::Error) -> Self {
+        Error::new(Kind::InvalidSyntax, e.to_string())
     }
 }
 

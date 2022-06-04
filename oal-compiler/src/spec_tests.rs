@@ -1,5 +1,6 @@
 use crate::compile::compile;
-use crate::spec::{Expr, Object, Spec, Uri, UriSegment};
+use crate::errors::{Error, Kind};
+use crate::spec::{Content, Expr, Object, Spec, Uri, UriSegment};
 use crate::{Locator, ModuleSet, Program};
 use oal_syntax::{atom, parse};
 
@@ -41,7 +42,7 @@ fn evaluate_simple() -> anyhow::Result<()> {
     assert_eq!(p.uri.path.len(), 1);
     assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
-    if let Some(x) = &p.xfers[oal_syntax::atom::Method::Put] {
+    if let Some(x) = &p.xfers[atom::Method::Put] {
         let d = x.domain.schema.as_ref().unwrap();
         assert_eq!(d.expr, Expr::Object(Object::default()));
         assert_eq!(d.desc, Some("some record".to_owned()));
@@ -72,7 +73,7 @@ fn evaluate_content() -> anyhow::Result<()> {
 #[test]
 fn evaluate_ranges() -> anyhow::Result<()> {
     let code = r#"
-        res / ( get -> <200,{}> :: <500,{}> );
+        res / ( get -> <status=200,{}> :: <status=500,media="plain/text",headers={},{}> );
     "#;
 
     let spec = eval(code)?;
@@ -84,6 +85,33 @@ fn evaluate_ranges() -> anyhow::Result<()> {
         .expect("expected get transfer");
 
     assert_eq!(xfer.ranges.len(), 2);
+
+    let cnt: &Content = xfer.ranges.last().unwrap().1;
+
+    assert_eq!(
+        cnt.status,
+        Some(atom::HttpStatus::Code(500.try_into().unwrap()))
+    );
+    assert_eq!(cnt.media, Some("plain/text".to_owned()));
+    assert_eq!(cnt.headers, Some(Object::default()));
+
+    anyhow::Ok(())
+}
+
+#[test]
+fn evaluate_invalid_status() -> anyhow::Result<()> {
+    let code = r#"
+        res / ( get -> <status=999,{}> );
+    "#;
+
+    assert_eq!(
+        eval(code)
+            .expect_err(format!("expected error evaluating: {}", code).as_str())
+            .downcast_ref::<Error>()
+            .expect("expected compiler error")
+            .kind,
+        Kind::InvalidSyntax
+    );
 
     anyhow::Ok(())
 }

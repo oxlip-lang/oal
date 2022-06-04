@@ -185,9 +185,22 @@ paths:
     get:
       summary: get-something
       operationId: get-something
+      parameters:
+        - in: header
+          name: If-None-Match
+          description: makes the request conditional
+          schema:
+            type: string
+          style: simple
       responses:
         "200":
           description: all good
+          headers:
+            ETag:
+              description: identifier for a specific version of a resource
+              style: simple
+              schema:
+                type: string
           content:
             application/vnd.blah+json:
               schema:

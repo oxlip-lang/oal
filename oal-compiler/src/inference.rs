@@ -27,6 +27,11 @@ where
 {
     match node {
         NodeMut::Expr(e) => match e.as_node().as_expr() {
+            Expr::Lit(l) => {
+                let t = Tag::from(l);
+                e.set_tag(t);
+                Ok(())
+            }
             Expr::Prim(_) => {
                 e.set_tag(Tag::Primitive);
                 Ok(())
@@ -157,14 +162,14 @@ fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
         Ok(())
     } else if let Tag::Var(v) = left {
         if occurs(&left, &right) {
-            Err(Error::new(Kind::InvalidTypes, "cycle").with(&(left, right)))
+            Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(left, right)))
         } else {
             s.extend(v, right);
             Ok(())
         }
     } else if let Tag::Var(v) = right {
         if occurs(&right, &left) {
-            Err(Error::new(Kind::InvalidTypes, "cycle").with(&(right, left)))
+            Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(right, left)))
         } else {
             s.extend(v, left);
             Ok(())
@@ -181,7 +186,8 @@ fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
     ) = (&left, &right)
     {
         if left_bindings.len() != right_bindings.len() {
-            Err(Error::new(Kind::InvalidTypes, "arity").with(&(left_bindings, right_bindings)))
+            Err(Error::new(Kind::InvalidTypes, "wrong arity")
+                .with(&(left_bindings, right_bindings)))
         } else {
             unify(s, left_range, right_range).and_then(|_| {
                 left_bindings
@@ -191,7 +197,7 @@ fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
             })
         }
     } else {
-        Err(Error::new(Kind::InvalidTypes, "no match").with(&(left, right)))
+        Err(Error::new(Kind::InvalidTypes, "type mismatch").with(&(left, right)))
     }
 }
 
@@ -239,6 +245,11 @@ where
 {
     match node {
         NodeRef::Expr(e) => match e.as_node().as_expr() {
+            Expr::Lit(l) => {
+                let t = Tag::from(l);
+                c.push(e.unwrap_tag(), t);
+                Ok(())
+            }
             Expr::Prim(_) => {
                 c.push(e.unwrap_tag(), Tag::Primitive);
                 Ok(())
@@ -274,7 +285,13 @@ where
                 c.push(e.unwrap_tag(), Tag::Object);
                 Ok(())
             }
-            Expr::Content(_) => {
+            Expr::Content(cnt) => {
+                cnt.headers
+                    .iter()
+                    .for_each(|h| c.push(h.unwrap_tag(), Tag::Object));
+                cnt.media
+                    .iter()
+                    .for_each(|m| c.push(m.unwrap_tag(), Tag::Text));
                 c.push(e.unwrap_tag(), Tag::Content);
                 Ok(())
             }

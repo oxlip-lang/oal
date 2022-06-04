@@ -165,7 +165,7 @@ impl<T: AsExpr> Transform<T> for Expr<T> {
             Expr::Op(operation) => operation.transform(acc, env, f),
             Expr::Lambda(lambda) => lambda.transform(acc, env, f),
             Expr::App(application) => application.transform(acc, env, f),
-            Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
+            Expr::Lit(_) | Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
         }
     }
 }

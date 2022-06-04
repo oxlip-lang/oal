@@ -1,3 +1,5 @@
+use oal_syntax::ast;
+
 #[derive(PartialEq, Clone, Debug)]
 pub struct FuncTag {
     pub bindings: Vec<Tag>,
@@ -6,6 +8,9 @@ pub struct FuncTag {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Tag {
+    Text,
+    Number,
+    Status,
     Primitive,
     Relation,
     Property,
@@ -33,6 +38,20 @@ impl Tag {
 
     pub fn is_schema_like(&self) -> bool {
         *self == Tag::Content || self.is_schema()
+    }
+
+    pub fn is_status_like(&self) -> bool {
+        matches!(self, Tag::Status | Tag::Number)
+    }
+}
+
+impl From<&ast::Literal> for Tag {
+    fn from(l: &ast::Literal) -> Self {
+        match l {
+            ast::Literal::Text(_) => Tag::Text,
+            ast::Literal::Number(_) => Tag::Number,
+            ast::Literal::Status(_) => Tag::Status,
+        }
     }
 }
 

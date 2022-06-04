@@ -3,7 +3,7 @@ use crate::node::NodeRef;
 use crate::scope::Env;
 use crate::tag::{Tag, Tagged};
 use oal_syntax::ast::{
-    Array, AsExpr, Expr, Object, Operator, Property, Relation, Transfer, Uri, UriSegment,
+    Array, AsExpr, Content, Expr, Object, Operator, Property, Relation, Transfer, Uri, UriSegment,
     VariadicOp,
 };
 
@@ -37,6 +37,32 @@ impl<T: AsExpr + Tagged> TypeChecked for VariadicOp<T> {
                     Err(Error::new(Kind::InvalidTypes, "ill-formed ranges").with(self))
                 }
             }
+        }
+    }
+}
+
+impl<T: AsExpr + Tagged> TypeChecked for Content<T> {
+    fn type_check(&self) -> Result<()> {
+        let status_check = self
+            .status
+            .as_ref()
+            .map_or(true, |s| s.unwrap_tag().is_status_like());
+        let media_check = self
+            .media
+            .as_ref()
+            .map_or(true, |m| m.unwrap_tag() == Tag::Text);
+        let headers_check = self
+            .headers
+            .as_ref()
+            .map_or(true, |h| h.unwrap_tag().is_schema());
+        let schema_check = self
+            .schema
+            .as_ref()
+            .map_or(true, |s| s.unwrap_tag().is_schema());
+        if status_check && media_check && headers_check && schema_check {
+            Ok(())
+        } else {
+            Err(Error::new(Kind::InvalidTypes, "ill-formed content").with(self))
         }
     }
 }
@@ -140,6 +166,7 @@ where
             Expr::Array(arr) => arr.type_check(),
             Expr::Property(prop) => prop.type_check(),
             Expr::Object(obj) => obj.type_check(),
+            Expr::Content(cnt) => cnt.type_check(),
             Expr::Xfer(xfer) => xfer.type_check(),
             _ => Ok(()),
         }

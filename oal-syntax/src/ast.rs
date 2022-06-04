@@ -1,12 +1,32 @@
-use crate::atom::{HttpStatus, HttpStatusRange, Ident, Literal, Method, Primitive};
+use crate::atom::{HttpStatus, HttpStatusRange, Ident, Method, Primitive, Text};
 use crate::{Pair, Rule};
 use enum_map::EnumMap;
 use std::fmt::Debug;
-use std::iter::{empty, once, Flatten, Once};
+use std::iter::{once, Flatten, Once};
 use std::slice::{Iter, IterMut};
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Literal {
+    Text(Text),
+    Number(u64),
+    Status(HttpStatus),
+}
+
+impl FromPair for Literal {
+    fn from_pair(p: Pair) -> Self {
+        let inner = p.into_inner().next().unwrap();
+        match inner.as_rule() {
+            Rule::literal_num => Literal::Number(inner.as_str().parse().unwrap()),
+            Rule::literal_str => Literal::Text(inner.into_inner().next().unwrap().as_str().into()),
+            Rule::http_status_range => Literal::Status(inner.into_expr()),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr<T> {
+    Lit(Literal),
     Prim(Primitive),
     Rel(Relation<T>),
     Uri(Uri<T>),
@@ -108,6 +128,7 @@ impl<T: AsExpr> FromPair for T {
             }
             Rule::apply => Expr::App(p.into_expr()).into_node().into(),
             Rule::xfer => Expr::Xfer(p.into_expr()).into_node().into(),
+            Rule::literal_type => Expr::Lit(p.into_expr()).into_node().into(),
             _ => unreachable!(),
         }
     }
@@ -410,7 +431,7 @@ impl<'a, T> IntoIterator for &'a mut Relation<T> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment<T> {
-    Literal(Literal),
+    Literal(Text),
     Variable(T),
 }
 
@@ -635,17 +656,27 @@ impl FromPair for HttpStatus {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Content<T> {
     pub schema: Option<Box<T>>,
-    pub status: Option<HttpStatus>,
-    pub media: Option<String>,
+    pub status: Option<Box<T>>,
+    pub media: Option<Box<T>>,
+    pub headers: Option<Box<T>>,
 }
 
 impl<T: AsExpr> FromPair for Content<T> {
     fn from_pair(p: Pair) -> Self {
-        let (mut schema, mut status, mut media) = (None, None, None);
+        let (mut schema, mut status, mut media, mut headers) = (None, None, None, None);
         for p in p.into_inner() {
             match p.as_rule() {
-                Rule::http_status => status = Some(p.into_expr()),
-                Rule::http_media_range => media = Some(p.as_str().to_owned()),
+                Rule::content_prop => {
+                    let mut inner = p.into_inner();
+                    let prop = inner.next().unwrap().into_inner().next().unwrap();
+                    let val = Some(Box::new(inner.next().unwrap().into_expr()));
+                    match prop.as_rule() {
+                        Rule::media_kw => media = val,
+                        Rule::status_kw => status = val,
+                        Rule::headers_kw => headers = val,
+                        _ => unreachable!(),
+                    }
+                }
                 Rule::expr_type => schema = Some(Box::new(p.into_expr())),
                 _ => unreachable!(),
             }
@@ -654,31 +685,40 @@ impl<T: AsExpr> FromPair for Content<T> {
             schema,
             status,
             media,
+            headers,
         }
     }
 }
 
 impl<'a, T> IntoIterator for &'a Content<T> {
     type Item = &'a T;
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 4>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match &self.schema {
-            None => Box::new(empty()),
-            Some(s) => Box::new(once(s.as_ref())),
-        }
+        [
+            self.schema.as_ref().map(AsRef::as_ref),
+            self.status.as_ref().map(AsRef::as_ref),
+            self.media.as_ref().map(AsRef::as_ref),
+            self.headers.as_ref().map(AsRef::as_ref),
+        ]
+        .into_iter()
+        .flatten()
     }
 }
 
 impl<'a, T> IntoIterator for &'a mut Content<T> {
     type Item = &'a mut T;
-    type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
+    type IntoIter = Flatten<std::array::IntoIter<Option<Self::Item>, 4>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match &mut self.schema {
-            None => Box::new(empty()),
-            Some(s) => Box::new(once(s.as_mut())),
-        }
+        [
+            self.schema.as_mut().map(AsMut::as_mut),
+            self.status.as_mut().map(AsMut::as_mut),
+            self.media.as_mut().map(AsMut::as_mut),
+            self.headers.as_mut().map(AsMut::as_mut),
+        ]
+        .into_iter()
+        .flatten()
     }
 }
 

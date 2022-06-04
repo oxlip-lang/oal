@@ -157,7 +157,7 @@ impl<T: AsExpr> Scan<T> for Expr<T> {
             Expr::Op(operation) => operation.scan(acc, env, f),
             Expr::Lambda(lambda) => lambda.scan(acc, env, f),
             Expr::App(application) => application.scan(acc, env, f),
-            Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
+            Expr::Lit(_) | Expr::Prim(_) | Expr::Var(_) | Expr::Binding(_) => Ok(()),
         }
     }
 }

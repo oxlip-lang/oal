@@ -4,14 +4,10 @@
 // Author: ebastien
 //
 
-http_token_char = @{ ASCII_ALPHANUMERIC | "!" | "#" | "$" | "%" | "&" | "'" | "*" | "+" | "-" | "." | "^" | "_" | "`" | "|" | "~" }
-http_token = @{ http_token_char+ }
 http_status_category = @{ '1'..'5' }
 http_status_range = @{ http_status_category ~ "XX" }
 http_status_code = @{ http_status_category ~ ASCII_DIGIT{2} }
 http_status = @{ http_status_range | http_status_code }
-http_type = @{ "*" | http_token }
-http_media_range = @{ http_type ~ "/" ~ http_type }
 
 ident_char = @{ ASCII_ALPHANUMERIC | "$" | "-" | "_" }
 ident = @{ !keyword ~ ASCII_ALPHA ~ ident_char* }
@@ -26,7 +22,7 @@ num_kw  = @{ "num"  ~ !ASCII_ALPHANUMERIC }
 str_kw  = @{ "str"  ~ !ASCII_ALPHANUMERIC }
 uri_kw  = @{ "uri"  ~ !ASCII_ALPHANUMERIC }
 bool_kw = @{ "bool" ~ !ASCII_ALPHANUMERIC }
-int_kw =  @{ "int" ~ !ASCII_ALPHANUMERIC }
+int_kw  = @{ "int"  ~ !ASCII_ALPHANUMERIC }
 
 type_kw = { num_kw | str_kw | uri_kw | bool_kw | int_kw }
 
@@ -40,7 +36,21 @@ head_kw    = @{ "head"    ~ !ASCII_ALPHANUMERIC }
 
 method_kw = { get_kw | put_kw | post_kw | patch_kw | delete_kw | options_kw | head_kw }
 
-keyword = { stmt_kw | type_kw | method_kw }
+media_kw   = @{ "media"   ~ !ASCII_ALPHANUMERIC }
+headers_kw = @{ "headers" ~ !ASCII_ALPHANUMERIC }
+status_kw  = @{ "status"  ~ !ASCII_ALPHANUMERIC }
+
+content_kw = { media_kw | headers_kw | status_kw }
+
+keyword = { stmt_kw | type_kw | method_kw | content_kw }
+
+literal_num = @{ ASCII_DIGIT+ }
+
+literal_str_char = _{ !"\"" ~ ANY }
+literal_str_inner = @{ literal_str_char* }
+literal_str = ${ "\"" ~ literal_str_inner ~ "\"" }
+
+literal_type = { http_status_range | literal_num | literal_str }
 
 var = { ident }
 
@@ -65,9 +75,21 @@ array_type = { "[" ~ expr_type ~ "]" }
 
 paren_type = { "(" ~ expr_type ~ ")" }
 
-content_type = { "<" ~ ((( http_media_range ~ "," )? ~ http_status ~ "," )? ~ expr_type )? ~ ">" }
+content_prop = { content_kw ~ "=" ~ term_type }
+content_type = { "<" ~ ( content_prop ~ "," )* ~ expr_type? ~ ">" }
 
-term_type = { ( prim_type | uri_type | array_type | prop_type | object_type | content_type | paren_type | var ) ~ inline_ann? }
+term_type = {
+  (  literal_type
+  |  prim_type
+  |  uri_type
+  |  array_type
+  |  prop_type
+  |  object_type
+  |  content_type
+  |  paren_type
+  |  var
+  ) ~ inline_ann?
+}
 
 apply = { ident ~ term_type+ }
 app_type = { apply | term_type }

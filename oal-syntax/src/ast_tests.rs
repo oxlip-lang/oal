@@ -341,7 +341,15 @@ fn parse_empty_content() {
 
 #[test]
 fn parse_complete_content() {
-    let d: Program = parse("let c = <application/json,200,{}>;").expect("parsing failed");
+    let code = r#"
+        let c = <
+            media = "application/json",
+            status = 200,
+            headers = {},
+            {}
+        >;
+    "#;
+    let d: Program = parse(code).expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -352,12 +360,28 @@ fn parse_complete_content() {
         if let Expr::Content(cnt) = decl.expr.as_node().as_expr() {
             assert!(cnt.schema.is_some());
             assert_eq!(
-                cnt.status.expect("expected status"),
-                HttpStatus::Code(200.try_into().unwrap())
+                *cnt.status
+                    .as_ref()
+                    .expect("expected status")
+                    .as_node()
+                    .as_expr(),
+                Expr::Lit(Literal::Number(200))
             );
             assert_eq!(
-                cnt.media.as_ref().expect("expected media"),
-                "application/json"
+                *cnt.media
+                    .as_ref()
+                    .expect("expected media")
+                    .as_node()
+                    .as_expr(),
+                Expr::Lit(Literal::Text("application/json".into()))
+            );
+            assert_eq!(
+                *cnt.headers
+                    .as_ref()
+                    .expect("expected headers")
+                    .as_node()
+                    .as_expr(),
+                Expr::Object(Object::default())
             );
         } else {
             panic!("expected content expression");
@@ -369,7 +393,7 @@ fn parse_complete_content() {
 
 #[test]
 fn parse_status_range() {
-    let d: Program = parse("let c = <4XX,{}>;").expect("parsing failed");
+    let d: Program = parse("let c = <status=4XX,{}>;").expect("parsing failed");
 
     assert_eq!(d.stmts.len(), 1);
 
@@ -377,8 +401,14 @@ fn parse_status_range() {
         assert_eq!(decl.name.as_ref(), "c");
         if let Expr::Content(cnt) = decl.expr.as_node().as_expr() {
             assert_eq!(
-                cnt.status.expect("expected status"),
-                HttpStatus::Range(HttpStatusRange::ClientError)
+                *cnt.status
+                    .as_ref()
+                    .expect("expected status")
+                    .as_node()
+                    .as_expr(),
+                Expr::Lit(Literal::Status(HttpStatus::Range(
+                    HttpStatusRange::ClientError
+                )))
             );
         } else {
             panic!("expected content expression");
@@ -500,6 +530,57 @@ fn parse_property_decl() {
             assert_eq!(*prop.val.as_node().as_expr(), Expr::Prim(Primitive::String));
         } else {
             panic!("expected property expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_literal_number_decl() {
+    let d: Program = parse("let a = 404;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        if let Expr::Lit(Literal::Number(n)) = decl.expr.as_node().as_expr() {
+            assert_eq!(*n, 404);
+        } else {
+            panic!("expected literal number expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_literal_text_decl() {
+    let d: Program = parse(r#"let a = "application/json";"#).expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        if let Expr::Lit(Literal::Text(t)) = decl.expr.as_node().as_expr() {
+            assert_eq!(t.as_ref(), "application/json");
+        } else {
+            panic!("expected literal number expression");
+        }
+    } else {
+        panic!("expected declaration");
+    }
+}
+
+#[test]
+fn parse_literal_status_decl() {
+    let d: Program = parse("let a = 4XX;").expect("parsing failed");
+
+    assert_eq!(d.stmts.len(), 1);
+
+    if let Statement::Decl(decl) = d.stmts.first().unwrap() {
+        if let Expr::Lit(Literal::Status(s)) = decl.expr.as_node().as_expr() {
+            assert_eq!(*s, HttpStatus::Range(HttpStatusRange::ClientError));
+        } else {
+            panic!("expected literal status expression");
         }
     } else {
         panic!("expected declaration");

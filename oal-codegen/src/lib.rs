@@ -3,9 +3,9 @@ use oal_compiler::spec;
 use oal_syntax::atom::HttpStatusRange;
 use oal_syntax::{ast, atom};
 use openapiv3::{
-    ArrayType, Info, IntegerType, MediaType, NumberType, ObjectType, OpenAPI, Operation, Parameter,
-    ParameterData, ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response,
-    Responses, Schema, SchemaData, SchemaKind, Server, StatusCode, StringType, Type,
+    ArrayType, Header, Info, IntegerType, MediaType, NumberType, ObjectType, OpenAPI, Operation,
+    Parameter, ParameterData, ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody,
+    Response, Responses, Schema, SchemaData, SchemaKind, Server, StatusCode, StringType, Type,
     VariantOrUnknownOrEmpty,
 };
 use std::iter::once;
@@ -15,6 +15,8 @@ pub struct Builder {
     spec: Option<spec::Spec>,
     base: Option<OpenAPI>,
 }
+
+type Headers = IndexMap<String, ReferenceOr<openapiv3::Header>>;
 
 impl Builder {
     pub fn new() -> Builder {
@@ -264,6 +266,26 @@ impl Builder {
         }
     }
 
+    fn prop_header_param(&self, prop: &spec::Property) -> Parameter {
+        Parameter::Header {
+            parameter_data: self.prop_param_data(prop, prop.required.unwrap_or(false)),
+            style: Default::default(),
+        }
+    }
+
+    fn prop_header(&self, prop: &spec::Property) -> Header {
+        Header {
+            description: prop.desc.clone(),
+            style: Default::default(),
+            required: prop.required.unwrap_or(false),
+            deprecated: None,
+            format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(self.schema(&prop.schema))),
+            example: None,
+            examples: Default::default(),
+            extensions: Default::default(),
+        }
+    }
+
     fn xfer_params(&self, xfer: &spec::Transfer) -> Vec<ReferenceOr<Parameter>> {
         xfer.params
             .iter()
@@ -272,6 +294,11 @@ impl Builder {
                     .iter()
                     .map(|p| ReferenceOr::Item(self.prop_query_param(p)))
             })
+            .chain(xfer.domain.headers.iter().flat_map(|o| {
+                o.props
+                    .iter()
+                    .map(|p| ReferenceOr::Item(self.prop_header_param(p)))
+            }))
             .collect()
     }
 
@@ -319,6 +346,20 @@ impl Builder {
         }
     }
 
+    fn content_headers(&self, content: &spec::Content) -> Headers {
+        content.headers.as_ref().map_or_else(Headers::default, |h| {
+            h.props
+                .iter()
+                .map(|p| {
+                    (
+                        p.name.as_ref().to_owned(),
+                        ReferenceOr::Item(self.prop_header(p)),
+                    )
+                })
+                .collect()
+        })
+    }
+
     fn xfer_responses(&self, xfer: &spec::Transfer) -> Responses {
         let mut default = None;
         let mut responses = IndexMap::new();
@@ -340,6 +381,7 @@ impl Builder {
                     };
                     res.content.insert(media_type, media_schema);
                 }
+                res.headers = self.content_headers(content);
                 res.description = content.desc.clone().unwrap_or_else(|| "".to_owned());
             } else {
                 unreachable!();
