@@ -11,11 +11,15 @@ let etag = 'ETag str;
 # description: "makes the request conditional"
 let ifnmatch = 'If-None-Match str;
 
+// Media types
+let vendor = "application/vnd.blah+json";
+let problem = "application/problem+json";
+
 // Combining contents into ranges
-let with_err s = <status=200, media="application/vnd.blah+json", headers={etag}, s>  `description: "all good"`
-              :: <status=5XX, media="application/problem+json", {}>                  `description: "internal error"`
-              :: <status=4XX, media="application/problem+json", {}>                  `description: "bad request"`
-              :: <>                                                                  `description: "no content"`;
+let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "all good"`
+              :: <status=5XX, media=problem, {}>                `description: "internal error"`
+              :: <status=4XX, media=problem, {}>                `description: "bad request"`
+              :: <>                                             `description: "no content"`;
 
 // Binding everything together as resources
 res rel1;
