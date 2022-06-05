@@ -39,7 +39,7 @@ fn typecheck_ok() {
         "let a = get { 'q str } -> {};",
         "let a = /something?{ 'q str } ( get -> {} );",
         "let a = 'q str; let b = /path/{a};",
-        r#"let a = <status=200, media="plain/text", headers={ 'h str }, str>;"#,
+        r#"let a = <status=200, media="text/plain", headers={ 'h str }, str>;"#,
     ];
 
     for c in cases {

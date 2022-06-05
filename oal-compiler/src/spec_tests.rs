@@ -73,7 +73,7 @@ fn evaluate_content() -> anyhow::Result<()> {
 #[test]
 fn evaluate_ranges() -> anyhow::Result<()> {
     let code = r#"
-        res / ( get -> <status=200,{}> :: <status=500,media="plain/text",headers={},{}> );
+        res / ( get -> <status=200,{}> :: <status=500,media="text/plain",headers={},{}> );
     "#;
 
     let spec = eval(code)?;
@@ -92,7 +92,7 @@ fn evaluate_ranges() -> anyhow::Result<()> {
         cnt.status,
         Some(atom::HttpStatus::Code(500.try_into().unwrap()))
     );
-    assert_eq!(cnt.media, Some("plain/text".to_owned()));
+    assert_eq!(cnt.media, Some("text/plain".to_owned()));
     assert_eq!(cnt.headers, Some(Object::default()));
 
     anyhow::Ok(())
