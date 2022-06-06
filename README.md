@@ -30,111 +30,109 @@ oal-cli -b examples/base.yaml -i examples/main.oal -o examples/openapi.yaml
 ```
 
 ## Examples of language constructs:
-```
-// Modules
-use "some/other/module.oal";
-```
-```
-// Primitives with inline annotations
-let id1 = num  `title: "some identifier"`;
-let name = str `pattern: "^[a-z]+$"`;
-```
-```
-// Properties with both statement and inline annotations
-# description: "some parameter"
-let prop1 = 'id id1;
 
-let prop2 = 'n num   `minimum: 0, maximum: 99.99`;
-let prop3 = 'age int `minimum: 0, maximum: 999`;
-```
-```
-// Objects
-# description: "some stuff"
-let obj1 = {
-  'firstName name     `title: "First name", required: true`
-, 'lastName name      `title: "Last name", required: true`
-, 'middleNames [name] `title: "Middle names"`
-};
-```
-```
-// Templated URIs
-let uri1 = /some/path/{ prop1 }/template;
-```
-```
-// Unspecified URIs
-let uri2 = uri;
-```
-```
-// Contents
-# description: "some content"
-let cnt1 = <obj1>;
-```
-```
-// Operations
-# summary: "does something"
-let op1 = patch, put { prop2 } : cnt1 -> cnt1;
-
-# summary: "does something else", tags: [blah]
-let op2 = get { 'q str } -> cnt1;
-```
-```
-// Relations
-let rel1 = uri1 ( op1, op2 );
-```
-```
-// Combining schemas
-let obj2 = obj1 & { prop3 };
-```
-```
-// Typed schema alternative
-let id2 = id1 | str;
-```
-```
-// Untyped schema alternative
-let any1 = id2 ~ obj2 ~ uri1;
-```
-```
-// Function declaration
-let f x y = obj2 & ( x | y );
-```
-```
-// Function application
-# description: "some other stuff"
-let obj3 = f { 'height num } { 'stuff any1 };
-```
-```
-// Headers
-# description: "identifier for a specific version of a resource"
-let etag = 'ETag str;
-
-# description: "makes the request conditional"
-let ifnmatch = 'If-None-Match str;
-```
-```
-// Media types
-let vendor = "application/vnd.blah+json";
-let problem = "application/problem+json";
-```
-```
-// Combining contents into ranges
-let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "all good"`
-              :: <status=5XX, media=problem, {}>                `description: "internal error"`
-              :: <status=4XX, media=problem, {}>                `description: "bad request"`
-              :: <>                                             `description: "no content"`;
-```
-```
-// Binding everything together as resources
-res rel1;
-
-res /something?{ 'q str } (
-  get : <headers={ifnmatch},> -> with_err obj3
-);
-```
-```
-/*
- * Block
- * comments
- */
-```
+<div>
+    <style>
+        p.p1 {margin: 0; line-height: 16px; font: 12px Menlo; color: #598a43; background-color: #000000}
+        p.p2 {margin: 0; line-height: 16px; font: 12px Menlo; color: #c27e65; background-color: #000000}
+        p.p3 {margin: 0; line-height: 16px; font: 12px Menlo; color: #cacaca; background-color: #000000; min-height: 19.0px}
+        p.p4 {margin: 0; line-height: 16px; font: 12px Menlo; color: #8cd3fe; background-color: #000000}
+        p.p5 {margin: 0; line-height: 16px; font: 12px Menlo; color: #cacaca; background-color: #000000}
+        span.s1 {font-kerning: none}
+        span.s2 {font-kerning: none; color: #b76fb3; -webkit-text-stroke: 0 #b76fb3}
+        span.s3 {font-kerning: none; color: #cacaca; -webkit-text-stroke: 0 #cacaca}
+        span.s4 {font-kerning: none; color: #8cd3fe; -webkit-text-stroke: 0 #8cd3fe}
+        span.s5 {font-kerning: none; color: #4689cc; -webkit-text-stroke: 0 #4689cc}
+        span.s6 {font-kerning: none; color: #a7c598; -webkit-text-stroke: 0 #a7c598}
+        span.s7 {font-kerning: none; color: #c27e65; -webkit-text-stroke: 0 #c27e65}
+    </style>
+    <p class="p1"><span class="s1">// Modules</span></p>
+    <p class="p2"><span class="s2">use</span><span class="s3"> </span><span class="s1">"some/other/module.oal"</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Primitives with inline annotations</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">id1</span><span class="s3"> = </span><span class="s5">num</span><span class="s3"><span class="Apple-converted-space">  </span></span><span class="s1">`title: "some identifier"`</span><span class="s3">;</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">name</span><span class="s3"> = </span><span class="s5">str</span><span class="s3"> </span><span class="s1">`pattern: "^[a-z]+$"`</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Properties with both statement and inline annotations</span></p>
+    <p class="p2"><span class="s1"># description: "some parameter"</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">prop1</span><span class="s3"> = </span><span class="s1">'id</span><span class="s3"> </span><span class="s1">id1</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">prop2</span><span class="s3"> = </span><span class="s4">'n</span><span class="s3"> </span><span class="s5">num</span><span class="s3"> <span class="Apple-converted-space">  </span></span><span class="s1">`minimum: 0, maximum: 99.99`</span><span class="s3">;</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">prop3</span><span class="s3"> = </span><span class="s4">'age</span><span class="s3"> </span><span class="s5">int</span><span class="s3"> </span><span class="s1">`minimum: 0, maximum: 999`</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Objects</span></p>
+    <p class="p2"><span class="s1"># description: "some stuff"</span></p>
+    <p class="p5"><span class="s2">let</span><span class="s1"> </span><span class="s4">obj1</span><span class="s1"> = {</span></p>
+    <p class="p2"><span class="s3"><span class="Apple-converted-space">  </span></span><span class="s4">'firstName</span><span class="s3"> </span><span class="s4">name</span><span class="s3"> <span class="Apple-converted-space">    </span></span><span class="s1">`title: "First name", required: true`</span></p>
+    <p class="p2"><span class="s3">, </span><span class="s4">'lastName</span><span class="s3"> </span><span class="s4">name</span><span class="s3"><span class="Apple-converted-space">      </span></span><span class="s1">`title: "Last name", required: true`</span></p>
+    <p class="p2"><span class="s3">, </span><span class="s4">'middleNames</span><span class="s3"> [</span><span class="s4">name</span><span class="s3">] </span><span class="s1">`title: "Middle names"`</span></p>
+    <p class="p5"><span class="s1">};</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Templated URIs</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">uri1</span><span class="s3"> = </span><span class="s1">/some/path/</span><span class="s3">{ </span><span class="s4">prop1</span><span class="s3"> }</span><span class="s1">/template</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Undefined URIs</span></p>
+    <p class="p5"><span class="s2">let</span><span class="s1"> </span><span class="s4">uri2</span><span class="s1"> = </span><span class="s5">uri</span><span class="s1">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Contents</span></p>
+    <p class="p2"><span class="s1"># description: "some content"</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">cnt1</span><span class="s3"> = &lt;</span><span class="s1">obj1</span><span class="s3">&gt;;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Operations</span></p>
+    <p class="p2"><span class="s1"># summary: "does something"</span></p>
+    <p class="p5"><span class="s2">let</span><span class="s1"> </span><span class="s4">op1</span><span class="s1"> = </span><span class="s5">patch</span><span class="s1">, </span><span class="s5">put</span><span class="s1"> { </span><span class="s4">prop2</span><span class="s1"> } : </span><span class="s4">cnt1</span><span class="s1"> -&gt; </span><span class="s4">cnt1</span><span class="s1">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p2"><span class="s1"># summary: "does something else", tags: [blah]</span></p>
+    <p class="p5"><span class="s2">let</span><span class="s1"> </span><span class="s4">op2</span><span class="s1"> = </span><span class="s5">get</span><span class="s1"> { </span><span class="s4">'q</span><span class="s1"> </span><span class="s5">str</span><span class="s1"> } -&gt; </span><span class="s4">cnt1</span><span class="s1">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Relations</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">rel1</span><span class="s3"> = </span><span class="s1">uri1</span><span class="s3"> ( </span><span class="s1">op1</span><span class="s3">, </span><span class="s1">op2</span><span class="s3"> );</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Combining schemas</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">obj2</span><span class="s3"> = </span><span class="s1">obj1</span><span class="s3"> &amp; { </span><span class="s1">prop3</span><span class="s3"> };</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Typed schema alternative</span></p>
+    <p class="p5"><span class="s2">let</span><span class="s1"> </span><span class="s4">id2</span><span class="s1"> = </span><span class="s4">id1</span><span class="s1"> | </span><span class="s5">str</span><span class="s1">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Untyped schema alternative</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">any1</span><span class="s3"> = </span><span class="s1">id2</span><span class="s3"> ~ </span><span class="s1">obj2</span><span class="s3"> ~ </span><span class="s1">uri1</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Function declaration</span></p>
+    <p class="p5"><span class="s2">let</span><span class="s1"> </span><span class="s4">f</span><span class="s1"> </span><span class="s4">x</span><span class="s1"> </span><span class="s4">y</span><span class="s1"> = </span><span class="s4">obj2</span><span class="s1"> &amp; ( </span><span class="s4">x</span><span class="s1"> | </span><span class="s4">y</span><span class="s1"> );</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Function application</span></p>
+    <p class="p2"><span class="s1"># description: "some other stuff"</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">obj3</span><span class="s3"> = </span><span class="s1">f</span><span class="s3"> { </span><span class="s1">'height</span><span class="s3"> </span><span class="s5">num</span><span class="s3"> } { </span><span class="s1">'stuff</span><span class="s3"> </span><span class="s1">any1</span><span class="s3"> };</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Headers</span></p>
+    <p class="p2"><span class="s1"># description: "identifier for a specific version of a resource"</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">etag</span><span class="s3"> = </span><span class="s1">'ETag</span><span class="s3"> </span><span class="s5">str</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p2"><span class="s1"># description: "makes the request conditional"</span></p>
+    <p class="p4"><span class="s2">let</span><span class="s3"> </span><span class="s1">ifnmatch</span><span class="s3"> = </span><span class="s1">'If-None-Match</span><span class="s3"> </span><span class="s5">str</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Media types</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">vendor</span><span class="s3"> = </span><span class="s1">"application/vnd.blah+json"</span><span class="s3">;</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">problem</span><span class="s3"> = </span><span class="s1">"application/problem+json"</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Combining contents into ranges</span></p>
+    <p class="p2"><span class="s2">let</span><span class="s3"> </span><span class="s4">with_err</span><span class="s3"> </span><span class="s4">s</span><span class="s3"> = &lt;</span><span class="s5">status</span><span class="s3">=</span><span class="s6">200</span><span class="s3">, </span><span class="s5">media</span><span class="s3">=</span><span class="s4">vendor</span><span class="s3">, </span><span class="s5">headers</span><span class="s3">={</span><span class="s4">etag</span><span class="s3">}, </span><span class="s4">s</span><span class="s3">&gt;<span class="Apple-converted-space">  </span></span><span class="s1">`description: "all good"`</span></p>
+    <p class="p5"><span class="s1"><span class="Apple-converted-space">              </span>:: &lt;</span><span class="s5">status</span><span class="s1">=5XX, </span><span class="s5">media</span><span class="s1">=</span><span class="s4">problem</span><span class="s1">, {}&gt;<span class="Apple-converted-space">                </span></span><span class="s7">`description: "internal error"`</span></p>
+    <p class="p5"><span class="s1"><span class="Apple-converted-space">              </span>:: &lt;</span><span class="s5">status</span><span class="s1">=4XX, </span><span class="s5">media</span><span class="s1">=</span><span class="s4">problem</span><span class="s1">, {}&gt;<span class="Apple-converted-space">                </span></span><span class="s7">`description: "bad request"`</span></p>
+    <p class="p5"><span class="s1"><span class="Apple-converted-space">              </span>:: &lt;&gt; <span class="Apple-converted-space">                                            </span></span><span class="s7">`description: "no content"`</span><span class="s1">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">// Binding everything together as resources</span></p>
+    <p class="p4"><span class="s2">res</span><span class="s3"> </span><span class="s1">rel1</span><span class="s3">;</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p2"><span class="s2">res</span><span class="s3"> </span><span class="s1">/something</span><span class="s3">?{ </span><span class="s4">'q</span><span class="s3"> </span><span class="s5">str</span><span class="s3"> } (</span></p>
+    <p class="p4"><span class="s3"><span class="Apple-converted-space">  </span></span><span class="s5">get</span><span class="s3"> : &lt;</span><span class="s5">headers</span><span class="s3">={</span><span class="s1">ifnmatch</span><span class="s3">},&gt; -&gt; </span><span class="s1">with_err</span><span class="s3"> </span><span class="s1">obj3</span></p>
+    <p class="p5"><span class="s1">);</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+    <p class="p1"><span class="s1">/*</span></p>
+    <p class="p1"><span class="s1"><span class="Apple-converted-space"> </span>* Block</span></p>
+    <p class="p1"><span class="s1"><span class="Apple-converted-space"> </span>* comments</span></p>
+    <p class="p1"><span class="s1"><span class="Apple-converted-space"> </span>*/</span></p>
+    <p class="p3"><span class="s1"></span><br></p>
+</div>
 
 [OpenAPI definition generated from this program](examples/openapi.yaml)
