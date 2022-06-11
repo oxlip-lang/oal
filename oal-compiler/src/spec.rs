@@ -146,13 +146,18 @@ impl PrimNumber {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrimString {
     pub pattern: Option<String>,
+    pub enumeration: Vec<String>,
 }
 
 impl PrimString {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         let ann = e.annotation();
         let pattern = ann.and_then(|a| a.get_string("pattern"));
-        Ok(PrimString { pattern })
+        let enumeration = ann.and_then(|a| a.get_enum("enum")).unwrap_or_default();
+        Ok(PrimString {
+            pattern,
+            enumeration,
+        })
     }
 }
 

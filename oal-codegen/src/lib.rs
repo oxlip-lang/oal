@@ -85,6 +85,7 @@ impl Builder {
             schema_data: Default::default(),
             schema_kind: SchemaKind::Type(Type::String(StringType {
                 pattern: p.pattern.clone(),
+                enumeration: p.enumeration.iter().map(|s| Some(s.clone())).collect(),
                 ..Default::default()
             })),
         }
