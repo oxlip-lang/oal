@@ -354,15 +354,14 @@ pub type Ranges = IndexMap<(Option<HttpStatus>, Option<MediaType>), Content>;
 
 fn try_into_ranges<T: AsExpr + Annotated>(ranges: &mut Ranges, e: &T) -> Result<()> {
     match e.as_node().as_expr() {
-        ast::Expr::Content(_) => {
+        ast::Expr::Op(op) if op.op == ast::Operator::Range => {
+            op.exprs.iter().try_for_each(|r| try_into_ranges(ranges, r))
+        }
+        _ => {
             let c = Content::try_from(e)?;
             ranges.insert((c.status, c.media.clone()), c);
             Ok(())
         }
-        ast::Expr::Op(op) if op.op == ast::Operator::Range => {
-            op.exprs.iter().try_for_each(|r| try_into_ranges(ranges, r))
-        }
-        _ => Err(Error::new(Kind::UnexpectedExpression, "not a ranges expression").with(e)),
     }
 }
 
