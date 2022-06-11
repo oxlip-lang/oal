@@ -22,47 +22,49 @@ impl TagSeq {
     }
 }
 
-pub fn tag_type<T>(seq: &mut TagSeq, env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
+pub fn tag_type<T>(seq: &mut TagSeq, env: &mut Env<T>, node_ref: NodeMut<T>) -> Result<()>
 where
     T: AsExpr + Tagged,
 {
-    match node {
-        NodeMut::Expr(e) => match e.as_node().as_expr() {
+    if let NodeMut::Expr(expr) = node_ref {
+        let node = expr.as_node();
+        let span = node.span;
+        match node.as_expr() {
             Expr::Lit(l) => {
                 let t = Tag::from(l);
-                e.set_tag(t);
+                expr.set_tag(t);
                 Ok(())
             }
             Expr::Prim(_) => {
-                e.set_tag(Tag::Primitive);
+                expr.set_tag(Tag::Primitive);
                 Ok(())
             }
             Expr::Rel(_) => {
-                e.set_tag(Tag::Relation);
+                expr.set_tag(Tag::Relation);
                 Ok(())
             }
             Expr::Uri(_) => {
-                e.set_tag(Tag::Uri);
+                expr.set_tag(Tag::Uri);
                 Ok(())
             }
             Expr::Property(_) => {
-                e.set_tag(Tag::Property);
+                expr.set_tag(Tag::Property);
                 Ok(())
             }
             Expr::Object(_) => {
-                e.set_tag(Tag::Object);
+                expr.set_tag(Tag::Object);
                 Ok(())
             }
             Expr::Content(_) => {
-                e.set_tag(Tag::Content);
+                expr.set_tag(Tag::Content);
                 Ok(())
             }
             Expr::Xfer(_) => {
-                e.set_tag(Tag::Transfer);
+                expr.set_tag(Tag::Transfer);
                 Ok(())
             }
             Expr::Array(_) => {
-                e.set_tag(Tag::Array);
+                expr.set_tag(Tag::Array);
                 Ok(())
             }
             Expr::Op(operation) => {
@@ -72,33 +74,35 @@ where
                     Operator::Sum => Tag::Var(seq.next()),
                     Operator::Range => Tag::Content,
                 };
-                e.set_tag(tag);
+                expr.set_tag(tag);
                 Ok(())
             }
             Expr::Var(var) => match env.lookup(var) {
-                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(expr)),
                 Some(val) => {
-                    e.set_tag(val.unwrap_tag());
+                    expr.set_tag(val.unwrap_tag());
                     Ok(())
                 }
             },
             Expr::Lambda(_) | Expr::Binding(_) => {
-                e.set_tag(Tag::Var(seq.next()));
+                expr.set_tag(Tag::Var(seq.next()));
                 Ok(())
             }
             Expr::App(application) => match env.lookup(&application.name) {
-                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(e)),
+                None => Err(Error::new(Kind::IdentifierNotInScope, "").with(expr)),
                 Some(val) => {
                     if let Expr::Lambda(l) = val.as_node().as_expr() {
-                        e.set_tag(l.body.unwrap_tag());
+                        expr.set_tag(l.body.unwrap_tag());
                         Ok(())
                     } else {
-                        Err(Error::new(Kind::IdentifierNotAFunction, "").with(e))
+                        Err(Error::new(Kind::IdentifierNotAFunction, "").with(expr))
                     }
                 }
             },
-        },
-        _ => Ok(()),
+        }
+        .map_err(|err| err.at(span))
+    } else {
+        Ok(())
     }
 }
 
