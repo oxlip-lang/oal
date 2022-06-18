@@ -12,6 +12,9 @@ http_status = @{ http_status_range | http_status_code }
 ident_char = @{ ASCII_ALPHANUMERIC | "$" | "-" | "_" }
 ident = @{ !reserved_keyword ~ ASCII_ALPHA ~ ident_char* }
 
+keyname_char = @{ ASCII_ALPHANUMERIC | "@" | "$" | "-" | "_" }
+keyname = @{ keyname_char* }
+
 let_kw = @{ "let"  ~ !ASCII_ALPHANUMERIC }
 res_kw = @{ "res"  ~ !ASCII_ALPHANUMERIC }
 use_kw = @{ "use"  ~ !ASCII_ALPHANUMERIC }
@@ -66,7 +69,7 @@ uri_type = { uri_kw | uri_template | uri_root }
 
 prim_type = { num_kw | str_kw | bool_kw | int_kw }
 
-prop_name = ${ "'" ~ ident }
+prop_name = ${ "'" ~ keyname }
 prop_type = { prop_name ~ term_type }
 
 object_type = { "{" ~ ( expr_type ~ ( "," ~ expr_type )* )? ~ "}" }
