@@ -69,8 +69,12 @@ impl Builder {
     }
 
     fn number_schema(&self, p: &spec::PrimNumber) -> Schema {
+        let example = p.example.map(Into::into);
         Schema {
-            schema_data: Default::default(),
+            schema_data: SchemaData {
+                example,
+                ..Default::default()
+            },
             schema_kind: SchemaKind::Type(Type::Number(NumberType {
                 minimum: p.minimum,
                 maximum: p.maximum,
@@ -81,8 +85,16 @@ impl Builder {
     }
 
     fn string_schema(&self, p: &spec::PrimString) -> Schema {
+        let example = p
+            .example
+            .clone()
+            .or_else(|| p.enumeration.first().cloned())
+            .map(Into::into);
         Schema {
-            schema_data: Default::default(),
+            schema_data: SchemaData {
+                example,
+                ..Default::default()
+            },
             schema_kind: SchemaKind::Type(Type::String(StringType {
                 pattern: p.pattern.clone(),
                 enumeration: p.enumeration.iter().map(|s| Some(s.clone())).collect(),
@@ -99,8 +111,12 @@ impl Builder {
     }
 
     fn integer_schema(&self, p: &spec::PrimInteger) -> Schema {
+        let example = p.example.map(Into::into);
         Schema {
-            schema_data: Default::default(),
+            schema_data: SchemaData {
+                example,
+                ..Default::default()
+            },
             schema_kind: SchemaKind::Type(Type::Integer(IntegerType {
                 minimum: p.minimum,
                 maximum: p.maximum,
@@ -115,14 +131,20 @@ impl Builder {
     }
 
     fn uri_schema(&self, uri: &spec::Uri) -> Schema {
-        let pattern = if uri.path.is_empty() {
-            None
-        } else {
-            Some(self.uri_pattern(uri).into())
-        };
+        let example = uri
+            .example
+            .clone()
+            .or_else(|| {
+                if uri.path.is_empty() {
+                    None
+                } else {
+                    Some(self.uri_pattern(uri))
+                }
+            })
+            .map(Into::into);
         Schema {
             schema_data: SchemaData {
-                example: pattern,
+                example,
                 ..Default::default()
             },
             schema_kind: SchemaKind::Type(Type::String(StringType {

@@ -19,6 +19,7 @@ fn uri_pattern() {
     let uri = Uri {
         path: vec![UriSegment::Literal("".into())],
         params: None,
+        example: None,
     };
 
     assert_eq!(uri.pattern(), "/");

@@ -33,6 +33,7 @@ where
 pub struct Uri {
     pub path: Vec<UriSegment>,
     pub params: Option<Object>,
+    pub example: Option<String>,
 }
 
 impl Uri {
@@ -59,7 +60,13 @@ impl Uri {
             } else {
                 None
             };
-            Ok(Uri { path, params })
+            let ann = e.annotation();
+            let example = ann.and_then(|a| a.get_string("example"));
+            Ok(Uri {
+                path,
+                params,
+                example,
+            })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not a URI").with(e))
         }
@@ -127,6 +134,7 @@ pub struct PrimNumber {
     pub minimum: Option<f64>,
     pub maximum: Option<f64>,
     pub multiple_of: Option<f64>,
+    pub example: Option<f64>,
 }
 
 impl PrimNumber {
@@ -135,10 +143,12 @@ impl PrimNumber {
         let minimum = ann.and_then(|a| a.get_num("minimum"));
         let maximum = ann.and_then(|a| a.get_num("maximum"));
         let multiple_of = ann.and_then(|a| a.get_num("multipleOf"));
+        let example = ann.and_then(|a| a.get_num("example"));
         Ok(PrimNumber {
             minimum,
             maximum,
             multiple_of,
+            example,
         })
     }
 }
@@ -147,6 +157,7 @@ impl PrimNumber {
 pub struct PrimString {
     pub pattern: Option<String>,
     pub enumeration: Vec<String>,
+    pub example: Option<String>,
 }
 
 impl PrimString {
@@ -154,9 +165,11 @@ impl PrimString {
         let ann = e.annotation();
         let pattern = ann.and_then(|a| a.get_string("pattern"));
         let enumeration = ann.and_then(|a| a.get_enum("enum")).unwrap_or_default();
+        let example = ann.and_then(|a| a.get_string("example"));
         Ok(PrimString {
             pattern,
             enumeration,
+            example,
         })
     }
 }
@@ -175,6 +188,7 @@ pub struct PrimInteger {
     pub minimum: Option<i64>,
     pub maximum: Option<i64>,
     pub multiple_of: Option<i64>,
+    pub example: Option<i64>,
 }
 
 impl PrimInteger {
@@ -183,10 +197,12 @@ impl PrimInteger {
         let minimum = ann.and_then(|a| a.get_int("minimum"));
         let maximum = ann.and_then(|a| a.get_int("maximum"));
         let multiple_of = ann.and_then(|a| a.get_int("multipleOf"));
+        let example = ann.and_then(|a| a.get_int("example"));
         Ok(PrimInteger {
             minimum,
             maximum,
             multiple_of,
+            example,
         })
     }
 }
