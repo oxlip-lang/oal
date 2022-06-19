@@ -4,12 +4,14 @@ use crate::scope::Env;
 use crate::transform::Transform;
 use oal_syntax::ast::{AsExpr, Expr};
 
+/// Associative binary operation for expression reduction.
 pub trait Semigroup: Sized {
     fn combine(&mut self, with: Self) {
         *self = with;
     }
 }
 
+/// Visits an abstract syntax tree to reduce expressions.
 pub fn reduce<T>(_acc: &mut (), env: &mut Env<T>, node_ref: NodeMut<T>) -> Result<()>
 where
     T: AsExpr + Semigroup,

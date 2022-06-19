@@ -4,12 +4,14 @@ use crate::scope::Env;
 use oal_syntax::ast::AsExpr;
 use serde_yaml::{Mapping, Value};
 
+/// An indexed annotation set.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Annotation {
     pub props: Mapping,
 }
 
 impl Annotation {
+    /// Extends the set by consuming annotations from the other set.
     pub fn extend(&mut self, other: Self) {
         self.props.extend(other.props.into_iter());
     }
@@ -64,33 +66,41 @@ impl TryFrom<&str> for Annotation {
     }
 }
 
+/// Expressions that support annotations.
 pub trait Annotated {
     fn annotation(&self) -> Option<&Annotation>;
     fn annotate(&mut self, a: Annotation);
 }
 
+/// Parses a piece of text and accumulates the resulting annotation.
 fn compose(acc: &mut Option<Annotation>, text: &str) -> Result<()> {
     let addon = Annotation::try_from(text)?;
     acc.get_or_insert(Default::default()).extend(addon);
     Ok(())
 }
 
+/// Assigns the accumulated annotation to the given expression.
 fn assign<T: Annotated>(acc: &mut Option<Annotation>, e: &mut T) {
     if let Some(ann) = acc.take() {
         e.annotate(ann);
     }
 }
 
-pub fn annotate<T>(acc: &mut Option<Annotation>, _env: &mut Env<T>, node: NodeMut<T>) -> Result<()>
+/// Visits an abstract syntax tree to process annotations.
+pub fn annotate<T>(
+    acc: &mut Option<Annotation>,
+    _env: &mut Env<T>,
+    node_ref: NodeMut<T>,
+) -> Result<()>
 where
     T: AsExpr + Annotated,
 {
-    match node {
-        NodeMut::Expr(e) => {
-            if let Some(a) = &e.as_node().ann {
+    match node_ref {
+        NodeMut::Expr(expr) => {
+            if let Some(a) = &expr.as_node().ann {
                 compose(acc, &a.text)?;
             }
-            assign(acc, e);
+            assign(acc, expr);
         }
         NodeMut::Ann(a) => {
             compose(acc, &a.text)?;
