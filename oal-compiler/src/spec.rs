@@ -1,5 +1,9 @@
 use crate::annotation::Annotated;
 use crate::errors::{Error, Kind, Result};
+use crate::module::ModuleSet;
+use crate::node::NodeRef;
+use crate::scan::Scan;
+use crate::scope::Env;
 use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_syntax::ast::AsExpr;
@@ -107,7 +111,7 @@ impl VariadicOp {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Schema {
-    pub expr: Expr,
+    pub expr: SchemaExpr,
     pub desc: Option<String>,
     pub title: Option<String>,
     pub required: Option<bool>,
@@ -115,7 +119,7 @@ pub struct Schema {
 
 impl Schema {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        let expr = Expr::try_from(e)?;
+        let expr = SchemaExpr::try_from(e)?;
         let ann = e.annotation();
         let desc = ann.and_then(|a| a.get_string("description"));
         let title = ann.and_then(|a| a.get_string("title"));
@@ -208,7 +212,7 @@ impl PrimInteger {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Expr {
+pub enum SchemaExpr {
     Num(PrimNumber),
     Str(PrimString),
     Bool(PrimBoolean),
@@ -218,22 +222,32 @@ pub enum Expr {
     Array(Box<Array>),
     Object(Object),
     Op(VariadicOp),
+    Ref(Ident),
 }
 
-impl Expr {
+impl SchemaExpr {
     fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
         let node = e.as_node();
         let span = node.span;
         match node.as_expr() {
-            ast::Expr::Prim(atom::Primitive::Number) => PrimNumber::try_from(e).map(Expr::Num),
-            ast::Expr::Prim(atom::Primitive::String) => PrimString::try_from(e).map(Expr::Str),
-            ast::Expr::Prim(atom::Primitive::Boolean) => PrimBoolean::try_from(e).map(Expr::Bool),
-            ast::Expr::Prim(atom::Primitive::Integer) => PrimInteger::try_from(e).map(Expr::Int),
-            ast::Expr::Rel(_) => Relation::try_from(e).map(|r| Expr::Rel(Box::new(r))),
-            ast::Expr::Uri(_) => Uri::try_from(e).map(Expr::Uri),
-            ast::Expr::Array(_) => Array::try_from(e).map(|a| Expr::Array(Box::new(a))),
-            ast::Expr::Object(_) => Object::try_from(e).map(Expr::Object),
-            ast::Expr::Op(_) => VariadicOp::try_from(e).map(Expr::Op),
+            ast::Expr::Prim(atom::Primitive::Number) => {
+                PrimNumber::try_from(e).map(SchemaExpr::Num)
+            }
+            ast::Expr::Prim(atom::Primitive::String) => {
+                PrimString::try_from(e).map(SchemaExpr::Str)
+            }
+            ast::Expr::Prim(atom::Primitive::Boolean) => {
+                PrimBoolean::try_from(e).map(SchemaExpr::Bool)
+            }
+            ast::Expr::Prim(atom::Primitive::Integer) => {
+                PrimInteger::try_from(e).map(SchemaExpr::Int)
+            }
+            ast::Expr::Rel(_) => Relation::try_from(e).map(|r| SchemaExpr::Rel(Box::new(r))),
+            ast::Expr::Uri(_) => Uri::try_from(e).map(SchemaExpr::Uri),
+            ast::Expr::Array(_) => Array::try_from(e).map(|a| SchemaExpr::Array(Box::new(a))),
+            ast::Expr::Object(_) => Object::try_from(e).map(SchemaExpr::Object),
+            ast::Expr::Op(_) => VariadicOp::try_from(e).map(SchemaExpr::Op),
+            ast::Expr::Var(v) if v.is_reference() => Ok(SchemaExpr::Ref(v.clone())),
             _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
         }
         .map_err(|err| err.at(span))
@@ -461,39 +475,78 @@ impl Relation {
     }
 }
 
-pub type PathPattern = String;
-pub type Relations = IndexMap<PathPattern, Relation>;
-
 #[derive(Clone, Debug, PartialEq)]
-pub struct Spec {
-    pub rels: Relations,
+pub enum Reference {
+    Schema(Schema),
 }
 
-impl<T> TryFrom<&ast::Program<T>> for Spec
+impl Reference {
+    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+        let s = Schema::try_from(e)?;
+        Ok(Reference::Schema(s))
+    }
+}
+
+pub type PathPattern = String;
+pub type Relations = IndexMap<PathPattern, Relation>;
+pub type References = IndexMap<Ident, Reference>;
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Spec {
+    pub rels: Relations,
+    pub refs: References,
+}
+
+impl<T> TryFrom<&ModuleSet<T>> for Spec
 where
     T: AsExpr + Annotated,
 {
     type Error = Error;
 
-    fn try_from(prg: &ast::Program<T>) -> Result<Self> {
-        let mut rels: Relations = IndexMap::new();
+    fn try_from(mods: &ModuleSet<T>) -> Result<Self> {
+        let mut spec = Spec::default();
+        let prg = mods.main();
+        prg.scan(&mut spec, &mut Env::new(Some(mods)), &mut export)?;
+        Ok(spec)
+    }
+}
 
-        prg.stmts.iter().try_for_each(|stmt| match stmt {
-            ast::Statement::Res(res) => {
-                let rel = Relation::try_from(&res.rel);
-                rel.and_then(|rel| match rels.entry(rel.uri.pattern()) {
-                    indexmap::map::Entry::Vacant(v) => {
-                        v.insert(rel);
+/// Visits an abstract syntax tree to export references and relations.
+fn export<T>(spec: &mut Spec, env: &mut Env<T>, node_ref: NodeRef<T>) -> Result<()>
+where
+    T: AsExpr + Annotated,
+{
+    match node_ref {
+        NodeRef::Expr(expr) => {
+            let node = expr.as_node();
+            let span = node.span;
+            match node.as_expr() {
+                ast::Expr::Var(name) if name.is_reference() => match env.lookup(name) {
+                    None => Err(Error::new(Kind::NotInScope, "").with(expr)),
+                    Some(val) => {
+                        let ref_ = Reference::try_from(val)?;
+                        spec.refs.entry(name.clone()).or_insert(ref_);
                         Ok(())
                     }
-                    indexmap::map::Entry::Occupied(_) => {
-                        Err(Error::new(Kind::RelationConflict, "").with(&rel))
-                    }
-                })
+                },
+                _ => Ok(()),
             }
-            _ => Ok(()),
-        })?;
-
-        Ok(Spec { rels })
+            .map_err(|err| err.at(span))
+        }
+        NodeRef::Res(res) => {
+            let span = res.rel.as_node().span;
+            let rel = Relation::try_from(&res.rel)?;
+            match spec.rels.entry(rel.uri.pattern()) {
+                indexmap::map::Entry::Vacant(v) => {
+                    v.insert(rel);
+                    Ok(())
+                }
+                indexmap::map::Entry::Occupied(_) => {
+                    Err(Error::new(Kind::Conflict, "redefined relation").with(&rel))
+                }
+            }
+            .map_err(|err| err.at(span))
+        }
+        _ => Ok(()),
     }
 }
