@@ -50,7 +50,7 @@ let prop3 = 'age int `minimum: 0, maximum: 999`;
 ```
 // Objects
 # description: "some stuff"
-let obj1 = {
+let @obj1 = {
   'firstName name     `title: "First name", required: true`
 , 'lastName name      `title: "Last name", required: true`
 , 'middleNames [name] `title: "Middle names"`
@@ -67,7 +67,7 @@ let uri2 = uri;
 ```
 // Contents
 # description: "some content"
-let cnt1 = <obj1>;
+let cnt1 = <@obj1>;
 ```
 ```
 // Operations
@@ -83,7 +83,7 @@ let rel1 = uri1 ( op1, op2 );
 ```
 ```
 // Combining schemas
-let obj2 = obj1 & { prop3 };
+let @obj2 = @obj1 & { prop3 };
 ```
 ```
 // Typed schema alternative
@@ -91,16 +91,16 @@ let id2 = id1 | str;
 ```
 ```
 // Untyped schema alternative
-let any1 = id2 ~ obj2 ~ uri1;
+let any1 = id2 ~ @obj2 ~ uri1;
 ```
 ```
 // Function declaration
-let f x y = obj2 & ( x | y );
+let f x y = @obj2 & ( x | y );
 ```
 ```
 // Function application
 # description: "some other stuff"
-let obj3 = f { 'height num } { 'stuff any1 };
+let @obj3 = f { 'height num } { 'stuff any1 };
 ```
 ```
 // Headers
@@ -127,7 +127,7 @@ let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "a
 res rel1;
 
 res /something?{ 'q str } (
-  get : <headers={ifnmatch},> -> with_err obj3
+  get : <headers={ifnmatch},> -> with_err @obj3
 );
 ```
 ```
