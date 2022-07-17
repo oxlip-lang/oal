@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::atom::{HttpStatus, HttpStatusRange, Method, Primitive};
 use crate::parse;
+use crate::span::Span;
 use enum_map::enum_map;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -309,11 +310,25 @@ fn parse_annotation() {
 
     if let Statement::Ann(ann) = d.stmts.get(0).unwrap() {
         assert_eq!(ann.text, r#" description: "some identifer""#);
+        assert_eq!(
+            ann.span,
+            Some(Span {
+                start: (2, 9),
+                end: (2, 40)
+            })
+        )
     } else {
         panic!("expected annotation");
     }
     if let Statement::Ann(ann) = d.stmts.get(2).unwrap() {
         assert_eq!(ann.text, r#" description: "some record""#);
+        assert_eq!(
+            ann.span,
+            Some(Span {
+                start: (4, 9),
+                end: (4, 37)
+            })
+        )
     } else {
         panic!("expected annotation");
     }

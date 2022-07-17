@@ -98,12 +98,12 @@ where
     match node_ref {
         NodeMut::Expr(expr) => {
             if let Some(a) = &expr.as_node().ann {
-                compose(acc, &a.text)?;
+                compose(acc, &a.text).map_err(|err| err.at(a.span))?;
             }
             assign(acc, expr);
         }
         NodeMut::Ann(a) => {
-            compose(acc, &a.text)?;
+            compose(acc, &a.text).map_err(|err| err.at(a.span))?;
         }
         NodeMut::Decl(d) => {
             assign(acc, &mut d.expr);

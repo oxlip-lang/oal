@@ -243,13 +243,14 @@ impl<'a, T> IntoIterator for &'a mut Resource<T> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation {
     pub text: String,
+    pub span: Option<Span>,
 }
 
 impl FromPair for Annotation {
     fn from_pair(p: Pair) -> Self {
-        Annotation {
-            text: p.into_inner().next().unwrap().as_str().to_owned(),
-        }
+        let span = Some(Span::from(&p));
+        let text = p.into_inner().next().unwrap().as_str().to_owned();
+        Annotation { text, span }
     }
 }
 
