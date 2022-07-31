@@ -10,10 +10,36 @@ pub struct Annotation {
     pub props: Mapping,
 }
 
+/// Extends a mapping recursively.
+fn deep_extend(prev: &mut Mapping, other: Mapping) {
+    for (k, ov) in other.into_iter() {
+        if let Some(Value::Mapping(pm)) = prev.get_mut(&k) {
+            if let Value::Mapping(om) = ov {
+                deep_extend(pm, om);
+            } else {
+                prev.insert(k, ov);
+            }
+        } else {
+            prev.insert(k, ov);
+        }
+    }
+}
+
+#[test]
+fn test_deep_extend() {
+    let mut m1 = serde_yaml::from_str(r#"{ a: { x: 0 }, b: 1, c: {} }"#).unwrap();
+    let m2 = serde_yaml::from_str(r#"{ a: { y: 0 }, b: 2, c: true }"#).unwrap();
+    let exp = serde_yaml::from_str::<Mapping>(r#"{ a: { x: 0, y: 0 }, b: 2, c: true }"#).unwrap();
+
+    deep_extend(&mut m1, m2);
+
+    assert_eq!(m1, exp);
+}
+
 impl Annotation {
     /// Extends the set by consuming annotations from the other set.
     pub fn extend(&mut self, other: Self) {
-        self.props.extend(other.props.into_iter());
+        deep_extend(&mut self.props, other.props);
     }
 
     pub fn get_str(&self, s: &str) -> Option<&str> {
@@ -75,7 +101,7 @@ pub trait Annotated {
 /// Parses a piece of text and accumulates the resulting annotation.
 fn compose(acc: &mut Option<Annotation>, text: &str) -> Result<()> {
     let addon = Annotation::try_from(text)?;
-    acc.get_or_insert(Default::default()).extend(addon);
+    acc.get_or_insert_with(Default::default).extend(addon);
     Ok(())
 }
 
