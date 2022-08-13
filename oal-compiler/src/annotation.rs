@@ -2,7 +2,7 @@ use crate::errors::Result;
 use crate::node::NodeMut;
 use crate::scope::Env;
 use oal_syntax::ast::AsExpr;
-use serde_yaml::{Mapping, Value};
+use serde_yaml::{Mapping, Sequence, Value};
 
 /// An indexed annotation set.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -10,28 +10,43 @@ pub struct Annotation {
     pub props: Mapping,
 }
 
+/// Extends a value when possible or defaults to overwrite.
+fn deep_extend_value(prev: &mut Value, other: Value) {
+    if let Value::Mapping(pm) = prev {
+        if let Value::Mapping(om) = other {
+            return deep_extend_mapping(pm, om);
+        }
+    } else if let Value::Sequence(ps) = prev {
+        if let Value::Sequence(os) = other {
+            return deep_extend_sequence(ps, os);
+        }
+    }
+    *prev = other;
+}
+
 /// Extends a mapping recursively.
-fn deep_extend(prev: &mut Mapping, other: Mapping) {
+fn deep_extend_mapping(prev: &mut Mapping, other: Mapping) {
     for (k, ov) in other.into_iter() {
-        if let Some(Value::Mapping(pm)) = prev.get_mut(&k) {
-            if let Value::Mapping(om) = ov {
-                deep_extend(pm, om);
-            } else {
-                prev.insert(k, ov);
-            }
+        if let Some(pv) = prev.get_mut(&k) {
+            deep_extend_value(pv, ov)
         } else {
             prev.insert(k, ov);
         }
     }
 }
 
+/// Extends a sequence by concatenation.
+fn deep_extend_sequence(prev: &mut Sequence, other: Sequence) {
+    prev.extend(other.into_iter());
+}
+
 #[test]
 fn test_deep_extend() {
-    let mut m1 = serde_yaml::from_str(r#"{ a: { x: 0 }, b: 1, c: {} }"#).unwrap();
-    let m2 = serde_yaml::from_str(r#"{ a: { y: 0 }, b: 2, c: true }"#).unwrap();
-    let exp = serde_yaml::from_str::<Mapping>(r#"{ a: { x: 0, y: 0 }, b: 2, c: true }"#).unwrap();
+    let mut m1 = serde_yaml::from_str(r#"{ a: { x: 0 }, b: 1, c: [1] }"#).unwrap();
+    let m2 = serde_yaml::from_str(r#"{ a: { y: 0 }, b: 2, c: [2] }"#).unwrap();
+    let exp = serde_yaml::from_str::<Mapping>(r#"{ a: { x: 0, y: 0 }, b: 2, c: [1,2] }"#).unwrap();
 
-    deep_extend(&mut m1, m2);
+    deep_extend_mapping(&mut m1, m2);
 
     assert_eq!(m1, exp);
 }
@@ -39,7 +54,7 @@ fn test_deep_extend() {
 impl Annotation {
     /// Extends the set by consuming annotations from the other set.
     pub fn extend(&mut self, other: Self) {
-        deep_extend(&mut self.props, other.props);
+        deep_extend_mapping(&mut self.props, other.props);
     }
 
     pub fn get_str(&self, s: &str) -> Option<&str> {

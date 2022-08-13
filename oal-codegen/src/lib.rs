@@ -401,8 +401,10 @@ impl Builder {
             if let ReferenceOr::Item(res) = response {
                 if let Some(schema) = content.schema.as_ref() {
                     let media_type = media.clone().unwrap_or_else(|| self.media_type());
+                    let examples = Default::default();
                     let media_schema = MediaType {
                         schema: Some(self.schema(schema)),
+                        examples,
                         ..Default::default()
                     };
                     res.content.insert(media_type, media_schema);
