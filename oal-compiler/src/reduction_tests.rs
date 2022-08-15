@@ -5,6 +5,7 @@ use crate::node::NodeRef;
 use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
+use crate::spec::Aliased;
 use crate::transform::Transform;
 use crate::Program;
 use oal_syntax::ast::{AsRefNode, Expr, Operator, Statement};
@@ -32,7 +33,7 @@ fn eval(code: &str) -> anyhow::Result<Program> {
     anyhow::Ok(prg)
 }
 
-/// Checks that no free variable by-value remains.
+/// Checks that no free variable remains.
 fn check_free_vars(
     _acc: &mut (),
     env: &mut Env<TypedExpr>,
@@ -40,8 +41,8 @@ fn check_free_vars(
 ) -> crate::errors::Result<()> {
     match node {
         NodeRef::Expr(e) => match e.as_node().as_expr() {
-            Expr::Var(var) if var.is_value() => match env.lookup(var) {
-                None => Err(Error::new(Kind::NotInScope, "").with(e)),
+            Expr::Var(var) => match env.lookup(var) {
+                None => Err(Error::new(Kind::NotInScope, "check free vars").with(e)),
                 Some(val) => match val.as_node().as_expr() {
                     Expr::Binding(_) => Ok(()),
                     _ => Err(Error::new(Kind::Unknown, "remaining free variable").with(e)),
@@ -95,20 +96,16 @@ fn reduce_application() {
 fn reduce_reference() {
     let code = r#"
         let @a = {};
-        let b = @a;
+        let f x = x;
+        let b = f @a;
     "#;
     let prg = eval(code).expect("evaluation failed");
 
-    match prg.stmts.iter().nth(1).unwrap() {
+    match prg.stmts.iter().nth(2).unwrap() {
         Statement::Decl(d) => {
             assert_eq!(d.name.as_ref(), "b");
-            match d.expr.as_node().as_expr() {
-                Expr::Var(v) => {
-                    assert!(v.is_reference());
-                    assert_eq!(v.as_ref(), "@a");
-                }
-                _ => panic!("expected variable"),
-            }
+            let alias = d.expr.alias().expect("expected alias");
+            assert_eq!(alias.as_ref(), "@a");
         }
         _ => panic!("expected declaration"),
     }

@@ -11,7 +11,12 @@ pub trait Transform<T> {
         F: FnMut(&mut U, &mut Env<T>, NodeMut<T>) -> Result<(), E>;
 }
 
-fn transform_expr<T, F, E, U>(e: &mut T, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+pub fn transform_expr<T, F, E, U>(
+    e: &mut T,
+    acc: &mut U,
+    env: &mut Env<T>,
+    f: &mut F,
+) -> Result<(), E>
 where
     T: AsExpr,
     E: From<Error>,

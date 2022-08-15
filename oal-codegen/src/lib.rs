@@ -5,12 +5,7 @@ use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
 use oal_syntax::atom::HttpStatusRange;
 use oal_syntax::{ast, atom};
-use openapiv3::{
-    ArrayType, Components, Header, Info, IntegerType, MediaType, NumberType, ObjectType, OpenAPI,
-    Operation, Parameter, ParameterData, ParameterSchemaOrContent, PathItem, Paths, ReferenceOr,
-    RequestBody, Response, Responses, Schema, SchemaData, SchemaKind, Server, StatusCode,
-    StringType, Type, VariantOrUnknownOrEmpty,
-};
+use openapiv3::*;
 use std::iter::once;
 
 #[derive(Default)]
@@ -20,6 +15,7 @@ pub struct Builder {
 }
 
 type Headers = IndexMap<String, ReferenceOr<Header>>;
+type Examples = IndexMap<String, ReferenceOr<Example>>;
 
 impl Builder {
     pub fn new() -> Builder {
@@ -386,6 +382,28 @@ impl Builder {
         })
     }
 
+    fn content_examples(&self, content: &spec::Content) -> Examples {
+        match content
+            .examples
+            .as_ref()
+            .or_else(|| content.schema.as_ref().and_then(|s| s.examples.as_ref()))
+        {
+            None => Default::default(),
+            Some(examples) => examples
+                .iter()
+                .map(|url| {
+                    // TODO: capture the example name in the annotation
+                    let name = "default".to_owned();
+                    let example = Example {
+                        external_value: Some(url.clone()),
+                        ..Default::default()
+                    };
+                    (name, ReferenceOr::Item(example))
+                })
+                .collect(),
+        }
+    }
+
     fn xfer_responses(&self, xfer: &spec::Transfer) -> Responses {
         let mut default = None;
         let mut responses = IndexMap::new();
@@ -401,10 +419,9 @@ impl Builder {
             if let ReferenceOr::Item(res) = response {
                 if let Some(schema) = content.schema.as_ref() {
                     let media_type = media.clone().unwrap_or_else(|| self.media_type());
-                    let examples = Default::default();
                     let media_schema = MediaType {
                         schema: Some(self.schema(schema)),
-                        examples,
+                        examples: self.content_examples(content),
                         ..Default::default()
                     };
                     res.content.insert(media_type, media_schema);

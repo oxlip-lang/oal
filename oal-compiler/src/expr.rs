@@ -1,13 +1,16 @@
 use crate::annotation::{Annotated, Annotation};
 use crate::reduction::Semigroup;
+use crate::spec::Aliased;
 use crate::tag::{Tag, Tagged};
-use oal_syntax::ast::{AsMutNode, AsRefNode, NodeExpr};
+use oal_syntax::ast::{AsMutNode, AsRefNode, Expr, NodeExpr};
+use oal_syntax::atom::Ident;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypedExpr {
     tag: Option<Tag>,
     ann: Option<Annotation>,
     inner: NodeExpr<TypedExpr>,
+    alias: Option<Ident>,
 }
 
 impl Tagged for TypedExpr {
@@ -45,6 +48,7 @@ impl From<NodeExpr<TypedExpr>> for TypedExpr {
             tag: None,
             ann: None,
             inner: e,
+            alias: None,
         }
     }
 }
@@ -61,9 +65,31 @@ impl AsMutNode for TypedExpr {
     }
 }
 
+impl Aliased for TypedExpr {
+    fn alias(&self) -> Option<&Ident> {
+        self.alias.as_ref()
+    }
+
+    fn substitute(&self) -> Self {
+        TypedExpr {
+            alias: None,
+            ..self.clone()
+        }
+    }
+}
+
 impl Semigroup for TypedExpr {
     /// Combines two expressions retaining annotations.
     fn combine(&mut self, with: Self) {
+        // Combining a reference retains the variable identifier as alias.
+        match self.as_node().as_expr() {
+            Expr::Var(var) if var.is_reference() => self.alias = Some(var.clone()),
+            _ => {}
+        }
+        // Once set the alias is immutable by combination.
+        if self.alias.is_none() {
+            self.alias = with.alias;
+        }
         self.inner = with.inner;
         self.tag = with.tag;
         if let Some(ann) = &mut self.ann {

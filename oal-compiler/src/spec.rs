@@ -11,6 +11,19 @@ use oal_syntax::atom::{HttpStatus, Ident, Text};
 use oal_syntax::{ast, atom};
 use std::fmt::Debug;
 
+/// Trait for aliasing expressions.
+pub trait Aliased {
+    /// Returns the identifier of the alias if it exists.
+    fn alias(&self) -> Option<&Ident>;
+    /// Returns the plain expression without aliasing.
+    fn substitute(&self) -> Self;
+}
+
+/// Trait for converting expressions to specifications.
+trait AsSpec: AsExpr + Annotated + Aliased {}
+
+impl<T> AsSpec for T where T: AsExpr + Annotated + Aliased {}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum UriSegment {
     Literal(Text),
@@ -19,7 +32,7 @@ pub enum UriSegment {
 
 impl<T> TryFrom<&ast::UriSegment<T>> for UriSegment
 where
-    T: AsExpr + Annotated,
+    T: AsSpec,
 {
     type Error = Error;
 
@@ -51,7 +64,7 @@ impl Uri {
             .collect()
     }
 
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Uri(uri) = e.as_node().as_expr() {
             let path = uri
                 .path
@@ -83,7 +96,7 @@ pub struct Array {
 }
 
 impl Array {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Array(a) = e.as_node().as_expr() {
             Schema::try_from(a.item.as_ref()).map(|item| Array { item })
         } else {
@@ -99,7 +112,7 @@ pub struct VariadicOp {
 }
 
 impl VariadicOp {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Op(op) = e.as_node().as_expr() {
             let schemas: Result<Vec<_>> = op.exprs.iter().map(Schema::try_from).collect();
             schemas.map(|schemas| VariadicOp { op: op.op, schemas })
@@ -115,20 +128,23 @@ pub struct Schema {
     pub desc: Option<String>,
     pub title: Option<String>,
     pub required: Option<bool>,
+    pub examples: Option<Vec<String>>,
 }
 
 impl Schema {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         let expr = SchemaExpr::try_from(e)?;
         let ann = e.annotation();
         let desc = ann.and_then(|a| a.get_string("description"));
         let title = ann.and_then(|a| a.get_string("title"));
         let required = ann.and_then(|a| a.get_bool("required"));
+        let examples = e.annotation().and_then(|a| a.get_enum("examples"));
         Ok(Schema {
             expr,
             desc,
             title,
             required,
+            examples,
         })
     }
 }
@@ -142,7 +158,7 @@ pub struct PrimNumber {
 }
 
 impl PrimNumber {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         let ann = e.annotation();
         let minimum = ann.and_then(|a| a.get_num("minimum"));
         let maximum = ann.and_then(|a| a.get_num("maximum"));
@@ -165,7 +181,7 @@ pub struct PrimString {
 }
 
 impl PrimString {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         let ann = e.annotation();
         let pattern = ann.and_then(|a| a.get_string("pattern"));
         let enumeration = ann.and_then(|a| a.get_enum("enum")).unwrap_or_default();
@@ -182,7 +198,7 @@ impl PrimString {
 pub struct PrimBoolean {}
 
 impl PrimBoolean {
-    fn try_from<T: AsExpr + Annotated>(_: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(_: &T) -> Result<Self> {
         Ok(PrimBoolean {})
     }
 }
@@ -196,7 +212,7 @@ pub struct PrimInteger {
 }
 
 impl PrimInteger {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         let ann = e.annotation();
         let minimum = ann.and_then(|a| a.get_int("minimum"));
         let maximum = ann.and_then(|a| a.get_int("maximum"));
@@ -226,31 +242,35 @@ pub enum SchemaExpr {
 }
 
 impl SchemaExpr {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
-        let node = e.as_node();
-        let span = node.span;
-        match node.as_expr() {
-            ast::Expr::Prim(atom::Primitive::Number) => {
-                PrimNumber::try_from(e).map(SchemaExpr::Num)
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
+        if let Some(alias) = e.alias() {
+            // Aliased expressions are converted to schema references.
+            Ok(SchemaExpr::Ref(alias.clone()))
+        } else {
+            let node = e.as_node();
+            let span = node.span;
+            match node.as_expr() {
+                ast::Expr::Prim(atom::Primitive::Number) => {
+                    PrimNumber::try_from(e).map(SchemaExpr::Num)
+                }
+                ast::Expr::Prim(atom::Primitive::String) => {
+                    PrimString::try_from(e).map(SchemaExpr::Str)
+                }
+                ast::Expr::Prim(atom::Primitive::Boolean) => {
+                    PrimBoolean::try_from(e).map(SchemaExpr::Bool)
+                }
+                ast::Expr::Prim(atom::Primitive::Integer) => {
+                    PrimInteger::try_from(e).map(SchemaExpr::Int)
+                }
+                ast::Expr::Rel(_) => Relation::try_from(e).map(|r| SchemaExpr::Rel(Box::new(r))),
+                ast::Expr::Uri(_) => Uri::try_from(e).map(SchemaExpr::Uri),
+                ast::Expr::Array(_) => Array::try_from(e).map(|a| SchemaExpr::Array(Box::new(a))),
+                ast::Expr::Object(_) => Object::try_from(e).map(SchemaExpr::Object),
+                ast::Expr::Op(_) => VariadicOp::try_from(e).map(SchemaExpr::Op),
+                _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
             }
-            ast::Expr::Prim(atom::Primitive::String) => {
-                PrimString::try_from(e).map(SchemaExpr::Str)
-            }
-            ast::Expr::Prim(atom::Primitive::Boolean) => {
-                PrimBoolean::try_from(e).map(SchemaExpr::Bool)
-            }
-            ast::Expr::Prim(atom::Primitive::Integer) => {
-                PrimInteger::try_from(e).map(SchemaExpr::Int)
-            }
-            ast::Expr::Rel(_) => Relation::try_from(e).map(|r| SchemaExpr::Rel(Box::new(r))),
-            ast::Expr::Uri(_) => Uri::try_from(e).map(SchemaExpr::Uri),
-            ast::Expr::Array(_) => Array::try_from(e).map(|a| SchemaExpr::Array(Box::new(a))),
-            ast::Expr::Object(_) => Object::try_from(e).map(SchemaExpr::Object),
-            ast::Expr::Op(_) => VariadicOp::try_from(e).map(SchemaExpr::Op),
-            ast::Expr::Var(v) if v.is_reference() => Ok(SchemaExpr::Ref(v.clone())),
-            _ => Err(Error::new(Kind::UnexpectedExpression, "expected schema-like").with(e)),
+            .map_err(|err| err.at(span))
         }
-        .map_err(|err| err.at(span))
     }
 }
 
@@ -265,7 +285,7 @@ pub struct Property {
 }
 
 impl Property {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Property(prop) = e.as_node().as_expr() {
             let name = prop.name.clone();
             let schema = Schema::try_from(prop.val.as_ref())?;
@@ -290,7 +310,7 @@ pub struct Object {
 }
 
 impl Object {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Object(o) = e.as_node().as_expr() {
             let props: Result<Vec<_>> = o.props.iter().map(Property::try_from).collect();
             props.map(|props| Object { props })
@@ -300,7 +320,7 @@ impl Object {
     }
 }
 
-fn try_into_status<T: AsExpr + Annotated>(e: &T) -> Result<HttpStatus> {
+fn try_into_status<T: AsSpec>(e: &T) -> Result<HttpStatus> {
     match e.as_node().as_expr() {
         ast::Expr::Lit(ast::Literal::Status(s)) => Ok(*s),
         ast::Expr::Lit(ast::Literal::Number(n)) => {
@@ -311,7 +331,7 @@ fn try_into_status<T: AsExpr + Annotated>(e: &T) -> Result<HttpStatus> {
     }
 }
 
-fn try_into_media<T: AsExpr + Annotated>(e: &T) -> Result<MediaType> {
+fn try_into_media<T: AsSpec>(e: &T) -> Result<MediaType> {
     match e.as_node().as_expr() {
         ast::Expr::Lit(ast::Literal::Text(t)) => Ok(t.as_ref().to_owned()),
         _ => Err(Error::new(Kind::UnexpectedExpression, "not a media expression").with(e)),
@@ -327,6 +347,7 @@ pub struct Content {
     pub media: Option<MediaType>,
     pub headers: Option<Object>,
     pub desc: Option<String>,
+    pub examples: Option<Vec<String>>,
 }
 
 impl From<Schema> for Content {
@@ -336,18 +357,20 @@ impl From<Schema> for Content {
         let status = None;
         let media = None;
         let headers = None;
+        let examples = Default::default();
         Content {
             schema,
             status,
             media,
             headers,
             desc,
+            examples,
         }
     }
 }
 
 impl Content {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Content(content) = e.as_node().as_expr() {
             let schema = match &content.schema {
                 Some(s) => Schema::try_from(s.as_ref()).map(|s| Some(Box::new(s))),
@@ -372,12 +395,14 @@ impl Content {
                 .as_ref()
                 .map_or(Ok(None), |h| Object::try_from(h.as_ref()).map(Some))?;
             let desc = e.annotation().and_then(|a| a.get_string("description"));
+            let examples = e.annotation().and_then(|a| a.get_enum("examples"));
             Ok(Content {
                 schema,
                 status,
                 media,
                 headers,
                 desc,
+                examples,
             })
         } else {
             Schema::try_from(e).map(Content::from)
@@ -387,7 +412,7 @@ impl Content {
 
 pub type Ranges = IndexMap<(Option<HttpStatus>, Option<MediaType>), Content>;
 
-fn try_into_ranges<T: AsExpr + Annotated>(ranges: &mut Ranges, e: &T) -> Result<()> {
+fn try_into_ranges<T: AsSpec>(ranges: &mut Ranges, e: &T) -> Result<()> {
     match e.as_node().as_expr() {
         ast::Expr::Op(op) if op.op == ast::Operator::Range => {
             op.exprs.iter().try_for_each(|r| try_into_ranges(ranges, r))
@@ -413,7 +438,7 @@ pub struct Transfer {
 }
 
 impl Transfer {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Xfer(xfer) = e.as_node().as_expr() {
             let methods = xfer.methods;
             let mut ranges = IndexMap::new();
@@ -456,7 +481,7 @@ pub struct Relation {
 }
 
 impl Relation {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Rel(rel) = e.as_node().as_expr() {
             let uri = Uri::try_from(rel.uri.as_ref())?;
             let mut xfers = Transfers::default();
@@ -481,7 +506,7 @@ pub enum Reference {
 }
 
 impl Reference {
-    fn try_from<T: AsExpr + Annotated>(e: &T) -> Result<Self> {
+    fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         let s = Schema::try_from(e)?;
         Ok(Reference::Schema(s))
     }
@@ -499,7 +524,7 @@ pub struct Spec {
 
 impl<T> TryFrom<&ModuleSet<T>> for Spec
 where
-    T: AsExpr + Annotated,
+    T: AsSpec,
 {
     type Error = Error;
 
@@ -512,26 +537,23 @@ where
 }
 
 /// Visits an abstract syntax tree to export references and relations.
-fn export<T>(spec: &mut Spec, env: &mut Env<T>, node_ref: NodeRef<T>) -> Result<()>
+fn export<T>(spec: &mut Spec, _env: &mut Env<T>, node_ref: NodeRef<T>) -> Result<()>
 where
-    T: AsExpr + Annotated,
+    T: AsSpec,
 {
     match node_ref {
         NodeRef::Expr(expr) => {
-            let node = expr.as_node();
-            let span = node.span;
-            match node.as_expr() {
-                ast::Expr::Var(name) if name.is_reference() => match env.lookup(name) {
-                    None => Err(Error::new(Kind::NotInScope, "").with(expr)),
-                    Some(val) => {
-                        let ref_ = Reference::try_from(val)?;
-                        spec.refs.entry(name.clone()).or_insert(ref_);
-                        Ok(())
-                    }
-                },
-                _ => Ok(()),
+            if let Some(alias) = expr.alias() {
+                if let indexmap::map::Entry::Vacant(v) = spec.refs.entry(alias.clone()) {
+                    // Remove aliasing before schema conversion.
+                    // Aliased expressions are converted to schema references
+                    // but we need the schema expression in the reference definition.
+                    let plain = expr.substitute();
+                    let reference = Reference::try_from(&plain)?;
+                    v.insert(reference);
+                }
             }
-            .map_err(|err| err.at(span))
+            Ok(())
         }
         NodeRef::Res(res) => {
             let span = res.rel.as_node().span;

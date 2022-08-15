@@ -11,6 +11,7 @@ let prop3 = 'age int `minimum: 0, maximum: 999`;
 
 // Objects
 # description: "some stuff"
+# examples: [ "examples/stuff.json" ]
 let @obj1 = {
   'firstName name     `title: "First name", required: true`
 , 'lastName name      `title: "Last name", required: true`

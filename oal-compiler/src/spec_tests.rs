@@ -157,3 +157,33 @@ fn evaluate_reference() -> anyhow::Result<()> {
 
     anyhow::Ok(())
 }
+
+#[test]
+fn evaluate_reference_examples() -> anyhow::Result<()> {
+    let code = r#"
+        # examples: [ "examples/stuff.json" ]
+        let @a = {};
+        res / ( get -> @a );
+    "#;
+
+    let spec = eval(code)?;
+
+    let rel = spec.rels.values().next().expect("expected relation");
+
+    let xfer = rel.xfers[atom::Method::Get]
+        .as_ref()
+        .expect("expected get transfer");
+
+    let range = xfer
+        .ranges
+        .values()
+        .next()
+        .unwrap()
+        .schema
+        .as_ref()
+        .unwrap();
+
+    assert!(range.examples.is_some());
+
+    anyhow::Ok(())
+}

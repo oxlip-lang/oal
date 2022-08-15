@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 pub type Scope<T> = HashMap<Ident, T>;
 
+#[derive(Debug)]
 pub struct Env<'a, T> {
     scopes: Vec<Scope<T>>,
     modules: Option<&'a ModuleSet<T>>,

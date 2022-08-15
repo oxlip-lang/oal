@@ -1,7 +1,7 @@
 use crate::errors::{Error, Kind, Result};
 use crate::node::NodeMut;
 use crate::scope::Env;
-use crate::transform::Transform;
+use crate::transform::transform_expr;
 use oal_syntax::ast::{AsExpr, Expr};
 
 /// Associative binary operation for expression reduction.
@@ -20,8 +20,10 @@ where
         let node = expr.as_node_mut();
         let span = node.span;
         match node.as_expr_mut() {
-            Expr::Var(var) if var.is_value() => match env.lookup(var) {
-                None => Err(Error::new(Kind::NotInScope, "").with(expr)),
+            Expr::Var(var) => match env.lookup(var) {
+                None => Err(Error::new(Kind::NotInScope, "reduction")
+                    .with(expr)
+                    .with(env)),
                 Some(val) => {
                     match val.as_node().as_expr() {
                         Expr::Binding(_) => {}
@@ -31,7 +33,7 @@ where
                 }
             },
             Expr::App(application) => match env.lookup(&application.name) {
-                None => Err(Error::new(Kind::NotAFunction, "").with(expr)),
+                None => Err(Error::new(Kind::NotAFunction, "reduction").with(expr)),
                 Some(val) => {
                     if let Expr::Lambda(lambda) = val.as_node().as_expr() {
                         let app_env = &mut Env::new(None);
@@ -43,9 +45,7 @@ where
                             }
                         }
                         let mut app = lambda.body.as_ref().clone();
-                        app.as_node_mut()
-                            .as_expr_mut()
-                            .transform(&mut (), app_env, &mut reduce)?;
+                        transform_expr(&mut app, &mut (), app_env, &mut reduce)?;
                         expr.combine(app);
                         Ok(())
                     } else {

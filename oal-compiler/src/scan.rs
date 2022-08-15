@@ -11,7 +11,7 @@ pub trait Scan<T> {
         F: FnMut(&mut U, &mut Env<T>, NodeRef<T>) -> Result<(), E>;
 }
 
-fn scan_expr<T, F, E, U>(e: &T, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
+pub fn scan_expr<T, F, E, U>(e: &T, acc: &mut U, env: &mut Env<T>, f: &mut F) -> Result<(), E>
 where
     T: AsExpr,
     E: From<Error>,

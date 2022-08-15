@@ -174,6 +174,7 @@ impl<T: AsExpr> FromPair for Declaration<T> {
                 .map(|p| p.into_expr())
                 .collect()
         } else {
+            // Lambda and reference declarations are mutually exclusive.
             Default::default()
         };
         let expr = p.next().unwrap().into_expr();
