@@ -173,7 +173,7 @@ impl PrimNumber {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrimString {
     pub pattern: Option<String>,
     pub enumeration: Vec<String>,
@@ -194,7 +194,7 @@ impl PrimString {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrimBoolean {}
 
 impl PrimBoolean {
@@ -203,7 +203,7 @@ impl PrimBoolean {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrimInteger {
     pub minimum: Option<i64>,
     pub maximum: Option<i64>,

@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::iter::{once, Flatten, Once};
 use std::slice::{Iter, IterMut};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr<T> {
     Lit(Literal),
     Prim(Primitive),
@@ -34,7 +34,7 @@ impl<T> Expr<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeExpr<T> {
     pub inner: Expr<T>,
     pub ann: Option<Annotation>,
@@ -121,7 +121,7 @@ impl<T: AsExpr> FromPair for T {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Program<T> {
     pub stmts: Vec<Statement<T>>,
 }
@@ -157,7 +157,7 @@ impl<'a, T> IntoIterator for &'a mut Program<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Declaration<T> {
     pub name: Ident,
     pub expr: T,
@@ -210,7 +210,7 @@ impl<'a, T> IntoIterator for &'a mut Declaration<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Resource<T> {
     pub rel: T,
 }
@@ -241,7 +241,7 @@ impl<'a, T> IntoIterator for &'a mut Resource<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Annotation {
     pub text: String,
     pub span: Option<Span>,
@@ -255,7 +255,7 @@ impl FromPair for Annotation {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Import {
     pub module: String,
 }
@@ -275,7 +275,7 @@ impl FromPair for Import {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Statement<T> {
     Decl(Declaration<T>),
     Res(Resource<T>),
@@ -311,7 +311,7 @@ impl FromPair for Method {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Transfer<T> {
     pub methods: EnumMap<Method, bool>,
     pub domain: Option<Box<T>>,
@@ -385,7 +385,7 @@ impl<'a, T> IntoIterator for &'a mut Transfer<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Relation<T> {
     pub uri: Box<T>,
     pub xfers: Vec<T>,
@@ -421,7 +421,7 @@ impl<'a, T> IntoIterator for &'a mut Relation<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UriSegment<T> {
     Literal(Text),
     Variable(T),
@@ -443,7 +443,7 @@ impl<T: AsExpr> FromPair for UriSegment<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Uri<T> {
     pub path: Vec<UriSegment<T>>,
     pub params: Option<Box<T>>,
@@ -517,7 +517,7 @@ impl<T: AsExpr> FromPair for Uri<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Array<T> {
     pub item: Box<T>,
 }
@@ -547,7 +547,7 @@ impl<'a, T> IntoIterator for &'a mut Array<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Property<T> {
     pub name: Ident,
     pub val: Box<T>,
@@ -587,7 +587,7 @@ impl<'a, T> IntoIterator for &'a mut Property<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Object<T> {
     pub props: Vec<T>,
 }
@@ -645,7 +645,7 @@ impl FromPair for HttpStatus {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Content<T> {
     pub schema: Option<Box<T>>,
     pub status: Option<Box<T>>,
@@ -714,7 +714,7 @@ impl<'a, T> IntoIterator for &'a mut Content<T> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Operator {
     Join,
     Any,
@@ -722,7 +722,7 @@ pub enum Operator {
     Range,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VariadicOp<T> {
     pub op: Operator,
     pub exprs: Vec<T>,
@@ -772,7 +772,7 @@ impl FromPair for Primitive {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lambda<T> {
     pub bindings: Vec<T>,
     pub body: Box<T>,
@@ -796,7 +796,7 @@ impl<'a, T> IntoIterator for &'a mut Lambda<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Application<T> {
     pub name: Ident,
     pub args: Vec<T>,
@@ -829,7 +829,7 @@ impl<'a, T> IntoIterator for &'a mut Application<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Literal {
     Text(Text),
     Number(u64),

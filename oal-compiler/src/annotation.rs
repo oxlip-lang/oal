@@ -5,7 +5,7 @@ use oal_syntax::ast::AsExpr;
 use serde_yaml::{Mapping, Sequence, Value};
 
 /// An indexed annotation set.
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Annotation {
     pub props: Mapping,
 }

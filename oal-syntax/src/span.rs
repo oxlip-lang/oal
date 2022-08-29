@@ -1,7 +1,7 @@
 use crate::Pair;
 use std::fmt::{Display, Formatter};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     pub start: (usize, usize),
     pub end: (usize, usize),

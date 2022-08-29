@@ -1,7 +1,7 @@
 use oal_syntax::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Kind {
     Unknown,
     NotInScope,

@@ -7,7 +7,7 @@ use oal_syntax::ast::{AsExpr, Expr, Operator, UriSegment};
 use oal_syntax::span::Span;
 use std::collections::HashMap;
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct TagSeq(Option<Locator>, usize);
 
 impl TagSeq {

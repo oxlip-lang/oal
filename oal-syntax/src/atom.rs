@@ -72,7 +72,7 @@ impl TryFrom<u64> for HttpStatus {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Primitive {
     Number,
     String,
