@@ -10,6 +10,8 @@ let prop2 = 'n num   `minimum: 0, maximum: 99.99`;
 let prop3 = 'age int `minimum: 0, maximum: 999`;
 
 // Objects
+// The at-sign prefix denotes a reference variable whose value
+// is registered as a component in the OpenAPI output.
 # description: "some stuff"
 # examples: [ "examples/stuff.json" ]
 let @obj1 = {

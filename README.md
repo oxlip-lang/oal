@@ -49,7 +49,10 @@ let prop3 = 'age int `minimum: 0, maximum: 999`;
 ```
 ```
 // Objects
+// The at-sign prefix denotes a reference variable whose value
+// is registered as a component in the OpenAPI output.
 # description: "some stuff"
+# examples: [ "examples/stuff.json" ]
 let @obj1 = {
   'firstName name     `title: "First name", required: true`
 , 'lastName name      `title: "Last name", required: true`
@@ -100,6 +103,7 @@ let f x y = @obj2 & ( x | y );
 ```
 // Function application
 # description: "some other stuff"
+# examples: [ "examples/other_stuff.json" ]
 let @obj3 = f { 'height num } { 'stuff any1 };
 ```
 ```
