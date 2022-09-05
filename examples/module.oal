@@ -13,7 +13,7 @@ let prop3 = 'age int `minimum: 0, maximum: 999`;
 // The at-sign prefix denotes a reference variable whose value
 // is registered as a component in the OpenAPI output.
 # description: "some stuff"
-# examples: [ "examples/stuff.json" ]
+# examples: { default: "examples/stuff.json" }
 let @obj1 = {
   'firstName name     `title: "First name", required: true`
 , 'lastName name      `title: "Last name", required: true`

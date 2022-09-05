@@ -3,6 +3,7 @@ use crate::node::NodeMut;
 use crate::scope::Env;
 use oal_syntax::ast::AsExpr;
 use serde_yaml::{Mapping, Sequence, Value};
+use std::collections::HashMap;
 
 /// An indexed annotation set.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
@@ -93,6 +94,21 @@ impl Annotation {
                 seq.iter()
                     .flat_map(Value::as_str)
                     .map(ToOwned::to_owned)
+                    .collect()
+            })
+    }
+
+    pub fn get_props(&self, s: &str) -> Option<HashMap<String, String>> {
+        self.props
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_mapping)
+            .map(|m| {
+                m.iter()
+                    .flat_map(|(k, v)| {
+                        let key = k.as_str().map(ToOwned::to_owned);
+                        let val = v.as_str().map(ToOwned::to_owned);
+                        key.and_then(|k| val.map(|v| (k, v)))
+                    })
                     .collect()
             })
     }

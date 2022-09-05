@@ -391,14 +391,12 @@ impl Builder {
             None => Default::default(),
             Some(examples) => examples
                 .iter()
-                .map(|url| {
-                    // TODO: capture the example name in the annotation
-                    let name = "default".to_owned();
+                .map(|(name, url)| {
                     let example = Example {
                         external_value: Some(url.clone()),
                         ..Default::default()
                     };
-                    (name, ReferenceOr::Item(example))
+                    (name.clone(), ReferenceOr::Item(example))
                 })
                 .collect(),
         }

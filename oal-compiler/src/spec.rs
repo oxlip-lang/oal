@@ -9,6 +9,7 @@ use indexmap::IndexMap;
 use oal_syntax::ast::AsExpr;
 use oal_syntax::atom::{HttpStatus, Ident, Text};
 use oal_syntax::{ast, atom};
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 /// Trait for aliasing expressions.
@@ -128,7 +129,7 @@ pub struct Schema {
     pub desc: Option<String>,
     pub title: Option<String>,
     pub required: Option<bool>,
-    pub examples: Option<Vec<String>>,
+    pub examples: Option<HashMap<String, String>>,
 }
 
 impl Schema {
@@ -138,7 +139,7 @@ impl Schema {
         let desc = ann.and_then(|a| a.get_string("description"));
         let title = ann.and_then(|a| a.get_string("title"));
         let required = ann.and_then(|a| a.get_bool("required"));
-        let examples = e.annotation().and_then(|a| a.get_enum("examples"));
+        let examples = e.annotation().and_then(|a| a.get_props("examples"));
         Ok(Schema {
             expr,
             desc,
@@ -347,7 +348,7 @@ pub struct Content {
     pub media: Option<MediaType>,
     pub headers: Option<Object>,
     pub desc: Option<String>,
-    pub examples: Option<Vec<String>>,
+    pub examples: Option<HashMap<String, String>>,
 }
 
 impl From<Schema> for Content {
@@ -395,7 +396,7 @@ impl Content {
                 .as_ref()
                 .map_or(Ok(None), |h| Object::try_from(h.as_ref()).map(Some))?;
             let desc = e.annotation().and_then(|a| a.get_string("description"));
-            let examples = e.annotation().and_then(|a| a.get_enum("examples"));
+            let examples = e.annotation().and_then(|a| a.get_props("examples"));
             Ok(Content {
                 schema,
                 status,

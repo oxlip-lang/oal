@@ -161,7 +161,7 @@ fn evaluate_reference() -> anyhow::Result<()> {
 #[test]
 fn evaluate_reference_examples() -> anyhow::Result<()> {
     let code = r#"
-        # examples: [ "examples/stuff.json" ]
+        # examples: { default: "examples/stuff.json" }
         let @a = {};
         res / ( get -> @a );
     "#;
@@ -183,7 +183,11 @@ fn evaluate_reference_examples() -> anyhow::Result<()> {
         .as_ref()
         .unwrap();
 
-    assert!(range.examples.is_some());
+    let examples = range.examples.as_ref().expect("expected examples");
+
+    let example = examples.get("default").expect("expected default example");
+
+    assert_eq!(example, "examples/stuff.json");
 
     anyhow::Ok(())
 }
