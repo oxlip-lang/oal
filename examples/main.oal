@@ -7,7 +7,8 @@ let @obj3 = f { 'height num } { 'stuff any1 };
 
 // Headers
 # description: "identifier for a specific version of a resource"
-let etag = 'ETag str;
+# required: true
+let etag = 'ETag str `example: "675af34563dc-tr34"`;
 
 # description: "makes the request conditional"
 let ifnmatch = 'If-None-Match str;

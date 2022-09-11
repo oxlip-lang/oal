@@ -1,12 +1,12 @@
 // Primitives with inline annotations
 let id1 = num  `title: "some identifier"`;
-let name = str `pattern: "^[a-z]+$"`;
+let name = str `pattern: "^[a-z]+$", example: sarah`;
 
 // Properties with both statement and inline annotations
 # description: "some parameter"
 let prop1 = 'id id1;
 
-let prop2 = 'n num   `minimum: 0, maximum: 99.99`;
+let prop2 = 'n num   `minimum: 0, maximum: 99.99, example: 42`;
 let prop3 = 'age int `minimum: 0, maximum: 999`;
 
 // Objects

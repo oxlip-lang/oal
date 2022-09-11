@@ -39,6 +39,7 @@ paths:
         - in: query
           name: n
           schema:
+            example: 42.0
             type: number
             minimum: 0.0
             maximum: 99.99
@@ -66,6 +67,7 @@ paths:
         - in: query
           name: n
           schema:
+            example: 42.0
             type: number
             minimum: 0.0
             maximum: 99.99
@@ -113,7 +115,9 @@ paths:
             ETag:
               description: identifier for a specific version of a resource
               style: simple
+              required: true
               schema:
+                example: 675af34563dc-tr34
                 type: string
           content:
             application/vnd.blah+json:
@@ -149,10 +153,12 @@ components:
       type: object
       properties:
         firstName:
+          example: sarah
           title: First name
           type: string
           pattern: "^[a-z]+$"
         lastName:
+          example: sarah
           title: Last name
           type: string
           pattern: "^[a-z]+$"
@@ -160,6 +166,7 @@ components:
           title: Middle names
           type: array
           items:
+            example: sarah
             type: string
             pattern: "^[a-z]+$"
       required:

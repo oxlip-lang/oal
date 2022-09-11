@@ -37,14 +37,14 @@ use "some/other/module.oal";
 ```
 // Primitives with inline annotations
 let id1 = num  `title: "some identifier"`;
-let name = str `pattern: "^[a-z]+$"`;
+let name = str `pattern: "^[a-z]+$", example: sarah`;
 ```
 ```
 // Properties with both statement and inline annotations
 # description: "some parameter"
 let prop1 = 'id id1;
 
-let prop2 = 'n num   `minimum: 0, maximum: 99.99`;
+let prop2 = 'n num   `minimum: 0, maximum: 99.99, example: 42`;
 let prop3 = 'age int `minimum: 0, maximum: 999`;
 ```
 ```
@@ -109,7 +109,8 @@ let @obj3 = f { 'height num } { 'stuff any1 };
 ```
 // Headers
 # description: "identifier for a specific version of a resource"
-let etag = 'ETag str;
+# required: true
+let etag = 'ETag str `example: "675af34563dc-tr34"`;
 
 # description: "makes the request conditional"
 let ifnmatch = 'If-None-Match str;
