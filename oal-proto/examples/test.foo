@@ -1,0 +1,38 @@
+use "module.oal";
+
+res 42;
+
+// Function application
+# description: "some other stuff"
+# examples: { default: "examples/other_stuff.json" }
+let @obj3 = f { 'height num } { 'stuff any1 };
+
+// Headers
+# description: "identifier for a specific version of a resource"
+# required: true
+let etag = 'ETag str `example: "675af34563dc-tr34"`;
+
+# description: "makes the request conditional"
+let ifnmatch = 'If-None-Match str;
+
+// Media types
+let vendor = "application/vnd.blah+json";
+let problem = "application/problem+json";
+
+// Combining contents into ranges
+let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "all good"`
+              :: <status=5XX, media=problem, {}>                `description: "internal error"`
+              :: <status=4XX, media=problem, {}>                `description: "bad request"`
+              :: <>                                             `description: "no content"`;
+
+// Binding everything together as resources
+res rel1;
+
+res /something?{ 'q str } (
+  get : <headers={ifnmatch},> -> with_err @obj3
+);
+
+/*
+ * Block
+ * comments
+*/

@@ -1,5 +1,3 @@
-use oal_syntax::ast;
-
 #[derive(PartialEq, Clone, Debug)]
 pub struct FuncTag {
     pub bindings: Vec<Tag>,
@@ -42,16 +40,6 @@ impl Tag {
 
     pub fn is_status_like(&self) -> bool {
         matches!(self, Tag::Status | Tag::Number)
-    }
-}
-
-impl From<&ast::Literal> for Tag {
-    fn from(l: &ast::Literal) -> Self {
-        match l {
-            ast::Literal::Text(_) => Tag::Text,
-            ast::Literal::Number(_) => Tag::Number,
-            ast::Literal::Status(_) => Tag::Status,
-        }
     }
 }
 

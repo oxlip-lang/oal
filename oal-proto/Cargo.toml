@@ -1,0 +1,8 @@
+[package]
+name = "oal-proto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+oal-model = { path = "../oal-model" }
+oal-syntax = { path = "../oal-syntax" }

@@ -12,6 +12,7 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
+oal-model = { path = "../oal-model" }
 oal-syntax = { path = "../oal-syntax" }
 indexmap = "1.8.1"
 enum-map = "2.1.0"

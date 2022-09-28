@@ -3,7 +3,7 @@ use crate::locator::Locator;
 use crate::node::{NodeMut, NodeRef};
 use crate::scope::Env;
 use crate::tag::{FuncTag, Tag, Tagged};
-use oal_syntax::ast::{AsExpr, Expr, Operator, UriSegment};
+use oal_syntax::ast::{AsExpr, Expr, Literal, Operator, UriSegment};
 use oal_syntax::span::Span;
 use std::collections::HashMap;
 
@@ -22,6 +22,14 @@ impl TagSeq {
     }
 }
 
+fn from_lit(l: &Literal) -> Tag {
+    match l {
+        Literal::Text(_) => Tag::Text,
+        Literal::Number(_) => Tag::Number,
+        Literal::Status(_) => Tag::Status,
+    }
+}
+
 pub fn tag_type<T>(seq: &mut TagSeq, env: &mut Env<T>, node_ref: NodeMut<T>) -> Result<()>
 where
     T: AsExpr + Tagged,
@@ -31,8 +39,7 @@ where
         let span = node.span;
         match node.as_expr() {
             Expr::Lit(l) => {
-                let t = Tag::from(l);
-                expr.set_tag(t);
+                expr.set_tag(from_lit(l));
                 Ok(())
             }
             Expr::Prim(_) => {
@@ -254,8 +261,7 @@ where
         let span = node.span;
         match node.as_expr() {
             Expr::Lit(lit) => {
-                let tag = Tag::from(lit);
-                c.push(expr.unwrap_tag(), tag, span);
+                c.push(expr.unwrap_tag(), from_lit(lit), span);
                 Ok(())
             }
             Expr::Prim(_) => {

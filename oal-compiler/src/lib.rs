@@ -9,6 +9,7 @@ mod locator;
 mod module;
 mod node;
 mod reduction;
+pub mod rewrite;
 mod scan;
 mod scope;
 pub mod spec;
