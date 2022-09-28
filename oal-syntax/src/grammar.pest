@@ -11,10 +11,10 @@ http_status = @{ http_status_range | http_status_code }
 
 ident_char = @{ ASCII_ALPHANUMERIC | "$" | "-" | "_" }
 val_ident = @{ !reserved_keyword ~ ASCII_ALPHA ~ ident_char* }
-ref_ident = @{ "@" ~ ident_char* }
+ref_ident = @{ "@" ~ ident_char+ }
 
 keyname_char = @{ ASCII_ALPHANUMERIC | "@" | "$" | "-" | "_" }
-keyname = @{ keyname_char* }
+keyname = @{ keyname_char+ }
 
 let_kw = @{ "let"  ~ !ASCII_ALPHANUMERIC }
 res_kw = @{ "res"  ~ !ASCII_ALPHANUMERIC }
