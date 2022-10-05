@@ -147,6 +147,11 @@ paths:
           type: string
         style: form
 components:
+  securitySchemes:
+    default:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     obj1:
       description: some stuff

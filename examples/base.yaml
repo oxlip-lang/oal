@@ -9,3 +9,9 @@ info:
 servers:
   - url: '/'
 paths: {}
+components:
+  securitySchemes:
+    default:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

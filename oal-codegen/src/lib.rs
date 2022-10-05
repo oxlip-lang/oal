@@ -41,7 +41,11 @@ impl Builder {
             self.default_base()
         };
         definition.paths = paths;
-        definition.components = Some(components);
+        // Keep non-schema components
+        definition
+            .components
+            .get_or_insert(Default::default())
+            .schemas = components.schemas;
         definition
     }
 
