@@ -347,6 +347,7 @@ impl Builder {
             ReferenceOr::Item(RequestBody {
                 content: indexmap! { media => MediaType {
                     schema: Some(self.schema(schema)),
+                    examples: self.content_examples(domain),
                     ..Default::default()
                 }},
                 description: domain.desc.clone(),

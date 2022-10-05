@@ -50,6 +50,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/obj1"
+            examples:
+              default:
+                externalValue: examples/stuff.json
       responses:
         default:
           description: some content
@@ -78,6 +81,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/obj1"
+            examples:
+              default:
+                externalValue: examples/stuff.json
       responses:
         default:
           description: some content
