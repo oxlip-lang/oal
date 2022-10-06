@@ -7,4 +7,4 @@ edition = "2021"
 oal-syntax = { path = "../oal-syntax" }
 oal-compiler = { path = "../oal-compiler" }
 indexmap = "1.8.1"
-openapiv3 = "1.0.1"
+openapiv3 = { git = "https://github.com/ebastien/openapiv3", branch = "fix/null-options" }
