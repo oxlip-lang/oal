@@ -56,13 +56,24 @@ pub struct Uri {
 
 impl Uri {
     pub fn pattern(&self) -> String {
-        self.path
-            .iter()
-            .map(|s| match s {
-                UriSegment::Literal(l) => format!("/{}", l),
-                UriSegment::Variable(t) => format!("/{{{}}}", t.name),
-            })
-            .collect()
+        self.pattern_with(|p| format!("{{{}}}", p.name.untagged()))
+    }
+
+    pub fn pattern_with<F>(&self, f: F) -> String
+    where
+        F: Fn(&Property) -> String,
+    {
+        const SEGMENT_LENGTH_HINT: usize = 10;
+
+        let mut b = String::with_capacity(self.path.len() * SEGMENT_LENGTH_HINT);
+        for s in self.path.iter() {
+            b.push('/');
+            match s {
+                UriSegment::Literal(l) => b.push_str(l),
+                UriSegment::Variable(t) => b.push_str(f(t).as_str()),
+            }
+        }
+        b
     }
 
     fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
@@ -204,7 +215,7 @@ impl PrimBoolean {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PrimInteger {
     pub minimum: Option<i64>,
     pub maximum: Option<i64>,

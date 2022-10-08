@@ -3,6 +3,7 @@ mod oas;
 use crate::oas::into_box_ref;
 use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
+use oal_compiler::spec::SchemaExpr;
 use oal_syntax::atom::HttpStatusRange;
 use oal_syntax::{ast, atom};
 use openapiv3::*;
@@ -69,8 +70,17 @@ impl Builder {
         "application/json".to_owned()
     }
 
-    fn uri_pattern(&self, uri: &spec::Uri) -> String {
-        uri.pattern()
+    fn uri_example_default(&self, uri: &spec::Uri) -> String {
+        uri.pattern_with(|p| {
+            let t = match p.schema.expr {
+                SchemaExpr::Num(_) => "number",
+                SchemaExpr::Str(_) => "string",
+                SchemaExpr::Bool(_) => "boolean",
+                SchemaExpr::Int(_) => "integer",
+                _ => "unknown",
+            };
+            format!("_{}_{}_", p.name, t)
+        })
     }
 
     fn number_schema(&self, p: &spec::PrimNumber) -> Schema {
@@ -143,7 +153,7 @@ impl Builder {
                 if uri.path.is_empty() {
                     None
                 } else {
-                    Some(self.uri_pattern(uri))
+                    Some(self.uri_example_default(uri))
                 }
             })
             .map(Into::into);

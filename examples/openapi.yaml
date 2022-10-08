@@ -209,6 +209,6 @@ components:
                           type: number
                         - type: string
                     - $ref: "#/components/schemas/obj2"
-                    - example: "/some/path/{id}/template"
+                    - example: /some/path/_id_number_/template
                       type: string
                       format: uri-reference
