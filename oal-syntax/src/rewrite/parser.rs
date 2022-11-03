@@ -67,6 +67,8 @@ where
 
 syntax_nodes!(
     Gram,
+    Property,
+    Array,
     Lambda,
     Symbol,
     Expression,
@@ -213,7 +215,7 @@ where
 
         let uri_var = just_(TokenKind::Control(Control::BlockBegin))
             .leaf()
-            .chain(expr)
+            .chain(expr.clone())
             .chain(just_(TokenKind::Control(Control::BlockEnd)).leaf())
             .tree(SyntaxKind::UriVariable);
 
@@ -244,8 +246,21 @@ where
 
         let prim_type = select! { t@(TokenKind::Keyword(Keyword::Primitive(_)), _) => t }.leaf();
 
+        let array_type = just_(TokenKind::Control(Control::ArrayBegin))
+            .leaf()
+            .chain(expr.clone())
+            .chain(just_(TokenKind::Control(Control::ArrayEnd)).leaf())
+            .tree(SyntaxKind::Array);
+
+        let prop_type = just_(TokenKind::Literal(Literal::Property))
+            .leaf()
+            .chain(expr)
+            .tree(SyntaxKind::Property);
+
         let term_type = prim_type
             .or(uri_type)
+            .or(array_type)
+            .or(prop_type)
             .or(object_type.clone())
             .or(literal_type);
 
