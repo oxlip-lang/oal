@@ -67,6 +67,7 @@ where
 
 syntax_nodes!(
     Gram,
+    Content,
     Property,
     Array,
     Lambda,
@@ -254,14 +255,33 @@ where
 
         let prop_type = just_(TokenKind::Literal(Literal::Property))
             .leaf()
-            .chain(expr)
+            .chain(expr.clone())
             .tree(SyntaxKind::Property);
+
+        let content_prop = select! { t@(TokenKind::Keyword(Keyword::Content(_)), _) => t }
+            .leaf()
+            .chain(just_(TokenKind::Operator(Operator::Equal)).leaf())
+            .chain(expr.clone());
+
+        let content_type = just_(TokenKind::Control(Control::ContentBegin))
+            .leaf()
+            .chain(
+                content_prop
+                    .clone()
+                    .chain(just_(TokenKind::Control(Control::Comma)).leaf())
+                    .repeated()
+                    .flatten(),
+            )
+            .chain(expr.or_not())
+            .chain(just_(TokenKind::Control(Control::ContentEnd)).leaf())
+            .tree(SyntaxKind::Content);
 
         let term_type = prim_type
             .or(uri_type)
             .or(array_type)
             .or(prop_type)
             .or(object_type.clone())
+            .or(content_type)
             .or(literal_type);
 
         let apply = just_(TokenKind::Identifier(Identifier::Value))

@@ -24,15 +24,20 @@ pub enum Primitive {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Keyword {
-    Method(Method),
-    Primitive(Primitive),
-    Let,
-    Res,
-    Use,
+pub enum Content {
     Media,
     Headers,
     Status,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Keyword {
+    Method(Method),
+    Primitive(Primitive),
+    Content(Content),
+    Let,
+    Res,
+    Use,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -202,9 +207,9 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
             "delete" => Ok(Keyword::Method(Method::Delete)),
             "options" => Ok(Keyword::Method(Method::Options)),
             "head" => Ok(Keyword::Method(Method::Head)),
-            "media" => Ok(Keyword::Media),
-            "headers" => Ok(Keyword::Headers),
-            "status" => Ok(Keyword::Status),
+            "media" => Ok(Keyword::Content(Content::Media)),
+            "headers" => Ok(Keyword::Content(Content::Headers)),
+            "status" => Ok(Keyword::Content(Content::Status)),
             _ => Err(Simple::custom(span, "not a keyword")),
         })
         .map(|k| (TokenKind::Keyword(k), TokenValue::None));
