@@ -1,10 +1,12 @@
 use crate::atom::Ident;
+use crate::errors::Result;
 use crate::rewrite::lexer::{
-    Control, Identifier, Keyword, Lex, Literal, Operator, Path, Primitive, TokenKind, TokenValue,
+    Annotation, Control, Identifier, Keyword, Lex, Literal, Operator, Path, Primitive, TokenKind,
+    TokenValue,
 };
 use chumsky::prelude::*;
 use oal_model::grammar::*;
-use oal_model::lexicon::{Interner, TokenList};
+use oal_model::lexicon::{Interner, TokenAlias, TokenList};
 use oal_model::syntax_nodes;
 use std::fmt::Debug;
 
@@ -17,31 +19,34 @@ impl Grammar for Gram {
 }
 
 impl Gram {
-    pub fn parse<T>(tokens: TokenList<Lex>) -> SyntaxTree<T, Gram>
+    pub fn parse<T>(tokens: TokenList<Lex>) -> Result<SyntaxTree<T, Gram>>
     where
         T: Clone + Default,
     {
-        let (root, _) = parser::<T>().parse_recovery(
+        let (root, mut errs) = parser::<T>().parse_recovery(
             tokens.stream(|k| !matches!(k, TokenKind::Space | TokenKind::Comment(_))),
         );
 
-        let root = root.unwrap();
-
-        SyntaxTree::import(tokens, root)
+        if !errs.is_empty() {
+            Err(errs.swap_remove(0).into())
+        } else {
+            Ok(SyntaxTree::import(tokens, root.unwrap()))
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct Term<'a, T>(NodeRef<'a, T, Gram>);
+pub struct Symbol<'a, T>(NodeRef<'a, T, Gram>);
 
-#[allow(dead_code)]
-impl<'a, T> Term<'a, T>
+impl<'a, T> Symbol<'a, T>
 where
     T: Default + Clone,
 {
     pub fn cast(node: NodeRef<'a, T, Gram>) -> Option<Self> {
         match node.syntax().trunk() {
-            SyntaxTrunk::Leaf(_) => Some(Term(node)),
+            SyntaxTrunk::Leaf(t) if matches!(t.kind(), TokenKind::Identifier(_)) => {
+                Some(Symbol(node))
+            }
             _ => None,
         }
     }
@@ -50,29 +55,21 @@ where
         self.0
     }
 
-    pub fn kind(&self) -> TokenKind {
-        match self.node().syntax().trunk() {
-            SyntaxTrunk::Leaf((kind, _)) => *kind,
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn to_ident(&self) -> Ident {
+    pub fn ident(&self) -> Ident {
         match self.node().token().value() {
             TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
-            _ => panic!("identifier must be a symbol"),
+            _ => panic!("identifier must be a registered string"),
         }
     }
 }
 
 syntax_nodes!(
     Gram,
+    Terminal,
+    SubExpression,
     Content,
     Property,
     Array,
-    Lambda,
-    Symbol,
-    Expression,
     Declaration,
     UriVariable,
     UriPath,
@@ -87,15 +84,6 @@ syntax_nodes!(
     Relation,
     Program
 );
-
-impl<'a, T> Symbol<'a, T>
-where
-    T: Default + Clone,
-{
-    pub fn term(&'a self) -> Term<'a, T> {
-        Term::cast(self.node().first()).unwrap()
-    }
-}
 
 impl<'a, T> Program<'a, T>
 where
@@ -119,25 +107,19 @@ where
     T: Default + Clone,
 {
     // TODO: get the real values for this
-    const NAME_POS: usize = 1;
+    const SYM_POS: usize = 1;
     const RHS_POS: usize = 2;
 
-    pub fn name(&'a self) -> Ident {
-        let name = self.node().nth(Self::NAME_POS);
-        if let Some(term) = Term::cast(name) {
-            term.to_ident()
+    pub fn symbol(&'a self) -> Symbol<'a, T> {
+        if let Some(symbol) = Symbol::cast(self.node().nth(Self::SYM_POS)) {
+            symbol
         } else {
-            panic!("declaration name must be a terminal")
+            panic!("declaration lhs must be a symbol")
         }
     }
 
-    pub fn rhs(&'a self) -> Expression<T> {
-        let rhs = self.node().nth(Self::RHS_POS);
-        if let Some(expr) = Expression::cast(rhs) {
-            expr
-        } else {
-            panic!("declaration rhs must be an expression")
-        }
+    pub fn rhs(&'a self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::RHS_POS)
     }
 }
 
@@ -155,9 +137,9 @@ where
     }
 }
 
-fn just_<E>(kind: TokenKind) -> impl Parser<SyntaxToken<Lex>, SyntaxToken<Lex>, Error = E> + Clone
+fn just_<E>(kind: TokenKind) -> impl Parser<TokenAlias<Lex>, TokenAlias<Lex>, Error = E> + Clone
 where
-    E: chumsky::Error<SyntaxToken<Lex>>,
+    E: chumsky::Error<TokenAlias<Lex>>,
 {
     just_token::<_, Gram>(kind)
 }
@@ -165,10 +147,10 @@ where
 fn variadic_op<'a, P, E, T>(
     op: Operator,
     p: P,
-) -> impl Parser<SyntaxToken<Lex>, ParseNode<T, Gram>, Error = E> + Clone + 'a
+) -> impl Parser<TokenAlias<Lex>, ParseNode<T, Gram>, Error = E> + Clone + 'a
 where
-    P: Parser<SyntaxToken<Lex>, ParseNode<T, Gram>, Error = E> + Clone + 'a,
-    E: chumsky::Error<SyntaxToken<Lex>> + 'a,
+    P: Parser<TokenAlias<Lex>, ParseNode<T, Gram>, Error = E> + Clone + 'a,
+    E: chumsky::Error<TokenAlias<Lex>> + 'a,
     T: Default + Clone + 'a,
 {
     p.clone()
@@ -182,21 +164,47 @@ where
         .skip_tree(SyntaxKind::VariadicOp)
 }
 
+macro_rules! match_ {
+    ($($p:pat $(if $guard:expr)?),+ $(,)?) => ({
+        chumsky::primitive::filter_map(move |span, x: TokenAlias<Lex>| match x.kind() {
+            $($p $(if $guard)? => ::core::result::Result::Ok(x)),+,
+            _ => ::core::result::Result::Err(chumsky::error::Error::expected_input_found(span, ::core::option::Option::None, ::core::option::Option::Some(x))),
+        })
+    });
+}
+
 fn parser<'a, T>(
-) -> impl Parser<SyntaxToken<Lex>, ParseNode<T, Gram>, Error = Simple<SyntaxToken<Lex>>> + 'a
+) -> impl Parser<TokenAlias<Lex>, ParseNode<T, Gram>, Error = Simple<TokenAlias<Lex>>> + 'a
 where
     T: Default + Clone + 'a,
 {
-    let annotation = select! { t@(TokenKind::Annotation(_), _) => t }.leaf();
+    let binding = just_(TokenKind::Identifier(Identifier::Value)).leaf();
 
-    let import = just_(TokenKind::Keyword(Keyword::Use))
-        .leaf()
-        .chain(just_(TokenKind::Literal(Literal::String)).leaf())
-        .tree(SyntaxKind::Import);
+    let variable = match_! { TokenKind::Identifier(_) }.leaf();
+
+    let literal_type = match_! { TokenKind::Literal(_) }.leaf();
+
+    let prim_type = match_! { TokenKind::Keyword(Keyword::Primitive(_)) }.leaf();
+
+    let uri_root = just_(TokenKind::Literal(Literal::Path(Path::Root))).leaf();
+
+    let uri_segment = just_(TokenKind::Literal(Literal::Path(Path::Segment))).leaf();
+
+    let method = match_! { TokenKind::Keyword(Keyword::Method(_)) }.leaf();
+
+    let methods = method.chain(
+        just_(TokenKind::Control(Control::Comma))
+            .leaf()
+            .chain(method)
+            .repeated()
+            .flatten(),
+    );
+
+    let line_ann = just_(TokenKind::Annotation(Annotation::Line)).leaf();
+
+    let inline_ann = just_(TokenKind::Annotation(Annotation::Inline)).leaf();
 
     let expr_type = recursive(|expr| {
-        let literal_type = select! { t@(TokenKind::Literal(_), _) => t }.leaf();
-
         let object_type = just_(TokenKind::Control(Control::BlockBegin))
             .leaf()
             .chain(
@@ -220,9 +228,6 @@ where
             .chain(just_(TokenKind::Control(Control::BlockEnd)).leaf())
             .tree(SyntaxKind::UriVariable);
 
-        let uri_root = just_(TokenKind::Literal(Literal::Path(Path::Root))).leaf();
-        let uri_segment = just_(TokenKind::Literal(Literal::Path(Path::Segment))).leaf();
-
         let uri_path = uri_segment
             .map(|l| vec![l])
             .or(uri_root.chain(uri_var.or_not()))
@@ -245,20 +250,18 @@ where
             .leaf()
             .or(uri_template);
 
-        let prim_type = select! { t@(TokenKind::Keyword(Keyword::Primitive(_)), _) => t }.leaf();
-
         let array_type = just_(TokenKind::Control(Control::ArrayBegin))
             .leaf()
             .chain(expr.clone())
             .chain(just_(TokenKind::Control(Control::ArrayEnd)).leaf())
             .tree(SyntaxKind::Array);
 
-        let prop_type = just_(TokenKind::Literal(Literal::Property))
+        let prop_type = just_(TokenKind::Property)
             .leaf()
             .chain(expr.clone())
             .tree(SyntaxKind::Property);
 
-        let content_prop = select! { t@(TokenKind::Keyword(Keyword::Content(_)), _) => t }
+        let content_prop = match_! { TokenKind::Keyword(Keyword::Content(_)) }
             .leaf()
             .chain(just_(TokenKind::Operator(Operator::Equal)).leaf())
             .chain(expr.clone());
@@ -272,17 +275,27 @@ where
                     .repeated()
                     .flatten(),
             )
-            .chain(expr.or_not())
+            .chain(expr.clone().or_not())
             .chain(just_(TokenKind::Control(Control::ContentEnd)).leaf())
             .tree(SyntaxKind::Content);
 
-        let term_type = prim_type
+        let paren_type = just_(TokenKind::Control(Control::ParenthesisBegin))
+            .leaf()
+            .chain(expr.clone())
+            .chain(just_(TokenKind::Control(Control::ParenthesisEnd)).leaf())
+            .tree(SyntaxKind::SubExpression);
+
+        let term_type = literal_type
+            .or(prim_type)
             .or(uri_type)
             .or(array_type)
             .or(prop_type)
             .or(object_type.clone())
             .or(content_type)
-            .or(literal_type);
+            .or(paren_type)
+            .or(variable)
+            .chain(inline_ann.or_not())
+            .tree(SyntaxKind::Terminal);
 
         let apply = just_(TokenKind::Identifier(Identifier::Value))
             .leaf()
@@ -298,16 +311,6 @@ where
         let any_type = variadic_op(Operator::Tilde, join_type);
 
         let sum_type = variadic_op(Operator::VerticalBar, any_type);
-
-        let method = select! { t@(TokenKind::Keyword(Keyword::Method(_)), _) => t }.leaf();
-
-        let methods = method.chain(
-            just_(TokenKind::Control(Control::Comma))
-                .leaf()
-                .chain(method)
-                .repeated()
-                .flatten(),
-        );
 
         let xfer = methods
             .chain(object_type.or_not())
@@ -340,15 +343,31 @@ where
         rel_type.or(xfer_type)
     });
 
+    let declaration = just_(TokenKind::Keyword(Keyword::Let))
+        .leaf()
+        .chain(variable)
+        .chain(binding.repeated())
+        .chain(just_(TokenKind::Operator(Operator::Equal)).leaf())
+        .chain(expr_type.clone())
+        .chain(just_(TokenKind::Control(Control::Semicolon)).leaf())
+        .tree(SyntaxKind::Declaration);
+
     let resource = just_(TokenKind::Keyword(Keyword::Res))
         .leaf()
         .chain(expr_type)
         .chain(just_(TokenKind::Control(Control::Semicolon)).leaf())
         .tree(SyntaxKind::Resource);
 
-    let statement = annotation
-        .or(import)
+    let import = just_(TokenKind::Keyword(Keyword::Use))
+        .leaf()
+        .chain(just_(TokenKind::Literal(Literal::String)).leaf())
+        .chain(just_(TokenKind::Control(Control::Semicolon)).leaf())
+        .tree(SyntaxKind::Import);
+
+    let statement = line_ann
+        .or(declaration)
         .or(resource)
+        .or(import)
         .recover_with(skip_then_retry_until([]));
 
     statement.repeated().tree(SyntaxKind::Program)

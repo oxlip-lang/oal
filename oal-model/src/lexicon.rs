@@ -1,5 +1,5 @@
 use chumsky::{prelude::*, Stream};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use string_interner::{DefaultSymbol, StringInterner};
 
 pub type Span = std::ops::Range<usize>;
@@ -26,9 +26,30 @@ pub type Token<L> = (<L as Lexicon>::Kind, <L as Lexicon>::Value);
 
 pub type TokenIdx = generational_token_list::ItemToken;
 
-pub type TokenInput<L> = (<L as Lexicon>::Kind, TokenIdx);
-
 pub type TokenSpan<L> = (Token<L>, Span);
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct TokenAlias<L: Lexicon>(L::Kind, TokenIdx);
+
+impl<L: Lexicon> TokenAlias<L> {
+    pub fn from(kind: L::Kind, idx: TokenIdx) -> Self {
+        TokenAlias(kind, idx)
+    }
+
+    pub fn kind(&self) -> L::Kind {
+        self.0
+    }
+
+    pub fn index(&self) -> TokenIdx {
+        self.1
+    }
+}
+
+impl<L: Lexicon> Display for TokenAlias<L> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?}", self.0)
+    }
+}
 
 type ListArena<L> = generational_token_list::GenerationalTokenList<(Token<L>, Span)>;
 
@@ -71,7 +92,7 @@ where
     pub fn stream<'a, F>(
         &'a self,
         filter: F,
-    ) -> Stream<TokenInput<L>, Span, impl Iterator<Item = (TokenInput<L>, Span)> + 'a>
+    ) -> Stream<TokenAlias<L>, Span, impl Iterator<Item = (TokenAlias<L>, Span)> + 'a>
     where
         F: Fn(L::Kind) -> bool + 'a,
     {
@@ -81,7 +102,7 @@ where
             self.list
                 .iter_with_tokens()
                 .filter_map(move |(index, ((kind, _value), span))| {
-                    filter(*kind).then(|| ((*kind, index), span.clone()))
+                    filter(*kind).then(|| (TokenAlias::from(*kind, index), span.clone()))
                 });
         Stream::from_iter(len..len + 1, iter)
     }

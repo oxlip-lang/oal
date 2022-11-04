@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 oal-model = { path = "../oal-model" }
 oal-syntax = { path = "../oal-syntax" }
+anyhow = "1.0.57"

@@ -1,7 +1,5 @@
 use "module.oal";
 
-res 42;
-
 // Function application
 # description: "some other stuff"
 # examples: { default: "examples/other_stuff.json" }

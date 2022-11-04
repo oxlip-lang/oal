@@ -1,4 +1,5 @@
 use crate::atom;
+use crate::errors::Result;
 use chumsky::prelude::*;
 use oal_model::lexicon::*;
 use std::fmt::Debug;
@@ -78,7 +79,6 @@ pub enum Literal {
     Number,
     String,
     Path(Path),
-    Property,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -102,6 +102,7 @@ pub enum Identifier {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     Space,
+    Property,
     Comment(Comment),
     Annotation(Annotation),
     Identifier(Identifier),
@@ -132,7 +133,7 @@ impl Interned for TokenValue {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Default, Debug)]
 pub struct Lex;
 
 impl Lexicon for Lex {
@@ -141,25 +142,28 @@ impl Lexicon for Lex {
 }
 
 impl Lex {
-    pub fn tokenize(input: &str) -> TokenList<Self> {
+    pub fn tokenize(input: &str) -> Result<TokenList<Self>> {
         let mut token_list = TokenList::default();
 
-        let (tokens, _) = lexer().parse_recovery(input);
+        let (tokens, mut errs) = lexer().parse_recovery(input);
 
-        let tokens = tokens.unwrap();
-
-        // Note: Chumsky does not support stateful combinators at the moment.
-        // Therefore we need a second pass over the vector of tokens to
-        // internalize the strings and build the index list.
-        tokens.into_iter().for_each(|((kind, value), span)| {
-            let value = match value {
-                TokenValue::String(s) => TokenValue::Symbol(token_list.register(s)),
-                _ => value,
-            };
-            token_list.push(((kind, value), span));
-        });
-
-        token_list
+        if !errs.is_empty() {
+            Err(errs.swap_remove(0).into())
+        } else {
+            if let Some(tokens) = tokens {
+                // Note: Chumsky does not support stateful combinators at the moment.
+                // Therefore we need a second pass over the vector of tokens to
+                // internalize the strings and build the index list.
+                tokens.into_iter().for_each(|((kind, value), span)| {
+                    let value = match value {
+                        TokenValue::String(s) => TokenValue::Symbol(token_list.register(s)),
+                        _ => value,
+                    };
+                    token_list.push(((kind, value), span));
+                });
+            }
+            Ok(token_list)
+        }
     }
 }
 
@@ -223,7 +227,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
             .at_least(1),
         )
         .collect::<String>()
-        .map(|p| (TokenKind::Literal(Literal::Property), TokenValue::String(p)));
+        .map(|p| (TokenKind::Property, TokenValue::String(p)));
 
     let http_status_range = one_of("12345")
         .then_ignore(just("XX"))
