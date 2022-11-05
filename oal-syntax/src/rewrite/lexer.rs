@@ -1,5 +1,4 @@
 use crate::atom;
-use crate::errors::Result;
 use chumsky::prelude::*;
 use oal_model::lexicon::*;
 use std::fmt::Debug;
@@ -112,7 +111,7 @@ pub enum TokenKind {
     Operator(Operator),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TokenValue {
     None,
     HttpStatus(atom::HttpStatus),
@@ -133,41 +132,39 @@ impl Interned for TokenValue {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Default, Debug)]
-pub struct Lex;
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Token(TokenKind, TokenValue);
 
-impl Lexicon for Lex {
+impl Lexeme for Token {
     type Kind = TokenKind;
     type Value = TokenValue;
-}
 
-impl Lex {
-    pub fn tokenize(input: &str) -> Result<TokenList<Self>> {
-        let mut token_list = TokenList::default();
+    fn new(kind: TokenKind, value: TokenValue) -> Self {
+        Token(kind, value)
+    }
 
-        let (tokens, mut errs) = lexer().parse_recovery(input);
+    fn kind(&self) -> TokenKind {
+        self.0
+    }
 
-        if !errs.is_empty() {
-            Err(errs.swap_remove(0).into())
-        } else {
-            if let Some(tokens) = tokens {
-                // Note: Chumsky does not support stateful combinators at the moment.
-                // Therefore we need a second pass over the vector of tokens to
-                // internalize the strings and build the index list.
-                tokens.into_iter().for_each(|((kind, value), span)| {
-                    let value = match value {
-                        TokenValue::String(s) => TokenValue::Symbol(token_list.register(s)),
-                        _ => value,
-                    };
-                    token_list.push(((kind, value), span));
-                });
-            }
-            Ok(token_list)
-        }
+    fn value(&self) -> &TokenValue {
+        &self.1
+    }
+
+    fn is_trivia(&self) -> bool {
+        matches!(self.0, TokenKind::Space | TokenKind::Comment(_))
+    }
+
+    fn internalize<I: Interner>(self, i: &mut I) -> Self {
+        let value = match self.1 {
+            TokenValue::String(s) => TokenValue::Symbol(i.register(s)),
+            v => v,
+        };
+        Self::new(self.0, value)
     }
 }
 
-fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
+pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>> {
     let ident_chars =
         filter(|c: &char| c.is_ascii_alphanumeric() || *c == '$' || *c == '-' || *c == '_')
             .repeated();
@@ -176,7 +173,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         .chain(ident_chars)
         .collect::<String>()
         .map(|i| {
-            (
+            Token::new(
                 TokenKind::Identifier(Identifier::Value),
                 TokenValue::String(i),
             )
@@ -186,7 +183,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         .chain(ident_chars.at_least(1))
         .collect::<String>()
         .map(|i| {
-            (
+            Token::new(
                 TokenKind::Identifier(Identifier::Reference),
                 TokenValue::String(i),
             )
@@ -216,7 +213,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
             "status" => Ok(Keyword::Content(Content::Status)),
             _ => Err(Simple::custom(span, "not a keyword")),
         })
-        .map(|k| (TokenKind::Keyword(k), TokenValue::None));
+        .map(|k| Token::new(TokenKind::Keyword(k), TokenValue::None));
 
     let property = just('\'')
         .ignore_then(
@@ -227,7 +224,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
             .at_least(1),
         )
         .collect::<String>()
-        .map(|p| (TokenKind::Property, TokenValue::String(p)));
+        .map(|p| Token::new(TokenKind::Property, TokenValue::String(p)));
 
     let http_status_range = one_of("12345")
         .then_ignore(just("XX"))
@@ -240,14 +237,14 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
             _ => unreachable!(),
         })
         .map(|r| {
-            (
+            Token::new(
                 TokenKind::Literal(Literal::HttpStatus),
                 TokenValue::HttpStatus(atom::HttpStatus::Range(r)),
             )
         });
 
     let lit_num = text::int(10).map(|n: String| {
-        (
+        Token::new(
             TokenKind::Literal(Literal::Number),
             TokenValue::Number(n.parse().unwrap()),
         )
@@ -257,7 +254,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         .ignore_then(filter(|c| *c != '"').repeated())
         .then_ignore(just('"'))
         .collect()
-        .map(|s| (TokenKind::Literal(Literal::String), TokenValue::String(s)));
+        .map(|s| Token::new(TokenKind::Literal(Literal::String), TokenValue::String(s)));
 
     let lit_path = just('/')
         .ignore_then(
@@ -274,12 +271,12 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         .collect::<String>()
         .map(|p| {
             if p.is_empty() {
-                (
+                Token::new(
                     TokenKind::Literal(Literal::Path(Path::Root)),
                     TokenValue::None,
                 )
             } else {
-                (
+                Token::new(
                     TokenKind::Literal(Literal::Path(Path::Segment)),
                     TokenValue::String(p),
                 )
@@ -301,7 +298,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         .or(just('&').to(Operator::Ampersand))
         .or(just('~').to(Operator::Tilde))
         .or(just('|').to(Operator::VerticalBar))
-        .map(|p| (TokenKind::Operator(p), TokenValue::None));
+        .map(|p| Token::new(TokenKind::Operator(p), TokenValue::None));
 
     let control = select! {
         '{' => Control::BlockBegin,
@@ -315,20 +312,20 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         ';' => Control::Semicolon,
         ',' => Control::Comma,
     }
-    .map(|c| (TokenKind::Control(c), TokenValue::None));
+    .map(|c| Token::new(TokenKind::Control(c), TokenValue::None));
 
     let space = filter(|c: &char| c.is_whitespace())
         .repeated()
         .at_least(1)
         .collect::<String>()
-        .map(|s| (TokenKind::Space, TokenValue::String(s)));
+        .map(|s| Token::new(TokenKind::Space, TokenValue::String(s)));
 
     let newline = one_of("\r\n").repeated().at_least(1);
 
     let line_comment = just("//")
         .ignore_then(take_until(newline.clone()))
         .map(|(c, n)| {
-            (
+            Token::new(
                 TokenKind::Comment(Comment::Line),
                 TokenValue::String(c.into_iter().chain(n.into_iter()).collect()),
             )
@@ -337,7 +334,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
     let block_comment = just("/*")
         .ignore_then(take_until(just("*/")))
         .map(|(c, _)| {
-            (
+            Token::new(
                 TokenKind::Comment(Comment::Block),
                 TokenValue::String(c.into_iter().collect()),
             )
@@ -346,7 +343,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
     let comment = line_comment.or(block_comment);
 
     let line_ann = just('#').ignore_then(take_until(newline)).map(|(c, n)| {
-        (
+        Token::new(
             TokenKind::Annotation(Annotation::Line),
             TokenValue::String(c.into_iter().chain(n.into_iter()).collect()),
         )
@@ -357,7 +354,7 @@ fn lexer() -> impl Parser<char, Vec<TokenSpan<Lex>>, Error = Simple<char>> {
         .then_ignore(just('`'))
         .collect()
         .map(|a| {
-            (
+            Token::new(
                 TokenKind::Annotation(Annotation::Inline),
                 TokenValue::String(a),
             )

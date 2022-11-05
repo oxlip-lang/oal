@@ -1,12 +1,11 @@
 use crate::atom::Ident;
-use crate::errors::Result;
 use crate::rewrite::lexer::{
-    Annotation, Control, Identifier, Keyword, Lex, Literal, Operator, Path, Primitive, TokenKind,
+    Annotation, Control, Identifier, Keyword, Literal, Operator, Path, Primitive, Token, TokenKind,
     TokenValue,
 };
 use chumsky::prelude::*;
 use oal_model::grammar::*;
-use oal_model::lexicon::{Interner, TokenAlias, TokenList};
+use oal_model::lexicon::{Interner, TokenAlias};
 use oal_model::syntax_nodes;
 use std::fmt::Debug;
 
@@ -14,25 +13,8 @@ use std::fmt::Debug;
 pub struct Gram;
 
 impl Grammar for Gram {
-    type Lex = Lex;
+    type Lex = Token;
     type Kind = SyntaxKind;
-}
-
-impl Gram {
-    pub fn parse<T>(tokens: TokenList<Lex>) -> Result<SyntaxTree<T, Gram>>
-    where
-        T: Clone + Default,
-    {
-        let (root, mut errs) = parser::<T>().parse_recovery(
-            tokens.stream(|k| !matches!(k, TokenKind::Space | TokenKind::Comment(_))),
-        );
-
-        if !errs.is_empty() {
-            Err(errs.swap_remove(0).into())
-        } else {
-            Ok(SyntaxTree::import(tokens, root.unwrap()))
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -137,9 +119,9 @@ where
     }
 }
 
-fn just_<E>(kind: TokenKind) -> impl Parser<TokenAlias<Lex>, TokenAlias<Lex>, Error = E> + Clone
+fn just_<E>(kind: TokenKind) -> impl Parser<TokenAlias<Token>, TokenAlias<Token>, Error = E> + Clone
 where
-    E: chumsky::Error<TokenAlias<Lex>>,
+    E: chumsky::Error<TokenAlias<Token>>,
 {
     just_token::<_, Gram>(kind)
 }
@@ -147,10 +129,10 @@ where
 fn variadic_op<'a, P, E, T>(
     op: Operator,
     p: P,
-) -> impl Parser<TokenAlias<Lex>, ParseNode<T, Gram>, Error = E> + Clone + 'a
+) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = E> + Clone + 'a
 where
-    P: Parser<TokenAlias<Lex>, ParseNode<T, Gram>, Error = E> + Clone + 'a,
-    E: chumsky::Error<TokenAlias<Lex>> + 'a,
+    P: Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = E> + Clone + 'a,
+    E: chumsky::Error<TokenAlias<Token>> + 'a,
     T: Default + Clone + 'a,
 {
     p.clone()
@@ -166,15 +148,19 @@ where
 
 macro_rules! match_ {
     ($($p:pat $(if $guard:expr)?),+ $(,)?) => ({
-        chumsky::primitive::filter_map(move |span, x: TokenAlias<Lex>| match x.kind() {
+        chumsky::primitive::filter_map(move |span, x: TokenAlias<Token>| match x.kind() {
             $($p $(if $guard)? => ::core::result::Result::Ok(x)),+,
-            _ => ::core::result::Result::Err(chumsky::error::Error::expected_input_found(span, ::core::option::Option::None, ::core::option::Option::Some(x))),
+            _ => ::core::result::Result::Err(
+                chumsky::error::Error::expected_input_found(
+                    span, ::core::option::Option::None, ::core::option::Option::Some(x)
+                )
+            ),
         })
     });
 }
 
-fn parser<'a, T>(
-) -> impl Parser<TokenAlias<Lex>, ParseNode<T, Gram>, Error = Simple<TokenAlias<Lex>>> + 'a
+pub fn parser<'a, T>(
+) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = Simple<TokenAlias<Token>>> + 'a
 where
     T: Default + Clone + 'a,
 {
