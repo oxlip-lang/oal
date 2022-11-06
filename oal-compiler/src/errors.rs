@@ -1,4 +1,4 @@
-use oal_syntax::span::Span;
+use oal_model::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

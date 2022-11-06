@@ -1,8 +1,8 @@
 use crate::ast::*;
 use crate::atom::{HttpStatus, HttpStatusRange, Method, Primitive};
 use crate::parse;
-use crate::span::Span;
 use enum_map::enum_map;
+use oal_model::span::Span;
 
 #[derive(Clone, Debug, PartialEq)]
 struct TestExpr(NodeExpr<TestExpr>);

@@ -1,10 +1,18 @@
 use crate::atom::{HttpStatus, HttpStatusRange, Ident, Method, Primitive, Text};
-use crate::span::Span;
 use crate::{Pair, Rule};
 use enum_map::EnumMap;
+use oal_model::span::Span;
 use std::fmt::Debug;
 use std::iter::{once, Flatten, Once};
 use std::slice::{Iter, IterMut};
+
+fn pair_span(p: &Pair) -> Span {
+    let s = p.as_span();
+    Span {
+        start: s.start_pos().line_col(),
+        end: s.end_pos().line_col(),
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr<T> {
@@ -83,7 +91,7 @@ impl<T: FromPair> IntoExpr<T> for Pair<'_> {
 
 impl<T: AsExpr> FromPair for T {
     fn from_pair(p: Pair) -> T {
-        let span = Span::from(&p);
+        let span = pair_span(&p);
         let mut expr = match p.as_rule() {
             Rule::expr_type | Rule::paren_type | Rule::app_type | Rule::xfer_type => {
                 p.into_inner().next().unwrap().into_expr()
@@ -249,7 +257,7 @@ pub struct Annotation {
 
 impl FromPair for Annotation {
     fn from_pair(p: Pair) -> Self {
-        let span = Some(Span::from(&p));
+        let span = Some(pair_span(&p));
         let text = p.into_inner().next().unwrap().as_str().to_owned();
         Annotation { text, span }
     }

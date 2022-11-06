@@ -3,7 +3,6 @@ pub mod atom;
 pub mod errors;
 mod parser;
 pub mod rewrite;
-pub mod span;
 
 #[cfg(test)]
 mod ast_tests;
