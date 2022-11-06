@@ -1,8 +1,6 @@
 use crate::atom::Ident;
-use crate::rewrite::lexer::{
-    Annotation, Control, Identifier, Keyword, Literal, Operator, Path, Primitive, Token, TokenKind,
-    TokenValue,
-};
+use crate::rewrite::lexer as lex;
+use crate::rewrite::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
 use oal_model::grammar::*;
 use oal_model::lexicon::{Interner, TokenAlias};
@@ -27,7 +25,7 @@ where
     pub fn cast(node: NodeRef<'a, T, Gram>) -> Option<Self> {
         match node.syntax().trunk() {
             SyntaxTrunk::Leaf(t) if matches!(t.kind(), TokenKind::Identifier(_)) => {
-                Some(Symbol(node))
+                Some(Self(node))
             }
             _ => None,
         }
@@ -42,6 +40,35 @@ where
             TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
             _ => panic!("identifier must be a registered string"),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Primitive<'a, T>(NodeRef<'a, T, Gram>);
+
+impl<'a, T> Primitive<'a, T>
+where
+    T: Default + Clone,
+{
+    pub fn cast(node: NodeRef<'a, T, Gram>) -> Option<Self> {
+        match node.syntax().trunk() {
+            SyntaxTrunk::Leaf(t)
+                if matches!(t.kind(), TokenKind::Keyword(lex::Keyword::Primitive(_))) =>
+            {
+                Some(Self(node))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn node(&self) -> NodeRef<'a, T, Gram> {
+        self.0
+    }
+
+    pub fn kind(&self) -> lex::Primitive {
+        let SyntaxTrunk::Leaf(t) = self.node().syntax().trunk() else { unreachable!() };
+        let TokenKind::Keyword(lex::Keyword::Primitive(p)) = t.kind() else { unreachable!() };
+        p
     }
 }
 
@@ -88,9 +115,8 @@ impl<'a, T> Declaration<'a, T>
 where
     T: Default + Clone,
 {
-    // TODO: get the real values for this
     const SYM_POS: usize = 1;
-    const RHS_POS: usize = 2;
+    const RHS_POS: usize = 3;
 
     pub fn symbol(&'a self) -> Symbol<'a, T> {
         if let Some(symbol) = Symbol::cast(self.node().nth(Self::SYM_POS)) {
@@ -119,6 +145,15 @@ where
     }
 }
 
+impl<'a, T> Terminal<'a, T>
+where
+    T: Default + Clone,
+{
+    pub fn inner(&'a self) -> NodeRef<'a, T, Gram> {
+        self.node().first()
+    }
+}
+
 fn just_<E>(kind: TokenKind) -> impl Parser<TokenAlias<Token>, TokenAlias<Token>, Error = E> + Clone
 where
     E: chumsky::Error<TokenAlias<Token>>,
@@ -127,7 +162,7 @@ where
 }
 
 fn variadic_op<'a, P, E, T>(
-    op: Operator,
+    op: lex::Operator,
     p: P,
 ) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = E> + Clone + 'a
 where
@@ -164,39 +199,39 @@ pub fn parser<'a, T>(
 where
     T: Default + Clone + 'a,
 {
-    let binding = just_(TokenKind::Identifier(Identifier::Value)).leaf();
+    let binding = just_(TokenKind::Identifier(lex::Identifier::Value)).leaf();
 
     let variable = match_! { TokenKind::Identifier(_) }.leaf();
 
     let literal_type = match_! { TokenKind::Literal(_) }.leaf();
 
-    let prim_type = match_! { TokenKind::Keyword(Keyword::Primitive(_)) }.leaf();
+    let prim_type = match_! { TokenKind::Keyword(lex::Keyword::Primitive(_)) }.leaf();
 
-    let uri_root = just_(TokenKind::Literal(Literal::Path(Path::Root))).leaf();
+    let uri_root = just_(TokenKind::Literal(lex::Literal::Path(lex::Path::Root))).leaf();
 
-    let uri_segment = just_(TokenKind::Literal(Literal::Path(Path::Segment))).leaf();
+    let uri_segment = just_(TokenKind::Literal(lex::Literal::Path(lex::Path::Segment))).leaf();
 
-    let method = match_! { TokenKind::Keyword(Keyword::Method(_)) }.leaf();
+    let method = match_! { TokenKind::Keyword(lex::Keyword::Method(_)) }.leaf();
 
     let methods = method.chain(
-        just_(TokenKind::Control(Control::Comma))
+        just_(TokenKind::Control(lex::Control::Comma))
             .leaf()
             .chain(method)
             .repeated()
             .flatten(),
     );
 
-    let line_ann = just_(TokenKind::Annotation(Annotation::Line)).leaf();
+    let line_ann = just_(TokenKind::Annotation(lex::Annotation::Line)).leaf();
 
-    let inline_ann = just_(TokenKind::Annotation(Annotation::Inline)).leaf();
+    let inline_ann = just_(TokenKind::Annotation(lex::Annotation::Inline)).leaf();
 
     let expr_type = recursive(|expr| {
-        let object_type = just_(TokenKind::Control(Control::BlockBegin))
+        let object_type = just_(TokenKind::Control(lex::Control::BlockBegin))
             .leaf()
             .chain(
                 expr.clone()
                     .chain(
-                        just_(TokenKind::Control(Control::Comma))
+                        just_(TokenKind::Control(lex::Control::Comma))
                             .leaf()
                             .chain(expr.clone())
                             .repeated()
@@ -205,13 +240,13 @@ where
                     .or_not()
                     .flatten(),
             )
-            .chain(just_(TokenKind::Control(Control::BlockEnd)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::BlockEnd)).leaf())
             .tree(SyntaxKind::Object);
 
-        let uri_var = just_(TokenKind::Control(Control::BlockBegin))
+        let uri_var = just_(TokenKind::Control(lex::Control::BlockBegin))
             .leaf()
             .chain(expr.clone())
-            .chain(just_(TokenKind::Control(Control::BlockEnd)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::BlockEnd)).leaf())
             .tree(SyntaxKind::UriVariable);
 
         let uri_path = uri_segment
@@ -223,7 +258,7 @@ where
             .collect()
             .tree(SyntaxKind::UriPath);
 
-        let uri_params = just_(TokenKind::Operator(Operator::QuestionMark))
+        let uri_params = just_(TokenKind::Operator(lex::Operator::QuestionMark))
             .leaf()
             .chain(object_type.clone())
             .tree(SyntaxKind::UriParams);
@@ -232,14 +267,16 @@ where
             .chain(uri_params.or_not())
             .tree(SyntaxKind::UriTemplate);
 
-        let uri_type = just_(TokenKind::Keyword(Keyword::Primitive(Primitive::Uri)))
-            .leaf()
-            .or(uri_template);
+        let uri_type = just_(TokenKind::Keyword(lex::Keyword::Primitive(
+            lex::Primitive::Uri,
+        )))
+        .leaf()
+        .or(uri_template);
 
-        let array_type = just_(TokenKind::Control(Control::ArrayBegin))
+        let array_type = just_(TokenKind::Control(lex::Control::ArrayBegin))
             .leaf()
             .chain(expr.clone())
-            .chain(just_(TokenKind::Control(Control::ArrayEnd)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::ArrayEnd)).leaf())
             .tree(SyntaxKind::Array);
 
         let prop_type = just_(TokenKind::Property)
@@ -247,28 +284,28 @@ where
             .chain(expr.clone())
             .tree(SyntaxKind::Property);
 
-        let content_prop = match_! { TokenKind::Keyword(Keyword::Content(_)) }
+        let content_prop = match_! { TokenKind::Keyword(lex::Keyword::Content(_)) }
             .leaf()
-            .chain(just_(TokenKind::Operator(Operator::Equal)).leaf())
+            .chain(just_(TokenKind::Operator(lex::Operator::Equal)).leaf())
             .chain(expr.clone());
 
-        let content_type = just_(TokenKind::Control(Control::ContentBegin))
+        let content_type = just_(TokenKind::Control(lex::Control::ContentBegin))
             .leaf()
             .chain(
                 content_prop
                     .clone()
-                    .chain(just_(TokenKind::Control(Control::Comma)).leaf())
+                    .chain(just_(TokenKind::Control(lex::Control::Comma)).leaf())
                     .repeated()
                     .flatten(),
             )
             .chain(expr.clone().or_not())
-            .chain(just_(TokenKind::Control(Control::ContentEnd)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::ContentEnd)).leaf())
             .tree(SyntaxKind::Content);
 
-        let paren_type = just_(TokenKind::Control(Control::ParenthesisBegin))
+        let paren_type = just_(TokenKind::Control(lex::Control::ParenthesisBegin))
             .leaf()
             .chain(expr.clone())
-            .chain(just_(TokenKind::Control(Control::ParenthesisEnd)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::ParenthesisEnd)).leaf())
             .tree(SyntaxKind::SubExpression);
 
         let term_type = literal_type
@@ -283,71 +320,71 @@ where
             .chain(inline_ann.or_not())
             .tree(SyntaxKind::Terminal);
 
-        let apply = just_(TokenKind::Identifier(Identifier::Value))
+        let apply = just_(TokenKind::Identifier(lex::Identifier::Value))
             .leaf()
             .chain(term_type.clone().repeated().at_least(1))
             .tree(SyntaxKind::Application);
 
         let app_type = apply.or(term_type.clone());
 
-        let range_type = variadic_op(Operator::DoubleColon, app_type);
+        let range_type = variadic_op(lex::Operator::DoubleColon, app_type);
 
-        let join_type = variadic_op(Operator::Ampersand, range_type.clone());
+        let join_type = variadic_op(lex::Operator::Ampersand, range_type.clone());
 
-        let any_type = variadic_op(Operator::Tilde, join_type);
+        let any_type = variadic_op(lex::Operator::Tilde, join_type);
 
-        let sum_type = variadic_op(Operator::VerticalBar, any_type);
+        let sum_type = variadic_op(lex::Operator::VerticalBar, any_type);
 
         let xfer = methods
             .chain(object_type.or_not())
             .chain(
-                just_(TokenKind::Operator(Operator::Colon))
+                just_(TokenKind::Operator(lex::Operator::Colon))
                     .leaf()
                     .chain(term_type.clone())
                     .or_not()
                     .flatten(),
             )
-            .chain(just_(TokenKind::Operator(Operator::Arrow)).leaf())
+            .chain(just_(TokenKind::Operator(lex::Operator::Arrow)).leaf())
             .chain(range_type)
             .tree(SyntaxKind::Transfer);
 
         let xfer_type = xfer.or(sum_type);
 
         let rel_type = term_type
-            .chain(just_(TokenKind::Control(Control::ParenthesisBegin)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::ParenthesisBegin)).leaf())
             .chain(xfer_type.clone())
             .chain(
-                just_(TokenKind::Control(Control::Comma))
+                just_(TokenKind::Control(lex::Control::Comma))
                     .leaf()
                     .chain(xfer_type.clone())
                     .repeated()
                     .flatten(),
             )
-            .chain(just_(TokenKind::Control(Control::ParenthesisEnd)).leaf())
+            .chain(just_(TokenKind::Control(lex::Control::ParenthesisEnd)).leaf())
             .tree(SyntaxKind::Relation);
 
         rel_type.or(xfer_type)
     });
 
-    let declaration = just_(TokenKind::Keyword(Keyword::Let))
+    let declaration = just_(TokenKind::Keyword(lex::Keyword::Let))
         .leaf()
         .chain(variable)
         .chain(binding.repeated())
-        .chain(just_(TokenKind::Operator(Operator::Equal)).leaf())
+        .chain(just_(TokenKind::Operator(lex::Operator::Equal)).leaf())
         .chain(expr_type.clone())
-        .chain(just_(TokenKind::Control(Control::Semicolon)).leaf())
+        .chain(just_(TokenKind::Control(lex::Control::Semicolon)).leaf())
         .tree(SyntaxKind::Declaration);
 
-    let resource = just_(TokenKind::Keyword(Keyword::Res))
+    let resource = just_(TokenKind::Keyword(lex::Keyword::Res))
         .leaf()
         .chain(expr_type)
-        .chain(just_(TokenKind::Control(Control::Semicolon)).leaf())
+        .chain(just_(TokenKind::Control(lex::Control::Semicolon)).leaf())
         .tree(SyntaxKind::Resource);
 
-    let import = just_(TokenKind::Keyword(Keyword::Use))
+    let import = just_(TokenKind::Keyword(lex::Keyword::Use))
         .leaf()
-        .chain(just_(TokenKind::Literal(Literal::String)).leaf())
-        .chain(just_(TokenKind::Control(Control::Semicolon)).leaf())
+        .chain(just_(TokenKind::Literal(lex::Literal::String)).leaf())
+        .chain(just_(TokenKind::Control(lex::Control::Semicolon)).leaf())
         .tree(SyntaxKind::Import);
 
     let statement = line_ann

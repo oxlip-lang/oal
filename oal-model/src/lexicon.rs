@@ -123,13 +123,16 @@ where
     }
 }
 
-pub fn tokenize<L: Lexeme, P>(input: &str, lexer: P) -> Result<TokenList<L>>
+/// Parse a string of characters, yielding a list of tokens.
+pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>>
 where
+    L: Lexeme,
+    I: AsRef<str>,
     P: Parser<char, Vec<TokenSpan<L>>, Error = Simple<char>>,
 {
     let mut token_list = TokenList::<L>::default();
 
-    let (tokens, mut errs) = lexer.parse_recovery(input);
+    let (tokens, mut errs) = lexer.parse_recovery(input.as_ref());
 
     if !errs.is_empty() {
         Err(errs.swap_remove(0).into())

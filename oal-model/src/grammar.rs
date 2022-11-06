@@ -435,7 +435,8 @@ where
     filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() == kind)
 }
 
-pub fn parse<G, P, T>(tokens: TokenList<G::Lex>, parser: P) -> Result<SyntaxTree<T, G>>
+/// Perform syntax analysis over a list of tokens, yielding a concrete syntax tree.
+pub fn analyze<G, P, T>(tokens: TokenList<G::Lex>, parser: P) -> Result<SyntaxTree<T, G>>
 where
     G: Grammar,
     P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = Simple<TokenAlias<G::Lex>>>,
@@ -446,6 +447,7 @@ where
     if !errs.is_empty() {
         Err(errs.swap_remove(0).into())
     } else {
-        Ok(SyntaxTree::import(tokens, root.unwrap()))
+        let root = root.expect("a successful parsing must return a syntax tree");
+        Ok(SyntaxTree::import(tokens, root))
     }
 }
