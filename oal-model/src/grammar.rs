@@ -225,9 +225,17 @@ where
         TokenRef { tokens, idx }
     }
 
-    pub fn value(&self) -> &<<G as Grammar>::Lex as Lexeme>::Value {
+    fn inner(&self) -> &<G as Grammar>::Lex {
         let (token, _) = self.tokens.get(self.idx);
-        token.value()
+        token
+    }
+
+    pub fn value(&self) -> &<<G as Grammar>::Lex as Lexeme>::Value {
+        self.inner().value()
+    }
+
+    pub fn kind(&self) -> <<G as Grammar>::Lex as Lexeme>::Kind {
+        self.inner().kind()
     }
 }
 
@@ -279,7 +287,7 @@ where
     pub fn token(&self) -> TokenRef<'a, G> {
         match self.syntax().trunk() {
             SyntaxTrunk::Leaf(t) => TokenRef::from(&self.tree.tokens, t.index()),
-            _ => panic!("tokens only present in leaves"),
+            _ => panic!("a node must be a leaf to link to a token"),
         }
     }
 
@@ -361,6 +369,37 @@ macro_rules! syntax_nodes {
             }
         )+
     }
+}
+
+#[macro_export]
+macro_rules! terminal_node {
+    ( $grammar:ident, $node:ident, $pat:pat  ) => {
+        #[allow(dead_code)]
+        #[derive(Debug)]
+        pub struct $node<'a, T>(NodeRef<'a, T, $grammar>);
+
+        #[allow(dead_code)]
+        impl<'a, T> $node<'a, T>
+        where
+            T: Default + Clone,
+        {
+            pub fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
+                match node.syntax().trunk() {
+                    SyntaxTrunk::Leaf(t) if matches!(t.kind(), $pat) => Some(Self(node)),
+                    _ => None,
+                }
+            }
+
+            pub fn node(&self) -> NodeRef<'a, T, $grammar> {
+                self.0
+            }
+
+            pub fn token(&self) -> TokenAlias<<$grammar as Grammar>::Lex> {
+                let SyntaxTrunk::Leaf(t) = self.node().syntax().trunk() else { unreachable!() };
+                *t
+            }
+        }
+    };
 }
 
 pub trait AsLeaf<T, G: Grammar> {

@@ -4,7 +4,7 @@ use crate::rewrite::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
 use oal_model::grammar::*;
 use oal_model::lexicon::{Interner, TokenAlias};
-use oal_model::syntax_nodes;
+use oal_model::{syntax_nodes, terminal_node};
 use std::fmt::Debug;
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -15,26 +15,9 @@ impl Grammar for Gram {
     type Kind = SyntaxKind;
 }
 
-#[derive(Debug)]
-pub struct Symbol<'a, T>(NodeRef<'a, T, Gram>);
+terminal_node!(Gram, Symbol, TokenKind::Identifier(_));
 
-impl<'a, T> Symbol<'a, T>
-where
-    T: Default + Clone,
-{
-    pub fn cast(node: NodeRef<'a, T, Gram>) -> Option<Self> {
-        match node.syntax().trunk() {
-            SyntaxTrunk::Leaf(t) if matches!(t.kind(), TokenKind::Identifier(_)) => {
-                Some(Self(node))
-            }
-            _ => None,
-        }
-    }
-
-    pub fn node(&self) -> NodeRef<'a, T, Gram> {
-        self.0
-    }
-
+impl<'a, T: Default + Clone> Symbol<'a, T> {
     pub fn ident(&self) -> Ident {
         match self.node().token().value() {
             TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
@@ -43,31 +26,15 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct Primitive<'a, T>(NodeRef<'a, T, Gram>);
+terminal_node!(
+    Gram,
+    Primitive,
+    TokenKind::Keyword(lex::Keyword::Primitive(_))
+);
 
-impl<'a, T> Primitive<'a, T>
-where
-    T: Default + Clone,
-{
-    pub fn cast(node: NodeRef<'a, T, Gram>) -> Option<Self> {
-        match node.syntax().trunk() {
-            SyntaxTrunk::Leaf(t)
-                if matches!(t.kind(), TokenKind::Keyword(lex::Keyword::Primitive(_))) =>
-            {
-                Some(Self(node))
-            }
-            _ => None,
-        }
-    }
-
-    pub fn node(&self) -> NodeRef<'a, T, Gram> {
-        self.0
-    }
-
-    pub fn kind(&self) -> lex::Primitive {
-        let SyntaxTrunk::Leaf(t) = self.node().syntax().trunk() else { unreachable!() };
-        let TokenKind::Keyword(lex::Keyword::Primitive(p)) = t.kind() else { unreachable!() };
+impl<'a, T: Default + Clone> Primitive<'a, T> {
+    pub fn primitive(&self) -> lex::Primitive {
+        let TokenKind::Keyword(lex::Keyword::Primitive(p)) = self.node().token().kind() else { unreachable!() };
         p
     }
 }
@@ -98,15 +65,15 @@ impl<'a, T> Program<'a, T>
 where
     T: Default + Clone,
 {
-    pub fn resources(&'a self) -> impl Iterator<Item = Resource<T>> {
+    pub fn resources(&self) -> impl Iterator<Item = Resource<'a, T>> {
         self.node().children().filter_map(Resource::cast)
     }
 
-    pub fn declarations(&'a self) -> impl Iterator<Item = Declaration<T>> {
+    pub fn declarations(&self) -> impl Iterator<Item = Declaration<'a, T>> {
         self.node().children().filter_map(Declaration::cast)
     }
 
-    pub fn imports(&'a self) -> impl Iterator<Item = Import<T>> {
+    pub fn imports(&self) -> impl Iterator<Item = Import<'a, T>> {
         self.node().children().filter_map(Import::cast)
     }
 }
@@ -118,15 +85,12 @@ where
     const SYM_POS: usize = 1;
     const RHS_POS: usize = 3;
 
-    pub fn symbol(&'a self) -> Symbol<'a, T> {
-        if let Some(symbol) = Symbol::cast(self.node().nth(Self::SYM_POS)) {
-            symbol
-        } else {
-            panic!("declaration lhs must be a symbol")
-        }
+    pub fn symbol(&self) -> Symbol<'a, T> {
+        let Some(symbol) = Symbol::cast(self.node().nth(Self::SYM_POS)) else { panic!("declaration lhs must be a symbol") };
+        symbol
     }
 
-    pub fn rhs(&'a self) -> NodeRef<'a, T, Gram> {
+    pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
         self.node().nth(Self::RHS_POS)
     }
 }
@@ -137,7 +101,7 @@ where
 {
     const MODULE_POS: usize = 1;
 
-    pub fn module(&'a self) -> &'a str {
+    pub fn module(&self) -> &'a str {
         match self.node().nth(Self::MODULE_POS).token().value() {
             TokenValue::Symbol(sym) => self.node().tree().resolve(*sym),
             _ => panic!("module must be a symbol"),
@@ -149,7 +113,7 @@ impl<'a, T> Terminal<'a, T>
 where
     T: Default + Clone,
 {
-    pub fn inner(&'a self) -> NodeRef<'a, T, Gram> {
+    pub fn inner(&self) -> NodeRef<'a, T, Gram> {
         self.node().first()
     }
 }
