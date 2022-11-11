@@ -67,7 +67,7 @@ pub enum Operator {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Path {
+pub enum PathElement {
     Root,
     Segment,
 }
@@ -77,7 +77,6 @@ pub enum Literal {
     HttpStatus,
     Number,
     String,
-    Path(Path),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -102,6 +101,7 @@ pub enum Identifier {
 pub enum TokenKind {
     Space,
     Property,
+    PathElement(PathElement),
     Comment(Comment),
     Annotation(Annotation),
     Identifier(Identifier),
@@ -243,20 +243,20 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>>
             )
         });
 
-    let lit_num = text::int(10).map(|n: String| {
+    let literal_number = text::int(10).map(|n: String| {
         Token::new(
             TokenKind::Literal(Literal::Number),
             TokenValue::Number(n.parse().unwrap()),
         )
     });
 
-    let lit_str = just('"')
+    let literal_string = just('"')
         .ignore_then(filter(|c| *c != '"').repeated())
         .then_ignore(just('"'))
         .collect()
         .map(|s| Token::new(TokenKind::Literal(Literal::String), TokenValue::String(s)));
 
-    let lit_path = just('/')
+    let path_element = just('/')
         .ignore_then(
             filter(|c: &char| {
                 c.is_ascii_alphanumeric()
@@ -271,23 +271,16 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>>
         .collect::<String>()
         .map(|p| {
             if p.is_empty() {
-                Token::new(
-                    TokenKind::Literal(Literal::Path(Path::Root)),
-                    TokenValue::None,
-                )
+                Token::new(TokenKind::PathElement(PathElement::Root), TokenValue::None)
             } else {
                 Token::new(
-                    TokenKind::Literal(Literal::Path(Path::Segment)),
+                    TokenKind::PathElement(PathElement::Segment),
                     TokenValue::String(p),
                 )
             }
         });
 
-    let literal = lit_str
-        .or(property)
-        .or(http_status_range)
-        .or(lit_num)
-        .or(lit_path);
+    let literal = literal_string.or(http_status_range).or(literal_number);
 
     let operator = just("->")
         .to(Operator::Arrow)
@@ -342,14 +335,14 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>>
 
     let comment = line_comment.or(block_comment);
 
-    let line_ann = just('#').ignore_then(take_until(newline)).map(|(c, n)| {
+    let line_annotation = just('#').ignore_then(take_until(newline)).map(|(c, n)| {
         Token::new(
             TokenKind::Annotation(Annotation::Line),
             TokenValue::String(c.into_iter().chain(n.into_iter()).collect()),
         )
     });
 
-    let inline_ann = just('`')
+    let inline_annotation = just('`')
         .ignore_then(filter(|c| *c != '`').repeated())
         .then_ignore(just('`'))
         .collect()
@@ -360,14 +353,16 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>>
             )
         });
 
-    let annotation = line_ann.or(inline_ann);
+    let annotation = line_annotation.or(inline_annotation);
 
     let token = space
         .or(comment)
         .or(annotation)
         .or(control)
         .or(operator)
+        .or(property)
         .or(literal)
+        .or(path_element)
         .or(keyword)
         .or(ident)
         .recover_with(skip_then_retry_until([]));

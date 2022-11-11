@@ -17,7 +17,7 @@ pub fn resolve(mods: &ModuleSet) -> Result<()> {
                         if let Some(program) = Program::cast(module.tree().root()) {
                             for decl in program.declarations() {
                                 let ext = External::new(module, decl.rhs());
-                                env.declare(decl.symbol().ident().clone(), ext);
+                                env.declare(decl.symbol().as_ident().clone(), ext);
                             }
                         } else {
                             panic!("module root must be a program")
@@ -31,9 +31,9 @@ pub fn resolve(mods: &ModuleSet) -> Result<()> {
                     // TODO: declare lambda bindings if any
                 } else if let Some(decl) = Declaration::cast(node) {
                     let ext = External::new(mods.main(), decl.rhs());
-                    env.declare(decl.symbol().ident(), ext);
+                    env.declare(decl.symbol().as_ident(), ext);
                 } else if let Some(symbol) = Symbol::cast(node) {
-                    let ident = symbol.ident();
+                    let ident = symbol.as_ident();
                     if let Some(ext) = env.lookup(&ident) {
                         symbol
                             .node()

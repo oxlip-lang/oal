@@ -18,7 +18,7 @@ impl Grammar for Gram {
 terminal_node!(Gram, Symbol, TokenKind::Identifier(_));
 
 impl<'a, T: Default + Clone> Symbol<'a, T> {
-    pub fn ident(&self) -> Ident {
+    pub fn as_ident(&self) -> Ident {
         match self.node().token().value() {
             TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
             _ => panic!("identifier must be a registered string"),
@@ -36,6 +36,35 @@ impl<'a, T: Default + Clone> Primitive<'a, T> {
     pub fn primitive(&self) -> lex::Primitive {
         let TokenKind::Keyword(lex::Keyword::Primitive(p)) = self.node().token().kind() else { unreachable!() };
         p
+    }
+}
+
+terminal_node!(Gram, PathElement, TokenKind::PathElement(_));
+
+impl<'a, T: Default + Clone> PathElement<'a, T> {
+    pub fn as_str(&self) -> &str {
+        match self.node().token().kind() {
+            TokenKind::PathElement(lex::PathElement::Root) => "/",
+            TokenKind::PathElement(lex::PathElement::Segment) => {
+                if let TokenValue::Symbol(sym) = self.node().token().value() {
+                    self.node().tree().resolve(*sym)
+                } else {
+                    panic!("path segment must be a registered string")
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+terminal_node!(Gram, ProperyName, TokenKind::Property);
+
+impl<'a, T: Default + Clone> ProperyName<'a, T> {
+    pub fn as_ident(&self) -> Ident {
+        match self.node().token().value() {
+            TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
+            _ => panic!("property name must be a registered string"),
+        }
     }
 }
 
@@ -61,10 +90,7 @@ syntax_nodes!(
     Program
 );
 
-impl<'a, T> Program<'a, T>
-where
-    T: Default + Clone,
-{
+impl<'a, T: Default + Clone> Program<'a, T> {
     pub fn resources(&self) -> impl Iterator<Item = Resource<'a, T>> {
         self.node().children().filter_map(Resource::cast)
     }
@@ -78,10 +104,7 @@ where
     }
 }
 
-impl<'a, T> Declaration<'a, T>
-where
-    T: Default + Clone,
-{
+impl<'a, T: Default + Clone> Declaration<'a, T> {
     const SYM_POS: usize = 1;
     const RHS_POS: usize = 3;
 
@@ -95,10 +118,7 @@ where
     }
 }
 
-impl<'a, T> Import<'a, T>
-where
-    T: Default + Clone,
-{
+impl<'a, T: Default + Clone> Import<'a, T> {
     const MODULE_POS: usize = 1;
 
     pub fn module(&self) -> &'a str {
@@ -109,12 +129,90 @@ where
     }
 }
 
-impl<'a, T> Terminal<'a, T>
-where
-    T: Default + Clone,
-{
+impl<'a, T: Default + Clone> Terminal<'a, T> {
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
         self.node().first()
+    }
+}
+
+impl<'a, T: Default + Clone> Array<'a, T> {
+    const INNER_POS: usize = 1;
+
+    pub fn inner(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::INNER_POS)
+    }
+}
+
+impl<'a, T: Default + Clone> UriTemplate<'a, T> {
+    const PATH_POS: usize = 0;
+    const PARAMS_POS: usize = 1;
+
+    pub fn path(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::PATH_POS)
+    }
+
+    pub fn params(&self) -> Option<UriParams<'a, T>> {
+        self.node()
+            .children()
+            .nth(Self::PARAMS_POS)
+            .and_then(UriParams::cast)
+    }
+}
+
+impl<'a, T: Default + Clone> UriVariable<'a, T> {
+    const INNER_POS: usize = 1;
+
+    pub fn inner(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::INNER_POS)
+    }
+}
+
+impl<'a, T: Default + Clone> UriParams<'a, T> {
+    const INNER_POS: usize = 1;
+
+    pub fn properties(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
+        let Some(object) = Object::cast(self.node().nth(Self::INNER_POS)) else { panic!("URI parameters must be an object") };
+        object.properties()
+    }
+}
+
+impl<'a, T: Default + Clone> Property<'a, T> {
+    const NAME_POS: usize = 0;
+    const RHS_POS: usize = 1;
+
+    pub fn name(&self) -> ProperyName<'a, T> {
+        let Some(name) = ProperyName::cast(self.node().nth(Self::NAME_POS)) else { panic!("expected a propery name") };
+        name
+    }
+
+    pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::RHS_POS)
+    }
+}
+
+impl<'a, T: Default + Clone> Object<'a, T> {
+    pub fn properties(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
+        self.node().children().skip(1).step_by(2)
+    }
+}
+
+#[derive(Debug)]
+pub enum UriSegment<'a, T: Clone + Default> {
+    Element(PathElement<'a, T>),
+    Variable(UriVariable<'a, T>),
+}
+
+impl<'a, T: Default + Clone> UriPath<'a, T> {
+    pub fn segments(&self) -> impl Iterator<Item = UriSegment<'a, T>> {
+        self.node().children().filter_map(|c| {
+            if let Some(v) = UriVariable::cast(c) {
+                Some(UriSegment::Variable(v))
+            } else if let Some(p) = PathElement::cast(c) {
+                Some(UriSegment::Element(p))
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -171,9 +269,9 @@ where
 
     let prim_type = match_! { TokenKind::Keyword(lex::Keyword::Primitive(_)) }.leaf();
 
-    let uri_root = just_(TokenKind::Literal(lex::Literal::Path(lex::Path::Root))).leaf();
+    let uri_root = just_(TokenKind::PathElement(lex::PathElement::Root)).leaf();
 
-    let uri_segment = just_(TokenKind::Literal(lex::Literal::Path(lex::Path::Segment))).leaf();
+    let uri_segment = just_(TokenKind::PathElement(lex::PathElement::Segment)).leaf();
 
     let method = match_! { TokenKind::Keyword(lex::Keyword::Method(_)) }.leaf();
 

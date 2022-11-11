@@ -5,7 +5,7 @@ use crate::lexicon::{
 use chumsky::prelude::*;
 use generational_indextree::NodeEdge;
 use std::cell::{Ref, RefCell, RefMut};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 
 pub type NodeIdx = generational_indextree::NodeId;
 
@@ -16,10 +16,19 @@ pub trait Grammar: Clone + Default + Debug {
     type Kind: Copy + Clone + PartialEq + Debug;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum SyntaxTrunk<G: Grammar> {
     Leaf(TokenAlias<G::Lex>),
     Tree(G::Kind),
+}
+
+impl<G: Grammar> Debug for SyntaxTrunk<G> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SyntaxTrunk::Leaf(t) => t.kind().fmt(f),
+            SyntaxTrunk::Tree(k) => k.fmt(f),
+        }
+    }
 }
 
 impl<G: Grammar> Copy for SyntaxTrunk<G> {}
@@ -239,7 +248,6 @@ where
     }
 }
 
-#[derive(Debug)]
 pub struct NodeRef<'a, T, G: Grammar> {
     tree: &'a SyntaxTree<T, G>,
     idx: NodeIdx,
@@ -258,7 +266,11 @@ impl<'a, T, G: Grammar> Clone for NodeRef<'a, T, G> {
 impl<'a, T, G: Grammar> Copy for NodeRef<'a, T, G> {}
 
 #[derive(Debug)]
-pub enum NodeCursor<'a, T, G: Grammar> {
+pub enum NodeCursor<'a, T, G>
+where
+    T: Clone + Default,
+    G: Grammar,
+{
     Start(NodeRef<'a, T, G>),
     End(NodeRef<'a, T, G>),
 }
@@ -289,6 +301,14 @@ where
             SyntaxTrunk::Leaf(t) => TokenRef::from(&self.tree.tokens, t.index()),
             _ => panic!("a node must be a leaf to link to a token"),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.tree.children(self.idx).count()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn children(&self) -> impl Iterator<Item = NodeRef<'a, T, G>> + 'a {
@@ -337,6 +357,21 @@ where
     }
 }
 
+impl<'a, T, G> Debug for NodeRef<'a, T, G>
+where
+    T: Clone + Default,
+    G: Grammar,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?}", self.syntax().trunk())?;
+        if !self.is_empty() {
+            write!(f, " -> ")?;
+            f.debug_list().entries(self.children()).finish()?;
+        }
+        Ok(())
+    }
+}
+
 #[macro_export]
 macro_rules! syntax_nodes {
     ( $grammar:ident, $( $node:ident ),+ ) => {
@@ -349,7 +384,7 @@ macro_rules! syntax_nodes {
         $(
             #[allow(dead_code)]
             #[derive(Debug)]
-            pub struct $node<'a, T>(NodeRef<'a, T, $grammar>);
+            pub struct $node<'a, T: Default + Clone>(NodeRef<'a, T, $grammar>);
 
             #[allow(dead_code)]
             impl<'a, T> $node<'a, T>
@@ -376,7 +411,7 @@ macro_rules! terminal_node {
     ( $grammar:ident, $node:ident, $pat:pat  ) => {
         #[allow(dead_code)]
         #[derive(Debug)]
-        pub struct $node<'a, T>(NodeRef<'a, T, $grammar>);
+        pub struct $node<'a, T: Default + Clone>(NodeRef<'a, T, $grammar>);
 
         #[allow(dead_code)]
         impl<'a, T> $node<'a, T>
