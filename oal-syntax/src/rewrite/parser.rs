@@ -4,7 +4,7 @@ use crate::rewrite::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
 use oal_model::grammar::*;
 use oal_model::lexicon::{Interner, TokenAlias};
-use oal_model::{syntax_nodes, terminal_node};
+use oal_model::{match_token, syntax_nodes, terminal_node};
 use std::fmt::Debug;
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -68,6 +68,15 @@ impl<'a, T: Default + Clone> ProperyName<'a, T> {
     }
 }
 
+terminal_node!(Gram, Method, TokenKind::Keyword(lex::Keyword::Method(_)));
+
+impl<'a, T: Default + Clone> Method<'a, T> {
+    pub fn method(&self) -> lex::Method {
+        let TokenKind::Keyword(lex::Keyword::Method(m)) = self.node().token().kind() else { unreachable!() };
+        m
+    }
+}
+
 syntax_nodes!(
     Gram,
     Terminal,
@@ -83,6 +92,9 @@ syntax_nodes!(
     Object,
     Application,
     VariadicOp,
+    XferMethods,
+    XferParams,
+    XferDomain,
     Transfer,
     Import,
     Resource,
@@ -196,6 +208,51 @@ impl<'a, T: Default + Clone> Object<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> XferParams<'a, T> {
+    const INNER_POS: usize = 0;
+
+    pub fn properties(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
+        self.node().children().nth(Self::INNER_POS).map(|i| {
+            let Some(object) = Object::cast(i) else { panic!("transfer parameters must be an object") };
+            object.properties()
+        })
+    }
+}
+
+impl<'a, T: Default + Clone> XferDomain<'a, T> {
+    const INNER_POS: usize = 1;
+
+    pub fn inner(&self) -> Option<Terminal<'a, T>> {
+        self.node()
+            .children()
+            .nth(Self::INNER_POS)
+            .and_then(Terminal::cast)
+    }
+}
+
+impl<'a, T: Default + Clone> Transfer<'a, T> {
+    const METHODS_POS: usize = 0;
+    const PARAMS_POS: usize = 1;
+    const DOMAIN_POS: usize = 2;
+
+    pub fn methods(&self) -> impl Iterator<Item = Method<'a, T>> {
+        self.node()
+            .nth(Self::METHODS_POS)
+            .children()
+            .filter_map(Method::cast)
+    }
+
+    pub fn params(&self) -> XferParams<'a, T> {
+        let Some(params) = XferParams::cast(self.node().nth(Self::PARAMS_POS)) else { panic!("expected transfer parameters") };
+        params
+    }
+
+    pub fn domain(&self) -> XferDomain<'a, T> {
+        let Some(domain) = XferDomain::cast(self.node().nth(Self::DOMAIN_POS)) else { panic!("expected transfer domain") };
+        domain
+    }
+}
+
 #[derive(Debug)]
 pub enum UriSegment<'a, T: Clone + Default> {
     Element(PathElement<'a, T>),
@@ -216,13 +273,6 @@ impl<'a, T: Default + Clone> UriPath<'a, T> {
     }
 }
 
-fn just_<E>(kind: TokenKind) -> impl Parser<TokenAlias<Token>, TokenAlias<Token>, Error = E> + Clone
-where
-    E: chumsky::Error<TokenAlias<Token>>,
-{
-    just_token::<_, Gram>(kind)
-}
-
 fn variadic_op<'a, P, E, T>(
     op: lex::Operator,
     p: P,
@@ -232,28 +282,15 @@ where
     E: chumsky::Error<TokenAlias<Token>> + 'a,
     T: Default + Clone + 'a,
 {
-    p.clone()
-        .chain(
-            just_(TokenKind::Operator(op))
-                .leaf()
+    tree_skip(
+        p.clone().chain(
+            just_token(TokenKind::Operator(op))
                 .chain(p)
                 .repeated()
                 .flatten(),
-        )
-        .skip_tree(SyntaxKind::VariadicOp)
-}
-
-macro_rules! match_ {
-    ($($p:pat $(if $guard:expr)?),+ $(,)?) => ({
-        chumsky::primitive::filter_map(move |span, x: TokenAlias<Token>| match x.kind() {
-            $($p $(if $guard)? => ::core::result::Result::Ok(x)),+,
-            _ => ::core::result::Result::Err(
-                chumsky::error::Error::expected_input_found(
-                    span, ::core::option::Option::None, ::core::option::Option::Some(x)
-                )
-            ),
-        })
-    });
+        ),
+        SyntaxKind::VariadicOp,
+    )
 }
 
 pub fn parser<'a, T>(
@@ -261,131 +298,138 @@ pub fn parser<'a, T>(
 where
     T: Default + Clone + 'a,
 {
-    let binding = just_(TokenKind::Identifier(lex::Identifier::Value)).leaf();
+    let binding = just_token(TokenKind::Identifier(lex::Identifier::Value));
 
-    let variable = match_! { TokenKind::Identifier(_) }.leaf();
+    let variable = match_token! { TokenKind::Identifier(_) };
 
-    let literal_type = match_! { TokenKind::Literal(_) }.leaf();
+    let literal_type = match_token! { TokenKind::Literal(_) };
 
-    let prim_type = match_! { TokenKind::Keyword(lex::Keyword::Primitive(_)) }.leaf();
+    let prim_type = match_token! { TokenKind::Keyword(lex::Keyword::Primitive(_)) };
 
-    let uri_root = just_(TokenKind::PathElement(lex::PathElement::Root)).leaf();
+    let uri_root = just_token(TokenKind::PathElement(lex::PathElement::Root));
 
-    let uri_segment = just_(TokenKind::PathElement(lex::PathElement::Segment)).leaf();
+    let uri_segment = just_token(TokenKind::PathElement(lex::PathElement::Segment));
 
-    let method = match_! { TokenKind::Keyword(lex::Keyword::Method(_)) }.leaf();
+    let method = match_token! { TokenKind::Keyword(lex::Keyword::Method(_)) };
 
-    let methods = method.chain(
-        just_(TokenKind::Control(lex::Control::Comma))
-            .leaf()
-            .chain(method)
-            .repeated()
-            .flatten(),
+    let xfer_methods = tree_many(
+        method.chain(
+            just_token(TokenKind::Control(lex::Control::Comma))
+                .chain(method)
+                .repeated()
+                .flatten(),
+        ),
+        SyntaxKind::XferMethods,
     );
 
-    let line_ann = just_(TokenKind::Annotation(lex::Annotation::Line)).leaf();
+    let line_ann = just_token(TokenKind::Annotation(lex::Annotation::Line));
 
-    let inline_ann = just_(TokenKind::Annotation(lex::Annotation::Inline)).leaf();
+    let inline_ann = just_token(TokenKind::Annotation(lex::Annotation::Inline));
 
     let expr_type = recursive(|expr| {
-        let object_type = just_(TokenKind::Control(lex::Control::BlockBegin))
-            .leaf()
-            .chain(
-                expr.clone()
-                    .chain(
-                        just_(TokenKind::Control(lex::Control::Comma))
-                            .leaf()
-                            .chain(expr.clone())
-                            .repeated()
-                            .flatten(),
-                    )
-                    .or_not()
-                    .flatten(),
-            )
-            .chain(just_(TokenKind::Control(lex::Control::BlockEnd)).leaf())
-            .tree(SyntaxKind::Object);
+        let object_type = tree_many(
+            just_token(TokenKind::Control(lex::Control::BlockBegin))
+                .chain(
+                    expr.clone()
+                        .chain(
+                            just_token(TokenKind::Control(lex::Control::Comma))
+                                .chain(expr.clone())
+                                .repeated()
+                                .flatten(),
+                        )
+                        .or_not()
+                        .flatten(),
+                )
+                .chain(just_token(TokenKind::Control(lex::Control::BlockEnd))),
+            SyntaxKind::Object,
+        );
 
-        let uri_var = just_(TokenKind::Control(lex::Control::BlockBegin))
-            .leaf()
-            .chain(expr.clone())
-            .chain(just_(TokenKind::Control(lex::Control::BlockEnd)).leaf())
-            .tree(SyntaxKind::UriVariable);
+        let uri_var = tree_many(
+            just_token(TokenKind::Control(lex::Control::BlockBegin))
+                .chain(expr.clone())
+                .chain(just_token(TokenKind::Control(lex::Control::BlockEnd))),
+            SyntaxKind::UriVariable,
+        );
 
-        let uri_path = uri_segment
-            .map(|l| vec![l])
-            .or(uri_root.chain(uri_var.or_not()))
-            .repeated()
-            .at_least(1)
-            .flatten()
-            .collect()
-            .tree(SyntaxKind::UriPath);
+        let uri_path = tree_many(
+            uri_segment
+                .map(|l| vec![l])
+                .or(uri_root.chain(uri_var.or_not()))
+                .repeated()
+                .at_least(1)
+                .flatten()
+                .collect(),
+            SyntaxKind::UriPath,
+        );
 
-        let uri_params = just_(TokenKind::Operator(lex::Operator::QuestionMark))
-            .leaf()
-            .chain(object_type.clone())
-            .tree(SyntaxKind::UriParams);
+        let uri_params = tree_many(
+            just_token(TokenKind::Operator(lex::Operator::QuestionMark)).chain(object_type.clone()),
+            SyntaxKind::UriParams,
+        );
 
-        let uri_template = uri_path
-            .chain(uri_params.or_not())
-            .tree(SyntaxKind::UriTemplate);
+        let uri_template = tree_many(uri_path.chain(uri_params.or_not()), SyntaxKind::UriTemplate);
 
-        let uri_type = just_(TokenKind::Keyword(lex::Keyword::Primitive(
+        let uri_type = just_token(TokenKind::Keyword(lex::Keyword::Primitive(
             lex::Primitive::Uri,
         )))
-        .leaf()
         .or(uri_template);
 
-        let array_type = just_(TokenKind::Control(lex::Control::ArrayBegin))
-            .leaf()
-            .chain(expr.clone())
-            .chain(just_(TokenKind::Control(lex::Control::ArrayEnd)).leaf())
-            .tree(SyntaxKind::Array);
+        let array_type = tree_many(
+            just_token(TokenKind::Control(lex::Control::ArrayBegin))
+                .chain(expr.clone())
+                .chain(just_token(TokenKind::Control(lex::Control::ArrayEnd))),
+            SyntaxKind::Array,
+        );
 
-        let prop_type = just_(TokenKind::Property)
-            .leaf()
-            .chain(expr.clone())
-            .tree(SyntaxKind::Property);
+        let prop_type = tree_many(
+            just_token(TokenKind::Property).chain(expr.clone()),
+            SyntaxKind::Property,
+        );
 
-        let content_prop = match_! { TokenKind::Keyword(lex::Keyword::Content(_)) }
-            .leaf()
-            .chain(just_(TokenKind::Operator(lex::Operator::Equal)).leaf())
+        let content_prop = match_token! { TokenKind::Keyword(lex::Keyword::Content(_)) }
+            .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
             .chain(expr.clone());
 
-        let content_type = just_(TokenKind::Control(lex::Control::ContentBegin))
-            .leaf()
-            .chain(
-                content_prop
-                    .clone()
-                    .chain(just_(TokenKind::Control(lex::Control::Comma)).leaf())
-                    .repeated()
-                    .flatten(),
-            )
-            .chain(expr.clone().or_not())
-            .chain(just_(TokenKind::Control(lex::Control::ContentEnd)).leaf())
-            .tree(SyntaxKind::Content);
+        let content_type = tree_many(
+            just_token(TokenKind::Control(lex::Control::ContentBegin))
+                .chain(
+                    content_prop
+                        .clone()
+                        .chain(just_token(TokenKind::Control(lex::Control::Comma)))
+                        .repeated()
+                        .flatten(),
+                )
+                .chain(expr.clone().or_not())
+                .chain(just_token(TokenKind::Control(lex::Control::ContentEnd))),
+            SyntaxKind::Content,
+        );
 
-        let paren_type = just_(TokenKind::Control(lex::Control::ParenthesisBegin))
-            .leaf()
-            .chain(expr.clone())
-            .chain(just_(TokenKind::Control(lex::Control::ParenthesisEnd)).leaf())
-            .tree(SyntaxKind::SubExpression);
+        let paren_type = tree_many(
+            just_token(TokenKind::Control(lex::Control::ParenthesisBegin))
+                .chain(expr.clone())
+                .chain(just_token(TokenKind::Control(lex::Control::ParenthesisEnd))),
+            SyntaxKind::SubExpression,
+        );
 
-        let term_type = literal_type
-            .or(prim_type)
-            .or(uri_type)
-            .or(array_type)
-            .or(prop_type)
-            .or(object_type.clone())
-            .or(content_type)
-            .or(paren_type)
-            .or(variable)
-            .chain(inline_ann.or_not())
-            .tree(SyntaxKind::Terminal);
+        let term_type = tree_many(
+            literal_type
+                .or(prim_type)
+                .or(uri_type)
+                .or(array_type)
+                .or(prop_type)
+                .or(object_type.clone())
+                .or(content_type)
+                .or(paren_type)
+                .or(variable)
+                .chain(inline_ann.or_not()),
+            SyntaxKind::Terminal,
+        );
 
-        let apply = just_(TokenKind::Identifier(lex::Identifier::Value))
-            .leaf()
-            .chain(term_type.clone().repeated().at_least(1))
-            .tree(SyntaxKind::Application);
+        let apply = tree_many(
+            just_token(TokenKind::Identifier(lex::Identifier::Value))
+                .chain(term_type.clone().repeated().at_least(1)),
+            SyntaxKind::Application,
+        );
 
         let app_type = apply.or(term_type.clone());
 
@@ -397,57 +441,69 @@ where
 
         let sum_type = variadic_op(lex::Operator::VerticalBar, any_type);
 
-        let xfer = methods
-            .chain(object_type.or_not())
-            .chain(
-                just_(TokenKind::Operator(lex::Operator::Colon))
-                    .leaf()
-                    .chain(term_type.clone())
-                    .or_not()
-                    .flatten(),
-            )
-            .chain(just_(TokenKind::Operator(lex::Operator::Arrow)).leaf())
-            .chain(range_type)
-            .tree(SyntaxKind::Transfer);
+        let xfer_params = tree_one(object_type.or_not(), SyntaxKind::XferParams);
 
-        let xfer_type = xfer.or(sum_type);
+        let xfer_domain = tree_many(
+            just_token(TokenKind::Operator(lex::Operator::Colon))
+                .chain(term_type.clone())
+                .or_not()
+                .flatten(),
+            SyntaxKind::XferDomain,
+        );
 
-        let rel_type = term_type
-            .chain(just_(TokenKind::Control(lex::Control::ParenthesisBegin)).leaf())
-            .chain(xfer_type.clone())
-            .chain(
-                just_(TokenKind::Control(lex::Control::Comma))
-                    .leaf()
-                    .chain(xfer_type.clone())
-                    .repeated()
-                    .flatten(),
-            )
-            .chain(just_(TokenKind::Control(lex::Control::ParenthesisEnd)).leaf())
-            .tree(SyntaxKind::Relation);
+        let transfer = tree_many(
+            xfer_methods
+                .chain(xfer_params)
+                .chain(xfer_domain)
+                .chain(just_token(TokenKind::Operator(lex::Operator::Arrow)))
+                .chain(range_type),
+            SyntaxKind::Transfer,
+        );
+
+        let xfer_type = transfer.or(sum_type);
+
+        let rel_type = tree_many(
+            term_type
+                .chain(just_token(TokenKind::Control(
+                    lex::Control::ParenthesisBegin,
+                )))
+                .chain(xfer_type.clone())
+                .chain(
+                    just_token(TokenKind::Control(lex::Control::Comma))
+                        .chain(xfer_type.clone())
+                        .repeated()
+                        .flatten(),
+                )
+                .chain(just_token(TokenKind::Control(lex::Control::ParenthesisEnd))),
+            SyntaxKind::Relation,
+        );
 
         rel_type.or(xfer_type)
     });
 
-    let declaration = just_(TokenKind::Keyword(lex::Keyword::Let))
-        .leaf()
-        .chain(variable)
-        .chain(binding.repeated())
-        .chain(just_(TokenKind::Operator(lex::Operator::Equal)).leaf())
-        .chain(expr_type.clone())
-        .chain(just_(TokenKind::Control(lex::Control::Semicolon)).leaf())
-        .tree(SyntaxKind::Declaration);
+    let declaration = tree_many(
+        just_token(TokenKind::Keyword(lex::Keyword::Let))
+            .chain(variable)
+            .chain(binding.repeated())
+            .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
+            .chain(expr_type.clone())
+            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+        SyntaxKind::Declaration,
+    );
 
-    let resource = just_(TokenKind::Keyword(lex::Keyword::Res))
-        .leaf()
-        .chain(expr_type)
-        .chain(just_(TokenKind::Control(lex::Control::Semicolon)).leaf())
-        .tree(SyntaxKind::Resource);
+    let resource = tree_many(
+        just_token(TokenKind::Keyword(lex::Keyword::Res))
+            .chain(expr_type)
+            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+        SyntaxKind::Resource,
+    );
 
-    let import = just_(TokenKind::Keyword(lex::Keyword::Use))
-        .leaf()
-        .chain(just_(TokenKind::Literal(lex::Literal::String)).leaf())
-        .chain(just_(TokenKind::Control(lex::Control::Semicolon)).leaf())
-        .tree(SyntaxKind::Import);
+    let import = tree_many(
+        just_token(TokenKind::Keyword(lex::Keyword::Use))
+            .chain(just_token(TokenKind::Literal(lex::Literal::String)))
+            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+        SyntaxKind::Import,
+    );
 
     let statement = line_ann
         .or(declaration)
@@ -455,5 +511,5 @@ where
         .or(import)
         .recover_with(skip_then_retry_until([]));
 
-    statement.repeated().tree(SyntaxKind::Program)
+    tree_many(statement.repeated(), SyntaxKind::Program)
 }

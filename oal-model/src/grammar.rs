@@ -43,11 +43,11 @@ where
     T: Default + Clone,
     G: Grammar,
 {
-    fn from_leaf(token: TokenAlias<G::Lex>) -> Self {
+    pub fn from_leaf(token: TokenAlias<G::Lex>) -> Self {
         ParseNode(SyntaxTrunk::Leaf(token), None, T::default())
     }
 
-    fn from_tree(kind: G::Kind, children: Vec<ParseNode<T, G>>) -> Self {
+    pub fn from_tree(kind: G::Kind, children: Vec<ParseNode<T, G>>) -> Self {
         ParseNode(SyntaxTrunk::Tree(kind), Some(children), T::default())
     }
 
@@ -437,76 +437,79 @@ macro_rules! terminal_node {
     };
 }
 
-pub trait AsLeaf<T, G: Grammar> {
-    #[allow(clippy::type_complexity)]
-    fn leaf(
-        self,
-    ) -> chumsky::combinator::Map<Self, fn(TokenAlias<G::Lex>) -> ParseNode<T, G>, TokenAlias<G::Lex>>
-    where
-        Self: Sized;
-}
-
-pub trait AsTree<'a, E, T, G>
+pub fn tree_one<'a, P, T, G>(
+    p: P,
+    k: G::Kind,
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
 where
-    E: chumsky::Error<TokenAlias<G::Lex>>,
-    G: Grammar,
-{
-    fn tree(self, k: G::Kind) -> BoxedParser<'a, TokenAlias<G::Lex>, ParseNode<T, G>, E>
-    where
-        Self: Sized;
-
-    fn skip_tree(self, k: G::Kind) -> BoxedParser<'a, TokenAlias<G::Lex>, ParseNode<T, G>, E>
-    where
-        Self: Sized;
-}
-
-impl<P, T, G> AsLeaf<T, G> for P
-where
-    P: Parser<TokenAlias<G::Lex>, TokenAlias<G::Lex>>,
-    T: Default + Clone,
-    G: Grammar,
-{
-    fn leaf(
-        self,
-    ) -> chumsky::combinator::Map<Self, fn(TokenAlias<G::Lex>) -> ParseNode<T, G>, TokenAlias<G::Lex>>
-    {
-        self.map(ParseNode::from_leaf)
-    }
-}
-
-impl<'a, P, T, G> AsTree<'a, P::Error, T, G> for P
-where
-    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + 'a,
+    P: Parser<TokenAlias<G::Lex>, Option<ParseNode<T, G>>> + Clone + 'a,
     T: Default + Clone + 'a,
     G: Grammar + 'a,
 {
-    fn tree(self, k: G::Kind) -> BoxedParser<'a, TokenAlias<G::Lex>, ParseNode<T, G>, P::Error> {
-        self.map(move |v| ParseNode::from_tree(k, v)).boxed()
-    }
-
-    fn skip_tree(
-        self,
-        k: G::Kind,
-    ) -> BoxedParser<'a, TokenAlias<G::Lex>, ParseNode<T, G>, P::Error> {
-        self.map(move |mut v| {
-            if v.len() == 1 {
-                v.pop().unwrap()
-            } else {
-                ParseNode::from_tree(k, v)
-            }
-        })
+    // The returned parser is boxed otherwise the Rust compiler
+    // cannot deal with the depth of the generated types.
+    p.map(move |n| ParseNode::from_tree(k, if let Some(n) = n { vec![n] } else { vec![] }))
         .boxed()
-    }
 }
 
-pub fn just_token<E, G>(
-    kind: <G::Lex as Lexeme>::Kind,
-) -> impl Parser<TokenAlias<G::Lex>, TokenAlias<G::Lex>, Error = E> + Clone
+pub fn tree_many<'a, P, T, G>(
+    p: P,
+    k: G::Kind,
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+where
+    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + Clone + 'a,
+    T: Default + Clone + 'a,
+    G: Grammar + 'a,
+{
+    // The returned parser is boxed otherwise the Rust compiler
+    // cannot deal with the depth of the generated types.
+    p.map(move |v| ParseNode::from_tree(k, v)).boxed()
+}
+
+pub fn tree_skip<'a, P, T, G>(
+    p: P,
+    k: G::Kind,
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+where
+    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + Clone + 'a,
+    T: Default + Clone + 'a,
+    G: Grammar + 'a,
+{
+    // The returned parser is boxed otherwise the Rust compiler
+    // cannot deal with the depth of the generated types.
+    p.map(move |mut v| {
+        if v.len() == 1 {
+            v.pop().unwrap()
+        } else {
+            ParseNode::from_tree(k, v)
+        }
+    })
+    .boxed()
+}
+
+pub fn just_token<E, T, G>(
+    kind: <<G as Grammar>::Lex as Lexeme>::Kind,
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = E> + Clone
 where
     E: chumsky::Error<TokenAlias<G::Lex>>,
+    T: Default + Clone,
     G: Grammar,
 {
-    filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() == kind)
+    filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() == kind).map(ParseNode::from_leaf)
+}
+
+#[macro_export]
+macro_rules! match_token {
+    ($($p:pat $(if $guard:expr)?),+ $(,)?) => ({
+        chumsky::primitive::filter_map(move |span, x: TokenAlias<_>| match x.kind() {
+            $($p $(if $guard)? => ::core::result::Result::Ok(ParseNode::from_leaf(x))),+,
+            _ => ::core::result::Result::Err(
+                chumsky::error::Error::expected_input_found(
+                    span, ::core::option::Option::None, ::core::option::Option::Some(x)
+                )
+            ),
+        })
+    });
 }
 
 /// Perform syntax analysis over a list of tokens, yielding a concrete syntax tree.
