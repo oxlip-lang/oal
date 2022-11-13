@@ -121,8 +121,7 @@ impl<'a, T: Default + Clone> Declaration<'a, T> {
     const RHS_POS: usize = 3;
 
     pub fn symbol(&self) -> Symbol<'a, T> {
-        let Some(symbol) = Symbol::cast(self.node().nth(Self::SYM_POS)) else { panic!("declaration lhs must be a symbol") };
-        symbol
+        Symbol::cast(self.node().nth(Self::SYM_POS)).expect("declaration lhs must be a symbol")
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
@@ -167,7 +166,7 @@ impl<'a, T: Default + Clone> UriTemplate<'a, T> {
         self.node()
             .children()
             .nth(Self::PARAMS_POS)
-            .and_then(UriParams::cast)
+            .map(|inner| UriParams::cast(inner).expect("expected URI parameters"))
     }
 }
 
@@ -183,8 +182,9 @@ impl<'a, T: Default + Clone> UriParams<'a, T> {
     const INNER_POS: usize = 1;
 
     pub fn properties(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
-        let Some(object) = Object::cast(self.node().nth(Self::INNER_POS)) else { panic!("URI parameters must be an object") };
-        object.properties()
+        Object::cast(self.node().nth(Self::INNER_POS))
+            .expect("URI parameters must be an object")
+            .properties()
     }
 }
 
@@ -193,8 +193,7 @@ impl<'a, T: Default + Clone> Property<'a, T> {
     const RHS_POS: usize = 1;
 
     pub fn name(&self) -> ProperyName<'a, T> {
-        let Some(name) = ProperyName::cast(self.node().nth(Self::NAME_POS)) else { panic!("expected a propery name") };
-        name
+        ProperyName::cast(self.node().nth(Self::NAME_POS)).expect("expected a propery name")
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
@@ -208,13 +207,20 @@ impl<'a, T: Default + Clone> Object<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> XferMethods<'a, T> {
+    pub fn methods(&self) -> impl Iterator<Item = Method<'a, T>> {
+        self.node().children().filter_map(Method::cast)
+    }
+}
+
 impl<'a, T: Default + Clone> XferParams<'a, T> {
     const INNER_POS: usize = 0;
 
-    pub fn properties(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
-        self.node().children().nth(Self::INNER_POS).map(|i| {
-            let Some(object) = Object::cast(i) else { panic!("transfer parameters must be an object") };
-            object.properties()
+    pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
+        self.node().children().nth(Self::INNER_POS).map(|inner| {
+            Object::cast(inner)
+                .expect("transfer parameters must be an object")
+                .properties()
         })
     }
 }
@@ -226,7 +232,7 @@ impl<'a, T: Default + Clone> XferDomain<'a, T> {
         self.node()
             .children()
             .nth(Self::INNER_POS)
-            .and_then(Terminal::cast)
+            .map(|inner| Terminal::cast(inner).expect("transfer domain must be a terminal"))
     }
 }
 
@@ -234,22 +240,41 @@ impl<'a, T: Default + Clone> Transfer<'a, T> {
     const METHODS_POS: usize = 0;
     const PARAMS_POS: usize = 1;
     const DOMAIN_POS: usize = 2;
+    const RANGE_POS: usize = 4;
 
     pub fn methods(&self) -> impl Iterator<Item = Method<'a, T>> {
-        self.node()
-            .nth(Self::METHODS_POS)
-            .children()
-            .filter_map(Method::cast)
+        XferMethods::cast(self.node().nth(Self::METHODS_POS))
+            .expect("expected transfer methods")
+            .methods()
     }
 
-    pub fn params(&self) -> XferParams<'a, T> {
-        let Some(params) = XferParams::cast(self.node().nth(Self::PARAMS_POS)) else { panic!("expected transfer parameters") };
-        params
+    pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
+        XferParams::cast(self.node().nth(Self::PARAMS_POS))
+            .expect("expected transfer parameters")
+            .params()
     }
 
-    pub fn domain(&self) -> XferDomain<'a, T> {
-        let Some(domain) = XferDomain::cast(self.node().nth(Self::DOMAIN_POS)) else { panic!("expected transfer domain") };
-        domain
+    pub fn domain(&self) -> Option<Terminal<'a, T>> {
+        XferDomain::cast(self.node().nth(Self::DOMAIN_POS))
+            .expect("expected transfer domain")
+            .inner()
+    }
+
+    pub fn range(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::RANGE_POS)
+    }
+}
+
+impl<'a, T: Default + Clone> VariadicOp<'a, T> {
+    const OPERATOR_POS: usize = 1;
+
+    pub fn operator(&self) -> lex::Operator {
+        let TokenKind::Operator(op) = self.node().nth(Self::OPERATOR_POS).token().kind() else { panic!("expected an operator") };
+        op
+    }
+
+    pub fn operands(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
+        self.node().children().step_by(2)
     }
 }
 
@@ -441,7 +466,7 @@ where
 
         let sum_type = variadic_op(lex::Operator::VerticalBar, any_type);
 
-        let xfer_params = tree_one(object_type.or_not(), SyntaxKind::XferParams);
+        let xfer_params = tree_maybe(object_type.or_not(), SyntaxKind::XferParams);
 
         let xfer_domain = tree_many(
             just_token(TokenKind::Operator(lex::Operator::Colon))

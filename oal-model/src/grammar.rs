@@ -318,11 +318,12 @@ where
     }
 
     pub fn first(&self) -> NodeRef<'a, T, G> {
-        self.children().next().unwrap()
+        self.nth(0)
     }
 
     pub fn nth(&self, n: usize) -> NodeRef<'a, T, G> {
-        self.children().nth(n).unwrap()
+        let Some(node) = self.children().nth(n) else { panic!("expected node at {}", n) };
+        node
     }
 
     pub fn descendants(&self) -> impl Iterator<Item = NodeRef<'a, T, G>> + 'a {
@@ -438,6 +439,20 @@ macro_rules! terminal_node {
 }
 
 pub fn tree_one<'a, P, T, G>(
+    p: P,
+    k: G::Kind,
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+where
+    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>> + Clone + 'a,
+    T: Default + Clone + 'a,
+    G: Grammar + 'a,
+{
+    // The returned parser is boxed otherwise the Rust compiler
+    // cannot deal with the depth of the generated types.
+    p.map(move |n| ParseNode::from_tree(k, vec![n])).boxed()
+}
+
+pub fn tree_maybe<'a, P, T, G>(
     p: P,
     k: G::Kind,
 ) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a

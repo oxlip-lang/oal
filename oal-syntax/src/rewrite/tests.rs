@@ -1,7 +1,7 @@
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
-    Array, Declaration, Gram, Primitive, Program, Property, Symbol, Terminal, Transfer, UriPath,
-    UriSegment, UriTemplate,
+    Array, Content, Declaration, Gram, Primitive, Program, Property, Symbol, Terminal, Transfer,
+    UriPath, UriSegment, UriTemplate, VariadicOp,
 };
 use oal_model::grammar::NodeRef;
 
@@ -120,11 +120,24 @@ fn parse_decl_uri() {
 }
 
 #[test]
-fn parse_decl_transfer_params() {
+fn parse_decl_transfer() {
+    parse("let a = get -> {};", |p: Program<()>| {
+        let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
+
+        let mtds = &mut xfer.methods();
+        assert_eq!(
+            mtds.next().expect("expected a method").method(),
+            lex::Method::Get
+        );
+        assert!(mtds.next().is_none());
+
+        assert!(xfer.params().is_none());
+        assert!(xfer.domain().is_none());
+        assert_term(xfer.range());
+    });
     parse(
         "let a = get, put { 'q str } : {} -> {};",
         |p: Program<()>| {
-            println!("{:#?}", p);
             let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
             let mtds = &mut xfer.methods();
@@ -137,13 +150,27 @@ fn parse_decl_transfer_params() {
                 lex::Method::Put
             );
 
-            let props = &mut xfer.params().properties().expect("expected parameters");
+            let props = &mut xfer.params().expect("expected parameters");
 
             let prop = assert_next_prop(props);
             assert_eq!(prop.name().as_ident().as_ref(), "q");
             assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
-            // TODO: test domain and range
+            assert!(xfer.domain().is_some(), "expected a domain");
+            assert_term(xfer.range());
         },
-    )
+    );
+    parse("let a = get -> <{}> :: <{}>;", |p: Program<()>| {
+        println!("{:#?}", p);
+        let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
+        let op = VariadicOp::cast(xfer.range()).expect("expected an operation");
+        assert_eq!(op.operator(), lex::Operator::DoubleColon);
+
+        let opds = &mut op.operands();
+        Content::cast(assert_term(opds.next().expect("expected operand")))
+            .expect("expected first content");
+        Content::cast(assert_term(opds.next().expect("expected operand")))
+            .expect("expected second content");
+        assert!(opds.next().is_none());
+    });
 }
