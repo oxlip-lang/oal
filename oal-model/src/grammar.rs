@@ -1,6 +1,6 @@
 use crate::errors::Result;
 use crate::lexicon::{
-    Interned, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList, TokenSpan,
+    Intern, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList, TokenSpan,
 };
 use chumsky::prelude::*;
 use generational_indextree::NodeEdge;
@@ -25,8 +25,8 @@ pub enum SyntaxTrunk<G: Grammar> {
 impl<G: Grammar> Debug for SyntaxTrunk<G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SyntaxTrunk::Leaf(t) => t.kind().fmt(f),
-            SyntaxTrunk::Tree(k) => k.fmt(f),
+            SyntaxTrunk::Leaf(t) => write!(f, "Leaf[{:?}]", t.kind()),
+            SyntaxTrunk::Tree(k) => write!(f, "Tree[{:?}]", k),
         }
     }
 }
@@ -234,12 +234,12 @@ where
         TokenRef { tokens, idx }
     }
 
-    fn inner(&self) -> &<G as Grammar>::Lex {
+    fn inner(&self) -> &'a <G as Grammar>::Lex {
         let (token, _) = self.tokens.get(self.idx);
         token
     }
 
-    pub fn value(&self) -> &<<G as Grammar>::Lex as Lexeme>::Value {
+    pub fn value(&self) -> &'a <<G as Grammar>::Lex as Lexeme>::Value {
         self.inner().value()
     }
 
@@ -356,6 +356,10 @@ where
     pub fn detach(&self) -> SyntaxTree<T, G> {
         self.tree.detach(self.idx)
     }
+
+    pub fn as_str(&self) -> &'a str {
+        self.token().value().as_str(self.tree)
+    }
 }
 
 impl<'a, T, G> Debug for NodeRef<'a, T, G>
@@ -364,7 +368,7 @@ where
     G: Grammar,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:#?}", self.syntax().trunk())?;
+        write!(f, "{:?}", self.syntax().trunk())?;
         if !self.is_empty() {
             write!(f, " -> ")?;
             f.debug_list().entries(self.children()).finish()?;
@@ -428,11 +432,6 @@ macro_rules! terminal_node {
 
             pub fn node(&self) -> NodeRef<'a, T, $grammar> {
                 self.0
-            }
-
-            pub fn token(&self) -> TokenAlias<<$grammar as Grammar>::Lex> {
-                let SyntaxTrunk::Leaf(t) = self.node().syntax().trunk() else { unreachable!() };
-                *t
             }
         }
     };

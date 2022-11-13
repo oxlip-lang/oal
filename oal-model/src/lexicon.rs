@@ -13,13 +13,14 @@ pub trait Interner {
     fn resolve(&self, sym: Symbol) -> &str;
 }
 
-pub trait Interned {
+pub trait Intern {
     fn copy<I: Interner>(&self, from: &I, to: &mut I) -> Self;
+    fn as_str<'a, I: Interner>(&'a self, from: &'a I) -> &'a str;
 }
 
 pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug {
     type Kind: Copy + Clone + PartialEq + Eq + Hash + Debug;
-    type Value: Debug + Interned;
+    type Value: Debug + Intern;
 
     fn new(kind: Self::Kind, value: Self::Value) -> Self;
     fn kind(&self) -> Self::Kind;

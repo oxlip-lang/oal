@@ -120,7 +120,7 @@ pub enum TokenValue {
     Symbol(Symbol),
 }
 
-impl Interned for TokenValue {
+impl Intern for TokenValue {
     fn copy<I: Interner>(&self, from: &I, to: &mut I) -> Self {
         match self {
             TokenValue::Symbol(sym) => TokenValue::Symbol(to.register(from.resolve(*sym))),
@@ -128,6 +128,14 @@ impl Interned for TokenValue {
             TokenValue::Number(n) => TokenValue::Number(*n),
             TokenValue::HttpStatus(s) => TokenValue::HttpStatus(*s),
             TokenValue::None => TokenValue::None,
+        }
+    }
+
+    fn as_str<'a, I: Interner>(&'a self, from: &'a I) -> &'a str {
+        match self {
+            TokenValue::String(str) => str.as_str(),
+            TokenValue::Symbol(sym) => from.resolve(*sym),
+            _ => panic!("not a string"),
         }
     }
 }

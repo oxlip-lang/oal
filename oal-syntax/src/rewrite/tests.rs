@@ -1,31 +1,35 @@
+use super::parser::PathElement;
+use crate::atom::{HttpStatus, HttpStatusRange};
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
-    Array, Content, Declaration, Gram, Primitive, Program, Property, Symbol, Terminal, Transfer,
-    UriPath, UriSegment, UriTemplate, VariadicOp,
+    Array, Content, Declaration, Gram, Literal, Primitive, Program, Property, Symbol, Terminal,
+    Transfer, UriPath, UriSegment, UriTemplate, VariadicOp,
 };
 use oal_model::grammar::NodeRef;
 
-use super::parser::PathElement;
+type Prog<'a> = Program<'a, ()>;
+type NRef<'a> = NodeRef<'a, (), Gram>;
 
-fn parse<F: Fn(Program<()>)>(i: &str, f: F) {
+fn parse<F: Fn(Prog)>(i: &str, f: F) {
     let tree = crate::rewrite::parse(i).expect("parsing failed");
     let prog = Program::cast(tree.root()).expect("expected a program");
     f(prog)
 }
 
-fn assert_decl<'a>(p: Program<'a, ()>, sym: &str) -> Declaration<'a, ()> {
-    assert_eq!(p.declarations().count(), 1, "expected one declaration");
-    let d = p.declarations().next().unwrap();
+fn assert_decl<'a>(p: Prog<'a>, sym: &str) -> Declaration<'a, ()> {
+    let decls = &mut p.declarations();
+    let d = decls.next().expect("expected a declaration");
+    assert!(decls.next().is_none(), "expected only one declaration");
     assert_eq!(d.symbol().as_ident().as_ref(), sym);
     d
 }
 
-fn assert_term(n: NodeRef<(), Gram>) -> NodeRef<(), Gram> {
+fn assert_term(n: NRef) -> NRef {
     let term = Terminal::cast(n).expect("expected a terminal");
     term.inner()
 }
 
-fn assert_prim(n: NodeRef<(), Gram>, kind: lex::Primitive) -> Primitive<()> {
+fn assert_prim(n: NRef, kind: lex::Primitive) -> Primitive<()> {
     let prim = Primitive::cast(n).expect("expected a primitive");
     assert_eq!(prim.primitive(), kind, "expected a type {:#?}", kind);
     prim
@@ -52,9 +56,13 @@ fn assert_next_prop<'a>(
     Property::cast(assert_term(n)).expect("expected a property")
 }
 
+fn assert_lit(n: NRef) -> Literal<()> {
+    Literal::cast(n).expect("expected a literal")
+}
+
 #[test]
 fn parse_decl_primitive() {
-    parse("let a = num;", |p: Program<()>| {
+    parse("let a = num;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         assert_prim(rhs, lex::Primitive::Num);
     })
@@ -62,7 +70,7 @@ fn parse_decl_primitive() {
 
 #[test]
 fn parse_decl_symbol() {
-    parse("let a = b;", |p: Program<()>| {
+    parse("let a = b;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let sym = Symbol::cast(rhs).expect("expected a symbol");
         assert_eq!(sym.as_ident().as_ref(), "b");
@@ -71,7 +79,7 @@ fn parse_decl_symbol() {
 
 #[test]
 fn parse_decl_array() {
-    parse("let a = [str];", |p: Program<()>| {
+    parse("let a = [str];", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let arr = Array::cast(rhs).expect("expected an array");
         assert_prim(assert_term(arr.inner()), lex::Primitive::Str);
@@ -80,7 +88,7 @@ fn parse_decl_array() {
 
 #[test]
 fn parse_decl_uri() {
-    parse("let a = /;", |p: Program<()>| {
+    parse("let a = /;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let tmpl = UriTemplate::cast(rhs).expect("expected an URI template");
         let uri = UriPath::cast(tmpl.path()).expect("expected an URI path");
@@ -88,40 +96,37 @@ fn parse_decl_uri() {
         let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
         assert_eq!(elem.as_str(), "/");
     });
-    parse(
-        "let a = /x/{ 'y str }/z?{ 'q str, 'n num };",
-        |p: Program<()>| {
-            let rhs = assert_term(assert_decl(p, "a").rhs());
-            let tmpl = UriTemplate::cast(rhs).expect("expected an URI template");
-            let uri = UriPath::cast(tmpl.path()).expect("expected an URI path");
-            let segs = &mut uri.segments();
+    parse("let a = /x/{ 'y str }/z?{ 'q str, 'n num };", |p: Prog| {
+        let rhs = assert_term(assert_decl(p, "a").rhs());
+        let tmpl = UriTemplate::cast(rhs).expect("expected an URI template");
+        let uri = UriPath::cast(tmpl.path()).expect("expected an URI path");
+        let segs = &mut uri.segments();
 
-            assert_eq!(assert_next_path_elem(segs).as_str(), "x");
-            assert_eq!(assert_next_path_elem(segs).as_str(), "/");
+        assert_eq!(assert_next_path_elem(segs).as_str(), "x");
+        assert_eq!(assert_next_path_elem(segs).as_str(), "/");
 
-            let prop = assert_next_path_var(segs);
-            assert_eq!(prop.name().as_ident().as_ref(), "y");
-            assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        let prop = assert_next_path_var(segs);
+        assert_eq!(prop.name().as_ident().as_ref(), "y");
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
-            assert_eq!(assert_next_path_elem(segs).as_str(), "z");
+        assert_eq!(assert_next_path_elem(segs).as_str(), "z");
 
-            let params = tmpl.params().expect("expected URI paramters");
-            let props = &mut params.properties();
+        let params = tmpl.params().expect("expected URI paramters");
+        let props = &mut params.properties();
 
-            let prop = assert_next_prop(props);
-            assert_eq!(prop.name().as_ident().as_ref(), "q");
-            assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        let prop = assert_next_prop(props);
+        assert_eq!(prop.name().as_ident().as_ref(), "q");
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
-            let prop = assert_next_prop(props);
-            assert_eq!(prop.name().as_ident().as_ref(), "n");
-            assert_prim(assert_term(prop.rhs()), lex::Primitive::Num);
-        },
-    );
+        let prop = assert_next_prop(props);
+        assert_eq!(prop.name().as_ident().as_ref(), "n");
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Num);
+    })
 }
 
 #[test]
 fn parse_decl_transfer() {
-    parse("let a = get -> {};", |p: Program<()>| {
+    parse("let a = get -> {};", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
         let mtds = &mut xfer.methods();
@@ -135,33 +140,29 @@ fn parse_decl_transfer() {
         assert!(xfer.domain().is_none());
         assert_term(xfer.range());
     });
-    parse(
-        "let a = get, put { 'q str } : {} -> {};",
-        |p: Program<()>| {
-            let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
+    parse("let a = get, put { 'q str } : {} -> {};", |p: Prog| {
+        let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
-            let mtds = &mut xfer.methods();
-            assert_eq!(
-                mtds.next().expect("expected a method").method(),
-                lex::Method::Get
-            );
-            assert_eq!(
-                mtds.next().expect("expected a method").method(),
-                lex::Method::Put
-            );
+        let mtds = &mut xfer.methods();
+        assert_eq!(
+            mtds.next().expect("expected a method").method(),
+            lex::Method::Get
+        );
+        assert_eq!(
+            mtds.next().expect("expected a method").method(),
+            lex::Method::Put
+        );
 
-            let props = &mut xfer.params().expect("expected parameters");
+        let props = &mut xfer.params().expect("expected parameters");
 
-            let prop = assert_next_prop(props);
-            assert_eq!(prop.name().as_ident().as_ref(), "q");
-            assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        let prop = assert_next_prop(props);
+        assert_eq!(prop.name().as_ident().as_ref(), "q");
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
-            assert!(xfer.domain().is_some(), "expected a domain");
-            assert_term(xfer.range());
-        },
-    );
-    parse("let a = get -> <{}> :: <{}>;", |p: Program<()>| {
-        println!("{:#?}", p);
+        assert!(xfer.domain().is_some(), "expected a domain");
+        assert_term(xfer.range());
+    });
+    parse("let a = get -> <{}> :: <{}>;", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
         let op = VariadicOp::cast(xfer.range()).expect("expected an operation");
         assert_eq!(op.operator(), lex::Operator::DoubleColon);
@@ -172,5 +173,56 @@ fn parse_decl_transfer() {
         Content::cast(assert_term(opds.next().expect("expected operand")))
             .expect("expected second content");
         assert!(opds.next().is_none());
+    })
+}
+
+#[test]
+fn parse_decl_property() {
+    parse("let a = 'q str;", |p: Prog| {
+        let prop =
+            Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a propery");
+        assert_eq!(prop.name().as_ident().as_ref(), "q");
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+    })
+}
+
+#[test]
+fn parse_decl_number() {
+    parse("let a = 404;", |p: Prog| {
+        let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
+        assert_eq!(lit.kind(), lex::Literal::Number);
+        let lex::TokenValue::Number(num) = lit.value() else { panic!("expected a number") };
+        assert_eq!(*num, 404);
     });
+    parse("let a = 4XX;", |p: Prog| {
+        let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
+        assert_eq!(lit.kind(), lex::Literal::HttpStatus);
+        let lex::TokenValue::HttpStatus(status) = lit.value() else { panic!("expected a status") };
+        assert_eq!(*status, HttpStatus::Range(HttpStatusRange::ClientError));
+    })
+}
+
+#[test]
+fn parse_decl_string() {
+    parse(r#"let a = "application/json";"#, |p: Prog| {
+        let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
+        assert_eq!(lit.kind(), lex::Literal::String);
+        assert_eq!(lit.as_str(), "application/json");
+    })
+}
+
+#[test]
+fn parse_decl_reference() {
+    parse("let @a = {};", |p: Prog| {
+        let decl = assert_decl(p, "@a");
+        assert!(decl.symbol().as_ident().is_reference());
+    })
+}
+
+#[test]
+fn parse_import() {
+    parse(r#"use "module";"#, |p: Prog| {
+        let imp = p.imports().next().expect("expected an import");
+        assert_eq!(imp.module(), "module");
+    })
 }

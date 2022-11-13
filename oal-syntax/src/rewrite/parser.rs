@@ -3,7 +3,7 @@ use crate::rewrite::lexer as lex;
 use crate::rewrite::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
 use oal_model::grammar::*;
-use oal_model::lexicon::{Interner, TokenAlias};
+use oal_model::lexicon::TokenAlias;
 use oal_model::{match_token, syntax_nodes, terminal_node};
 use std::fmt::Debug;
 
@@ -19,10 +19,7 @@ terminal_node!(Gram, Symbol, TokenKind::Identifier(_));
 
 impl<'a, T: Default + Clone> Symbol<'a, T> {
     pub fn as_ident(&self) -> Ident {
-        match self.node().token().value() {
-            TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
-            _ => panic!("identifier must be a registered string"),
-        }
+        self.node().as_str().into()
     }
 }
 
@@ -42,16 +39,10 @@ impl<'a, T: Default + Clone> Primitive<'a, T> {
 terminal_node!(Gram, PathElement, TokenKind::PathElement(_));
 
 impl<'a, T: Default + Clone> PathElement<'a, T> {
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'a str {
         match self.node().token().kind() {
             TokenKind::PathElement(lex::PathElement::Root) => "/",
-            TokenKind::PathElement(lex::PathElement::Segment) => {
-                if let TokenValue::Symbol(sym) = self.node().token().value() {
-                    self.node().tree().resolve(*sym)
-                } else {
-                    panic!("path segment must be a registered string")
-                }
-            }
+            TokenKind::PathElement(lex::PathElement::Segment) => self.node().as_str(),
             _ => unreachable!(),
         }
     }
@@ -61,10 +52,7 @@ terminal_node!(Gram, ProperyName, TokenKind::Property);
 
 impl<'a, T: Default + Clone> ProperyName<'a, T> {
     pub fn as_ident(&self) -> Ident {
-        match self.node().token().value() {
-            TokenValue::Symbol(sym) => self.node().tree().resolve(*sym).into(),
-            _ => panic!("property name must be a registered string"),
-        }
+        self.node().as_str().into()
     }
 }
 
@@ -74,6 +62,23 @@ impl<'a, T: Default + Clone> Method<'a, T> {
     pub fn method(&self) -> lex::Method {
         let TokenKind::Keyword(lex::Keyword::Method(m)) = self.node().token().kind() else { unreachable!() };
         m
+    }
+}
+
+terminal_node!(Gram, Literal, TokenKind::Literal(_));
+
+impl<'a, T: Default + Clone> Literal<'a, T> {
+    pub fn kind(&self) -> lex::Literal {
+        let TokenKind::Literal(l) = self.node().token().kind() else { unreachable!() };
+        l
+    }
+
+    pub fn value(&self) -> &'a TokenValue {
+        self.node().token().value()
+    }
+
+    pub fn as_str(&self) -> &'a str {
+        self.node().as_str()
     }
 }
 
@@ -133,10 +138,7 @@ impl<'a, T: Default + Clone> Import<'a, T> {
     const MODULE_POS: usize = 1;
 
     pub fn module(&self) -> &'a str {
-        match self.node().nth(Self::MODULE_POS).token().value() {
-            TokenValue::Symbol(sym) => self.node().tree().resolve(*sym),
-            _ => panic!("module must be a symbol"),
-        }
+        self.node().nth(Self::MODULE_POS).as_str()
     }
 }
 
