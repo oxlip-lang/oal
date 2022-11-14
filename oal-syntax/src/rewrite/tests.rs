@@ -2,8 +2,8 @@ use super::parser::PathElement;
 use crate::atom::{HttpStatus, HttpStatusRange};
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
-    Array, Content, Declaration, Gram, Literal, Primitive, Program, Property, Symbol, Terminal,
-    Transfer, UriPath, UriSegment, UriTemplate, VariadicOp,
+    Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property, Symbol,
+    Terminal, Transfer, UriPath, UriSegment, UriTemplate, VariadicOp,
 };
 use oal_model::grammar::NodeRef;
 
@@ -224,5 +224,73 @@ fn parse_import() {
     parse(r#"use "module";"#, |p: Prog| {
         let imp = p.imports().next().expect("expected an import");
         assert_eq!(imp.module(), "module");
+    })
+}
+
+#[test]
+fn parse_decl_ann_inline() {
+    parse(r#"let a = num `title: "number"`;"#, |p: Prog| {
+        let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
+        assert_eq!(
+            term.annotation().expect("expected an inline annotation"),
+            r#"title: "number""#
+        );
+    });
+    parse(r#"let a = num;"#, |p: Prog| {
+        let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
+        assert!(term.annotation().is_none());
+    })
+}
+
+#[test]
+fn parse_decl_content() {
+    parse(
+        r#"let a = <media="application/json", status=200, headers={}, {}>;"#,
+        |p: Prog| {
+            let cnt =
+                Content::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a content");
+
+            let body = cnt.body().expect("expected a content body");
+            Object::cast(assert_term(body)).expect("expected an object");
+
+            let metas = &mut cnt.meta();
+
+            let meta = metas.next().expect("expected meta");
+            assert_eq!(meta.tag(), lex::Content::Media);
+            assert_eq!(assert_term(meta.rhs()).as_str(), "application/json");
+
+            let meta = metas.next().expect("expected meta");
+            assert_eq!(meta.tag(), lex::Content::Status);
+            let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
+            assert_eq!(*num, 200);
+
+            let meta = metas.next().expect("expected meta");
+            assert_eq!(meta.tag(), lex::Content::Headers);
+            Object::cast(assert_term(meta.rhs())).expect("expected an object");
+
+            assert!(metas.next().is_none());
+        },
+    );
+    parse(r#"let a = <status=204,>;"#, |p: Prog| {
+        let cnt =
+            Content::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a content");
+
+        assert!(cnt.body().is_none());
+
+        let metas = &mut cnt.meta();
+
+        let meta = metas.next().expect("expected meta");
+        assert_eq!(meta.tag(), lex::Content::Status);
+        let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
+        assert_eq!(*num, 204);
+
+        assert!(metas.next().is_none());
+    });
+    parse(r#"let a = <>;"#, |p: Prog| {
+        let cnt =
+            Content::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a content");
+
+        assert!(cnt.body().is_none());
+        assert!(cnt.meta().next().is_none());
     })
 }

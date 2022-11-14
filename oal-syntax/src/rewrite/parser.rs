@@ -82,10 +82,26 @@ impl<'a, T: Default + Clone> Literal<'a, T> {
     }
 }
 
+terminal_node!(
+    Gram,
+    ContentTag,
+    TokenKind::Keyword(lex::Keyword::Content(_))
+);
+
+impl<'a, T: Default + Clone> ContentTag<'a, T> {
+    pub fn tag(&self) -> lex::Content {
+        let TokenKind::Keyword(lex::Keyword::Content(t)) = self.node().token().kind() else { unreachable!() };
+        t
+    }
+}
+
 syntax_nodes!(
     Gram,
     Terminal,
     SubExpression,
+    ContentMeta,
+    ContentMetaList,
+    ContentBody,
     Content,
     Property,
     Array,
@@ -143,8 +159,18 @@ impl<'a, T: Default + Clone> Import<'a, T> {
 }
 
 impl<'a, T: Default + Clone> Terminal<'a, T> {
+    const INNER_POS: usize = 0;
+    const ANN_POS: usize = 1;
+
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
-        self.node().first()
+        self.node().nth(Self::INNER_POS)
+    }
+
+    pub fn annotation(&self) -> Option<&'a str> {
+        self.node()
+            .children()
+            .nth(Self::ANN_POS)
+            .map(|n| n.as_str())
     }
 }
 
@@ -300,6 +326,52 @@ impl<'a, T: Default + Clone> UriPath<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> ContentMeta<'a, T> {
+    const TAG_POS: usize = 0;
+    const RHS_POS: usize = 2;
+
+    pub fn tag(&self) -> lex::Content {
+        ContentTag::cast(self.node().nth(Self::TAG_POS))
+            .expect("expected content tag")
+            .tag()
+    }
+
+    pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::RHS_POS)
+    }
+}
+
+impl<'a, T: Default + Clone> ContentMetaList<'a, T> {
+    pub fn items(&self) -> impl Iterator<Item = ContentMeta<'a, T>> {
+        self.node().children().filter_map(ContentMeta::cast)
+    }
+}
+
+impl<'a, T: Default + Clone> ContentBody<'a, T> {
+    const INNER_POS: usize = 0;
+
+    pub fn inner(&self) -> Option<NodeRef<'a, T, Gram>> {
+        self.node().children().nth(Self::INNER_POS)
+    }
+}
+
+impl<'a, T: Default + Clone> Content<'a, T> {
+    const META_POS: usize = 1;
+    const BODY_POS: usize = 2;
+
+    pub fn meta(&self) -> impl Iterator<Item = ContentMeta<'a, T>> {
+        ContentMetaList::cast(self.node().nth(Self::META_POS))
+            .expect("expected content meta")
+            .items()
+    }
+
+    pub fn body(&self) -> Option<NodeRef<'a, T, Gram>> {
+        ContentBody::cast(self.node().nth(Self::BODY_POS))
+            .expect("expected content body")
+            .inner()
+    }
+}
+
 fn variadic_op<'a, P, E, T>(
     op: lex::Operator,
     p: P,
@@ -408,30 +480,36 @@ where
             SyntaxKind::Array,
         );
 
-        let prop_type = tree_many(
+        let property_type = tree_many(
             just_token(TokenKind::Property).chain(expr.clone()),
             SyntaxKind::Property,
         );
 
-        let content_prop = match_token! { TokenKind::Keyword(lex::Keyword::Content(_)) }
-            .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
-            .chain(expr.clone());
+        let content_meta = tree_many(
+            match_token! { TokenKind::Keyword(lex::Keyword::Content(_)) }
+                .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
+                .chain(expr.clone()),
+            SyntaxKind::ContentMeta,
+        );
+
+        let content_meta_list = tree_many(
+            content_meta.chain(just_token(TokenKind::Control(lex::Control::Comma)))
+                .repeated()
+                .flatten(),
+            SyntaxKind::ContentMetaList,
+        );
+
+        let content_body = tree_maybe(expr.clone().or_not(), SyntaxKind::ContentBody);
 
         let content_type = tree_many(
             just_token(TokenKind::Control(lex::Control::ContentBegin))
-                .chain(
-                    content_prop
-                        .clone()
-                        .chain(just_token(TokenKind::Control(lex::Control::Comma)))
-                        .repeated()
-                        .flatten(),
-                )
-                .chain(expr.clone().or_not())
+                .chain(content_meta_list)
+                .chain(content_body)
                 .chain(just_token(TokenKind::Control(lex::Control::ContentEnd))),
             SyntaxKind::Content,
         );
 
-        let paren_type = tree_many(
+        let subexpr_type = tree_many(
             just_token(TokenKind::Control(lex::Control::ParenthesisBegin))
                 .chain(expr.clone())
                 .chain(just_token(TokenKind::Control(lex::Control::ParenthesisEnd))),
@@ -443,10 +521,10 @@ where
                 .or(prim_type)
                 .or(uri_type)
                 .or(array_type)
-                .or(prop_type)
+                .or(property_type)
                 .or(object_type.clone())
                 .or(content_type)
-                .or(paren_type)
+                .or(subexpr_type)
                 .or(variable)
                 .chain(inline_ann.or_not()),
             SyntaxKind::Terminal,
