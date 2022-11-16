@@ -1,3 +1,3 @@
 [workspace]
 
-members = [ "oal-model", "oal-server", "oal-cli", "oal-codegen", "oal-syntax", "oal-compiler", "oal-proto" ]
+members = [ "oal-model", "oal-server", "oal-cli", "oal-codegen", "oal-syntax", "oal-compiler" ]

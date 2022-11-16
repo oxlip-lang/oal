@@ -294,3 +294,39 @@ fn parse_decl_content() {
         assert!(cnt.meta().next().is_none());
     })
 }
+
+#[test]
+fn parse_annotation() {
+    parse(
+        r#"
+# description: "some identifer"
+# required: true
+let id = num;
+# description: "some record"
+let r = {};
+"#,
+        |p: Prog| {
+            let decls = &mut p.declarations();
+
+            let decl = decls.next().expect("expected a declaration");
+            let anns = &mut decl.annotations();
+            assert_eq!(
+                anns.next().expect("expected an annotation"),
+                " description: \"some identifer\"\n"
+            );
+            assert_eq!(
+                anns.next().expect("expected an annotation"),
+                " required: true\n"
+            );
+            assert!(anns.next().is_none(), "expected no more annotation");
+
+            let decl = decls.next().expect("expected another declaration");
+            let anns = &mut decl.annotations();
+            assert_eq!(
+                anns.next().expect("expected an annotation"),
+                " description: \"some record\"\n"
+            );
+            assert!(anns.next().is_none(), "expected no more annotation");
+        },
+    )
+}

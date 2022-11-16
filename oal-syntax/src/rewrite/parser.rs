@@ -105,6 +105,7 @@ syntax_nodes!(
     Content,
     Property,
     Array,
+    Annotations,
     Declaration,
     UriVariable,
     UriPath,
@@ -137,9 +138,22 @@ impl<'a, T: Default + Clone> Program<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> Annotations<'a, T> {
+    pub fn items(&self) -> impl Iterator<Item = &'a str> {
+        self.node().children().map(|c| c.as_str())
+    }
+}
+
 impl<'a, T: Default + Clone> Declaration<'a, T> {
-    const SYM_POS: usize = 1;
-    const RHS_POS: usize = 3;
+    const ANN_POS: usize = 0;
+    const SYM_POS: usize = 2;
+    const RHS_POS: usize = 4;
+
+    pub fn annotations(&self) -> impl Iterator<Item = &'a str> {
+        Annotations::cast(self.node().nth(Self::ANN_POS))
+            .expect("expected annotations")
+            .items()
+    }
 
     pub fn symbol(&self) -> Symbol<'a, T> {
         Symbol::cast(self.node().nth(Self::SYM_POS)).expect("declaration lhs must be a symbol")
@@ -493,7 +507,8 @@ where
         );
 
         let content_meta_list = tree_many(
-            content_meta.chain(just_token(TokenKind::Control(lex::Control::Comma)))
+            content_meta
+                .chain(just_token(TokenKind::Control(lex::Control::Comma)))
                 .repeated()
                 .flatten(),
             SyntaxKind::ContentMetaList,
@@ -586,8 +601,11 @@ where
         rel_type.or(xfer_type)
     });
 
+    let annotations = tree_many(line_ann.repeated(), SyntaxKind::Annotations);
+
     let declaration = tree_many(
-        just_token(TokenKind::Keyword(lex::Keyword::Let))
+        annotations
+            .chain(just_token(TokenKind::Keyword(lex::Keyword::Let)))
             .chain(variable)
             .chain(binding.repeated())
             .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
@@ -610,8 +628,7 @@ where
         SyntaxKind::Import,
     );
 
-    let statement = line_ann
-        .or(declaration)
+    let statement = declaration
         .or(resource)
         .or(import)
         .recover_with(skip_then_retry_until([]));
