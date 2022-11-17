@@ -296,6 +296,42 @@ fn parse_decl_content() {
 }
 
 #[test]
+fn parse_decl_lambda() {
+    parse("let f x y z = num;", |p: Prog| {
+        let decl = assert_decl(p, "f");
+
+        let bindings = &mut decl.bindings();
+        assert_eq!(
+            bindings
+                .next()
+                .expect("expected a binding")
+                .as_ident()
+                .as_ref(),
+            "x"
+        );
+        assert_eq!(
+            bindings
+                .next()
+                .expect("expected a binding")
+                .as_ident()
+                .as_ref(),
+            "y"
+        );
+        assert_eq!(
+            bindings
+                .next()
+                .expect("expected a binding")
+                .as_ident()
+                .as_ref(),
+            "z"
+        );
+        assert!(bindings.next().is_none(), "expected no more binding");
+
+        assert_prim(assert_term(decl.rhs()), lex::Primitive::Num);
+    })
+}
+
+#[test]
 fn parse_annotation() {
     parse(
         r#"

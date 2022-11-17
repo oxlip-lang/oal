@@ -106,6 +106,7 @@ syntax_nodes!(
     Property,
     Array,
     Annotations,
+    Bindings,
     Declaration,
     UriVariable,
     UriPath,
@@ -144,19 +145,32 @@ impl<'a, T: Default + Clone> Annotations<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> Bindings<'a, T> {
+    pub fn items(&self) -> impl Iterator<Item = Symbol<'a, T>> {
+        self.node().children().filter_map(Symbol::cast)
+    }
+}
+
 impl<'a, T: Default + Clone> Declaration<'a, T> {
-    const ANN_POS: usize = 0;
-    const SYM_POS: usize = 2;
-    const RHS_POS: usize = 4;
+    const ANNOTATIONS_POS: usize = 0;
+    const SYMBOL_POS: usize = 2;
+    const BINDINGS_POS: usize = 3;
+    const RHS_POS: usize = 5;
 
     pub fn annotations(&self) -> impl Iterator<Item = &'a str> {
-        Annotations::cast(self.node().nth(Self::ANN_POS))
+        Annotations::cast(self.node().nth(Self::ANNOTATIONS_POS))
             .expect("expected annotations")
             .items()
     }
 
     pub fn symbol(&self) -> Symbol<'a, T> {
-        Symbol::cast(self.node().nth(Self::SYM_POS)).expect("declaration lhs must be a symbol")
+        Symbol::cast(self.node().nth(Self::SYMBOL_POS)).expect("declaration lhs must be a symbol")
+    }
+
+    pub fn bindings(&self) -> impl Iterator<Item = Symbol<'a, T>> {
+        Bindings::cast(self.node().nth(Self::BINDINGS_POS))
+            .expect("expected bindings")
+            .items()
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
@@ -603,11 +617,13 @@ where
 
     let annotations = tree_many(line_ann.repeated(), SyntaxKind::Annotations);
 
+    let bindings = tree_many(binding.repeated(), SyntaxKind::Bindings);
+
     let declaration = tree_many(
         annotations
             .chain(just_token(TokenKind::Keyword(lex::Keyword::Let)))
             .chain(variable)
-            .chain(binding.repeated())
+            .chain(bindings)
             .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
             .chain(expr_type.clone())
             .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
