@@ -146,8 +146,11 @@ impl<'a, T: Default + Clone> Annotations<'a, T> {
 }
 
 impl<'a, T: Default + Clone> Bindings<'a, T> {
-    pub fn items(&self) -> impl Iterator<Item = Symbol<'a, T>> {
-        self.node().children().filter_map(Symbol::cast)
+    pub fn items(&self) -> impl Iterator<Item = Ident> + 'a {
+        self.node()
+            .children()
+            .filter_map(Symbol::cast)
+            .map(|s| s.as_ident())
     }
 }
 
@@ -163,11 +166,13 @@ impl<'a, T: Default + Clone> Declaration<'a, T> {
             .items()
     }
 
-    pub fn symbol(&self) -> Symbol<'a, T> {
-        Symbol::cast(self.node().nth(Self::SYMBOL_POS)).expect("declaration lhs must be a symbol")
+    pub fn symbol(&self) -> Ident {
+        Symbol::cast(self.node().nth(Self::SYMBOL_POS))
+            .expect("declaration lhs must be a symbol")
+            .as_ident()
     }
 
-    pub fn bindings(&self) -> impl Iterator<Item = Symbol<'a, T>> {
+    pub fn bindings(&self) -> impl Iterator<Item = Ident> + 'a {
         Bindings::cast(self.node().nth(Self::BINDINGS_POS))
             .expect("expected bindings")
             .items()
@@ -397,6 +402,18 @@ impl<'a, T: Default + Clone> Content<'a, T> {
         ContentBody::cast(self.node().nth(Self::BODY_POS))
             .expect("expected content body")
             .inner()
+    }
+}
+
+impl<'a, T: Default + Clone> Application<'a, T> {
+    pub fn symbol(&self) -> Ident {
+        Symbol::cast(self.node().first())
+            .expect("expected a symbol")
+            .as_ident()
+    }
+
+    pub fn bindings(&self) -> impl Iterator<Item = Terminal<'a, T>> {
+        self.node().children().skip(1).filter_map(Terminal::cast)
     }
 }
 

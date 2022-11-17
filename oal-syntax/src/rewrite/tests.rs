@@ -2,8 +2,8 @@ use super::parser::PathElement;
 use crate::atom::{HttpStatus, HttpStatusRange};
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
-    Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property, Symbol,
-    Terminal, Transfer, UriPath, UriSegment, UriTemplate, VariadicOp,
+    Application, Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property,
+    Symbol, Terminal, Transfer, UriPath, UriSegment, UriTemplate, VariadicOp,
 };
 use oal_model::grammar::NodeRef;
 
@@ -20,7 +20,7 @@ fn assert_decl<'a>(p: Prog<'a>, sym: &str) -> Declaration<'a, ()> {
     let decls = &mut p.declarations();
     let d = decls.next().expect("expected a declaration");
     assert!(decls.next().is_none(), "expected only one declaration");
-    assert_eq!(d.symbol().as_ident().as_ref(), sym);
+    assert_eq!(d.symbol().as_ref(), sym);
     d
 }
 
@@ -215,7 +215,7 @@ fn parse_decl_string() {
 fn parse_decl_reference() {
     parse("let @a = {};", |p: Prog| {
         let decl = assert_decl(p, "@a");
-        assert!(decl.symbol().as_ident().is_reference());
+        assert!(decl.symbol().is_reference());
     })
 }
 
@@ -301,33 +301,35 @@ fn parse_decl_lambda() {
         let decl = assert_decl(p, "f");
 
         let bindings = &mut decl.bindings();
-        assert_eq!(
-            bindings
-                .next()
-                .expect("expected a binding")
-                .as_ident()
-                .as_ref(),
-            "x"
-        );
-        assert_eq!(
-            bindings
-                .next()
-                .expect("expected a binding")
-                .as_ident()
-                .as_ref(),
-            "y"
-        );
-        assert_eq!(
-            bindings
-                .next()
-                .expect("expected a binding")
-                .as_ident()
-                .as_ref(),
-            "z"
-        );
+        assert_eq!(bindings.next().expect("expected a binding").as_ref(), "x");
+        assert_eq!(bindings.next().expect("expected a binding").as_ref(), "y");
+        assert_eq!(bindings.next().expect("expected a binding").as_ref(), "z");
         assert!(bindings.next().is_none(), "expected no more binding");
 
         assert_prim(assert_term(decl.rhs()), lex::Primitive::Num);
+    })
+}
+
+#[test]
+fn parse_decl_application() {
+    parse("let a = f num {} uri;", |p: Prog| {
+        let decl = assert_decl(p, "a");
+
+        let app = Application::cast(decl.rhs()).expect("expected an application");
+        assert_eq!(app.symbol().as_ref(), "f");
+
+        let bindings = &mut app.bindings();
+        assert_prim(
+            bindings.next().expect("expected a binding").inner(),
+            lex::Primitive::Num,
+        );
+        Object::cast(bindings.next().expect("expected a binding").inner())
+            .expect("expected an object");
+        assert_prim(
+            bindings.next().expect("expected a binding").inner(),
+            lex::Primitive::Uri,
+        );
+        assert!(bindings.next().is_none(), "expected no more binding");
     })
 }
 
