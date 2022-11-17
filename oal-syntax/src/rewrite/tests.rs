@@ -3,7 +3,7 @@ use crate::atom::{HttpStatus, HttpStatusRange};
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
     Application, Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property,
-    Symbol, Terminal, Transfer, UriPath, UriSegment, UriTemplate, VariadicOp,
+    Relation, Symbol, Terminal, Transfer, UriSegment, UriTemplate, VariadicOp,
 };
 use oal_model::grammar::NodeRef;
 
@@ -90,36 +90,34 @@ fn parse_decl_array() {
 fn parse_decl_uri() {
     parse("let a = /;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
-        let tmpl = UriTemplate::cast(rhs).expect("expected an URI template");
-        let uri = UriPath::cast(tmpl.path()).expect("expected an URI path");
-        let mut segs = uri.segments();
+        let segs = &mut UriTemplate::cast(rhs)
+            .expect("expected an URI template")
+            .segments();
         let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
         assert_eq!(elem.as_str(), "/");
     });
     parse("let a = /x/{ 'y str }/z?{ 'q str, 'n num };", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
-        let tmpl = UriTemplate::cast(rhs).expect("expected an URI template");
-        let uri = UriPath::cast(tmpl.path()).expect("expected an URI path");
+        let uri = UriTemplate::cast(rhs).expect("expected an URI template");
         let segs = &mut uri.segments();
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "x");
         assert_eq!(assert_next_path_elem(segs).as_str(), "/");
 
         let prop = assert_next_path_var(segs);
-        assert_eq!(prop.name().as_ident().as_ref(), "y");
+        assert_eq!(prop.name().as_ref(), "y");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "z");
 
-        let params = tmpl.params().expect("expected URI paramters");
-        let props = &mut params.properties();
+        let props = &mut uri.params().expect("expected URI parameters");
 
         let prop = assert_next_prop(props);
-        assert_eq!(prop.name().as_ident().as_ref(), "q");
+        assert_eq!(prop.name().as_ref(), "q");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
         let prop = assert_next_prop(props);
-        assert_eq!(prop.name().as_ident().as_ref(), "n");
+        assert_eq!(prop.name().as_ref(), "n");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Num);
     })
 }
@@ -129,12 +127,8 @@ fn parse_decl_transfer() {
     parse("let a = get -> {};", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
-        let mtds = &mut xfer.methods();
-        assert_eq!(
-            mtds.next().expect("expected a method").method(),
-            lex::Method::Get
-        );
-        assert!(mtds.next().is_none());
+        let methods: Vec<_> = xfer.methods().collect();
+        assert_eq!(methods, vec![lex::Method::Get]);
 
         assert!(xfer.params().is_none());
         assert!(xfer.domain().is_none());
@@ -143,20 +137,13 @@ fn parse_decl_transfer() {
     parse("let a = get, put { 'q str } : {} -> {};", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
-        let mtds = &mut xfer.methods();
-        assert_eq!(
-            mtds.next().expect("expected a method").method(),
-            lex::Method::Get
-        );
-        assert_eq!(
-            mtds.next().expect("expected a method").method(),
-            lex::Method::Put
-        );
+        let methods: Vec<_> = xfer.methods().collect();
+        assert_eq!(methods, vec![lex::Method::Get, lex::Method::Put]);
 
         let props = &mut xfer.params().expect("expected parameters");
 
         let prop = assert_next_prop(props);
-        assert_eq!(prop.name().as_ident().as_ref(), "q");
+        assert_eq!(prop.name().as_ref(), "q");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
         assert!(xfer.domain().is_some(), "expected a domain");
@@ -180,8 +167,8 @@ fn parse_decl_transfer() {
 fn parse_decl_property() {
     parse("let a = 'q str;", |p: Prog| {
         let prop =
-            Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a propery");
-        assert_eq!(prop.name().as_ident().as_ref(), "q");
+            Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
+        assert_eq!(prop.name().as_ref(), "q");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
     })
 }
@@ -356,10 +343,62 @@ fn parse_decl_variadic_op() {
 }
 
 #[test]
+fn parse_decl_relation() {
+    parse("let a = / ( put : <{}> -> <{}> );", |p: Prog| {
+        let decl = assert_decl(p, "a");
+        let rel = Relation::cast(decl.rhs()).expect("expected a relation");
+
+        let uri = UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
+        let segs = &mut uri.segments();
+        let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else { panic!("expected path element") };
+        assert_eq!(elem.as_str(), "/");
+        assert!(segs.next().is_none(), "expected no more URI segment");
+
+        let xfers = &mut rel.transfers();
+
+        let xfer = xfers.next().expect("expected a transfer");
+        let methods: Vec<_> = xfer.methods().collect();
+        assert_eq!(methods, vec![lex::Method::Put]);
+
+        assert!(xfers.next().is_none(), "expected no more transfer");
+    });
+    parse(
+        r#"
+let a = / (
+    patch, put : <{}> -> <{}>,
+    get               -> <{}>
+);
+"#,
+        |p: Prog| {
+            let decl = assert_decl(p, "a");
+            let rel = Relation::cast(decl.rhs()).expect("expected a relation");
+
+            let uri = UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
+            let segs = &mut uri.segments();
+            let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else { panic!("expected path element") };
+            assert_eq!(elem.as_str(), "/");
+            assert!(segs.next().is_none(), "expected no more URI segment");
+
+            let xfers = &mut rel.transfers();
+
+            let xfer = xfers.next().expect("expected a transfer");
+            let methods: Vec<_> = xfer.methods().collect();
+            assert_eq!(methods, vec![lex::Method::Patch, lex::Method::Put]);
+
+            let xfer = xfers.next().expect("expected a transfer");
+            let methods: Vec<_> = xfer.methods().collect();
+            assert_eq!(methods, vec![lex::Method::Get]);
+
+            assert!(xfers.next().is_none(), "expected no more transfer");
+        },
+    )
+}
+
+#[test]
 fn parse_annotation() {
     parse(
         r#"
-# description: "some identifer"
+# description: "some identifier"
 # required: true
 let id = num;
 # description: "some record"
@@ -372,7 +411,7 @@ let r = {};
             let anns = &mut decl.annotations();
             assert_eq!(
                 anns.next().expect("expected an annotation"),
-                " description: \"some identifer\"\n"
+                " description: \"some identifier\"\n"
             );
             assert_eq!(
                 anns.next().expect("expected an annotation"),

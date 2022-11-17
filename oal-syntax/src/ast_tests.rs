@@ -298,7 +298,7 @@ fn parse_lambda_decl() {
 #[test]
 fn parse_annotation() {
     let code = r#"
-        # description: "some identifer"
+        # description: "some identifier"
         let id = num;
         # description: "some record"
         let r = {};
@@ -309,12 +309,12 @@ fn parse_annotation() {
     assert_eq!(d.stmts.len(), 5);
 
     if let Statement::Ann(ann) = d.stmts.get(0).unwrap() {
-        assert_eq!(ann.text, r#" description: "some identifer""#);
+        assert_eq!(ann.text, r#" description: "some identifier""#);
         assert_eq!(
             ann.span,
             Some(Span {
                 start: (2, 9),
-                end: (2, 40)
+                end: (2, 41)
             })
         )
     } else {

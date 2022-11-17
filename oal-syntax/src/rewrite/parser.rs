@@ -48,9 +48,9 @@ impl<'a, T: Default + Clone> PathElement<'a, T> {
     }
 }
 
-terminal_node!(Gram, ProperyName, TokenKind::Property);
+terminal_node!(Gram, PropertyName, TokenKind::Property);
 
-impl<'a, T: Default + Clone> ProperyName<'a, T> {
+impl<'a, T: Default + Clone> PropertyName<'a, T> {
     pub fn as_ident(&self) -> Ident {
         self.node().as_str().into()
     }
@@ -95,6 +95,15 @@ impl<'a, T: Default + Clone> ContentTag<'a, T> {
     }
 }
 
+terminal_node!(Gram, Operator, TokenKind::Operator(_));
+
+impl<'a, T: Default + Clone> Operator<'a, T> {
+    pub fn operator(&self) -> lex::Operator {
+        let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
+        op
+    }
+}
+
 syntax_nodes!(
     Gram,
     Terminal,
@@ -121,6 +130,7 @@ syntax_nodes!(
     Transfer,
     Import,
     Resource,
+    XferList,
     Relation,
     Program
 );
@@ -215,22 +225,6 @@ impl<'a, T: Default + Clone> Array<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> UriTemplate<'a, T> {
-    const PATH_POS: usize = 0;
-    const PARAMS_POS: usize = 1;
-
-    pub fn path(&self) -> NodeRef<'a, T, Gram> {
-        self.node().nth(Self::PATH_POS)
-    }
-
-    pub fn params(&self) -> Option<UriParams<'a, T>> {
-        self.node()
-            .children()
-            .nth(Self::PARAMS_POS)
-            .map(|inner| UriParams::cast(inner).expect("expected URI parameters"))
-    }
-}
-
 impl<'a, T: Default + Clone> UriVariable<'a, T> {
     const INNER_POS: usize = 1;
 
@@ -239,10 +233,49 @@ impl<'a, T: Default + Clone> UriVariable<'a, T> {
     }
 }
 
+#[derive(Debug)]
+pub enum UriSegment<'a, T: Clone + Default> {
+    Element(PathElement<'a, T>),
+    Variable(UriVariable<'a, T>),
+}
+
+impl<'a, T: Default + Clone> UriPath<'a, T> {
+    pub fn segments(&self) -> impl Iterator<Item = UriSegment<'a, T>> {
+        self.node().children().filter_map(|c| {
+            if let Some(v) = UriVariable::cast(c) {
+                Some(UriSegment::Variable(v))
+            } else if let Some(p) = PathElement::cast(c) {
+                Some(UriSegment::Element(p))
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl<'a, T: Default + Clone> UriTemplate<'a, T> {
+    const PATH_POS: usize = 0;
+    const PARAMS_POS: usize = 1;
+
+    pub fn segments(&self) -> impl Iterator<Item = UriSegment<'a, T>> {
+        UriPath::cast(self.node().nth(Self::PATH_POS))
+            .expect("expected an URI path")
+            .segments()
+    }
+
+    pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
+        self.node().children().nth(Self::PARAMS_POS).map(|inner| {
+            UriParams::cast(inner)
+                .expect("expected URI parameters")
+                .params()
+        })
+    }
+}
+
 impl<'a, T: Default + Clone> UriParams<'a, T> {
     const INNER_POS: usize = 1;
 
-    pub fn properties(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
+    pub fn params(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
         Object::cast(self.node().nth(Self::INNER_POS))
             .expect("URI parameters must be an object")
             .properties()
@@ -253,8 +286,10 @@ impl<'a, T: Default + Clone> Property<'a, T> {
     const NAME_POS: usize = 0;
     const RHS_POS: usize = 1;
 
-    pub fn name(&self) -> ProperyName<'a, T> {
-        ProperyName::cast(self.node().nth(Self::NAME_POS)).expect("expected a propery name")
+    pub fn name(&self) -> Ident {
+        PropertyName::cast(self.node().nth(Self::NAME_POS))
+            .expect("expected a property name")
+            .as_ident()
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
@@ -269,8 +304,11 @@ impl<'a, T: Default + Clone> Object<'a, T> {
 }
 
 impl<'a, T: Default + Clone> XferMethods<'a, T> {
-    pub fn methods(&self) -> impl Iterator<Item = Method<'a, T>> {
-        self.node().children().filter_map(Method::cast)
+    pub fn methods(&self) -> impl Iterator<Item = lex::Method> + 'a {
+        self.node()
+            .children()
+            .filter_map(Method::cast)
+            .map(|m| m.method())
     }
 }
 
@@ -303,7 +341,7 @@ impl<'a, T: Default + Clone> Transfer<'a, T> {
     const DOMAIN_POS: usize = 2;
     const RANGE_POS: usize = 4;
 
-    pub fn methods(&self) -> impl Iterator<Item = Method<'a, T>> {
+    pub fn methods(&self) -> impl Iterator<Item = lex::Method> + 'a {
         XferMethods::cast(self.node().nth(Self::METHODS_POS))
             .expect("expected transfer methods")
             .methods()
@@ -330,32 +368,13 @@ impl<'a, T: Default + Clone> VariadicOp<'a, T> {
     const OPERATOR_POS: usize = 1;
 
     pub fn operator(&self) -> lex::Operator {
-        let TokenKind::Operator(op) = self.node().nth(Self::OPERATOR_POS).token().kind() else { panic!("expected an operator") };
-        op
+        Operator::cast(self.node().nth(Self::OPERATOR_POS))
+            .expect("expected an operator")
+            .operator()
     }
 
     pub fn operands(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
         self.node().children().step_by(2)
-    }
-}
-
-#[derive(Debug)]
-pub enum UriSegment<'a, T: Clone + Default> {
-    Element(PathElement<'a, T>),
-    Variable(UriVariable<'a, T>),
-}
-
-impl<'a, T: Default + Clone> UriPath<'a, T> {
-    pub fn segments(&self) -> impl Iterator<Item = UriSegment<'a, T>> {
-        self.node().children().filter_map(|c| {
-            if let Some(v) = UriVariable::cast(c) {
-                Some(UriSegment::Variable(v))
-            } else if let Some(p) = PathElement::cast(c) {
-                Some(UriSegment::Element(p))
-            } else {
-                None
-            }
-        })
     }
 }
 
@@ -417,6 +436,27 @@ impl<'a, T: Default + Clone> Application<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> XferList<'a, T> {
+    pub fn items(&self) -> impl Iterator<Item = Transfer<'a, T>> {
+        self.node().children().step_by(2).filter_map(Transfer::cast)
+    }
+}
+
+impl<'a, T: Default + Clone> Relation<'a, T> {
+    const URI_POS: usize = 0;
+    const XFERS_POS: usize = 2;
+
+    pub fn uri(&self) -> Terminal<'a, T> {
+        Terminal::cast(self.node().nth(Self::URI_POS)).expect("expected a terminal")
+    }
+
+    pub fn transfers(&self) -> impl Iterator<Item = Transfer<'a, T>> {
+        XferList::cast(self.node().nth(Self::XFERS_POS))
+            .expect("expected a transfer list")
+            .items()
+    }
+}
+
 fn variadic_op<'a, P, E, T>(
     op: lex::Operator,
     p: P,
@@ -472,7 +512,7 @@ where
 
     let expr_type = recursive(|expr| {
         let object_type = tree_many(
-            just_token(TokenKind::Control(lex::Control::BlockBegin))
+            just_token(TokenKind::Control(lex::Control::BraceLeft))
                 .chain(
                     expr.clone()
                         .chain(
@@ -484,14 +524,14 @@ where
                         .or_not()
                         .flatten(),
                 )
-                .chain(just_token(TokenKind::Control(lex::Control::BlockEnd))),
+                .chain(just_token(TokenKind::Control(lex::Control::BraceRight))),
             SyntaxKind::Object,
         );
 
         let uri_var = tree_many(
-            just_token(TokenKind::Control(lex::Control::BlockBegin))
+            just_token(TokenKind::Control(lex::Control::BraceLeft))
                 .chain(expr.clone())
-                .chain(just_token(TokenKind::Control(lex::Control::BlockEnd))),
+                .chain(just_token(TokenKind::Control(lex::Control::BraceRight))),
             SyntaxKind::UriVariable,
         );
 
@@ -519,9 +559,9 @@ where
         .or(uri_template);
 
         let array_type = tree_many(
-            just_token(TokenKind::Control(lex::Control::ArrayBegin))
+            just_token(TokenKind::Control(lex::Control::BracketLeft))
                 .chain(expr.clone())
-                .chain(just_token(TokenKind::Control(lex::Control::ArrayEnd))),
+                .chain(just_token(TokenKind::Control(lex::Control::BracketRight))),
             SyntaxKind::Array,
         );
 
@@ -548,17 +588,17 @@ where
         let content_body = tree_maybe(expr.clone().or_not(), SyntaxKind::ContentBody);
 
         let content_type = tree_many(
-            just_token(TokenKind::Control(lex::Control::ContentBegin))
+            just_token(TokenKind::Control(lex::Control::ChevronLeft))
                 .chain(content_meta_list)
                 .chain(content_body)
-                .chain(just_token(TokenKind::Control(lex::Control::ContentEnd))),
+                .chain(just_token(TokenKind::Control(lex::Control::ChevronRight))),
             SyntaxKind::Content,
         );
 
         let subexpr_type = tree_many(
-            just_token(TokenKind::Control(lex::Control::ParenthesisBegin))
+            just_token(TokenKind::Control(lex::Control::ParenLeft))
                 .chain(expr.clone())
-                .chain(just_token(TokenKind::Control(lex::Control::ParenthesisEnd))),
+                .chain(just_token(TokenKind::Control(lex::Control::ParenRight))),
             SyntaxKind::SubExpression,
         );
 
@@ -613,19 +653,21 @@ where
 
         let xfer_type = transfer.or(sum_type);
 
+        let xfer_list = tree_many(
+            xfer_type.clone().chain(
+                just_token(TokenKind::Control(lex::Control::Comma))
+                    .chain(xfer_type.clone())
+                    .repeated()
+                    .flatten(),
+            ),
+            SyntaxKind::XferList,
+        );
+
         let rel_type = tree_many(
             term_type
-                .chain(just_token(TokenKind::Control(
-                    lex::Control::ParenthesisBegin,
-                )))
-                .chain(xfer_type.clone())
-                .chain(
-                    just_token(TokenKind::Control(lex::Control::Comma))
-                        .chain(xfer_type.clone())
-                        .repeated()
-                        .flatten(),
-                )
-                .chain(just_token(TokenKind::Control(lex::Control::ParenthesisEnd))),
+                .chain(just_token(TokenKind::Control(lex::Control::ParenLeft)))
+                .chain(xfer_list)
+                .chain(just_token(TokenKind::Control(lex::Control::ParenRight))),
             SyntaxKind::Relation,
         );
 

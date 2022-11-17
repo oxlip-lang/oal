@@ -42,14 +42,14 @@ pub enum Keyword {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Control {
-    BlockBegin,
-    BlockEnd,
-    ParenthesisBegin,
-    ParenthesisEnd,
-    ArrayBegin,
-    ArrayEnd,
-    ContentBegin,
-    ContentEnd,
+    BraceLeft,
+    BraceRight,
+    ParenLeft,
+    ParenRight,
+    BracketLeft,
+    BracketRight,
+    ChevronLeft,
+    ChevronRight,
     Semicolon,
     Comma,
 }
@@ -302,14 +302,14 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>>
         .map(|p| Token::new(TokenKind::Operator(p), TokenValue::None));
 
     let control = select! {
-        '{' => Control::BlockBegin,
-        '}' => Control::BlockEnd,
-        '(' => Control::ParenthesisBegin,
-        ')' => Control::ParenthesisEnd,
-        '[' => Control::ArrayBegin,
-        ']' => Control::ArrayEnd,
-        '<' => Control::ContentBegin,
-        '>' => Control::ContentEnd,
+        '{' => Control::BraceLeft,
+        '}' => Control::BraceRight,
+        '(' => Control::ParenLeft,
+        ')' => Control::ParenRight,
+        '[' => Control::BracketLeft,
+        ']' => Control::BracketRight,
+        '<' => Control::ChevronLeft,
+        '>' => Control::ChevronRight,
         ';' => Control::Semicolon,
         ',' => Control::Comma,
     }

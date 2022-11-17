@@ -3,4 +3,3 @@ target/
 *.iml
 Cargo.lock
 gen/
-.vscode/
