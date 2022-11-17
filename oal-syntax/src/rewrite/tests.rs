@@ -172,7 +172,7 @@ fn parse_decl_transfer() {
             .expect("expected first content");
         Content::cast(assert_term(opds.next().expect("expected operand")))
             .expect("expected second content");
-        assert!(opds.next().is_none());
+        assert!(opds.next().is_none(), "expected no more operand");
     })
 }
 
@@ -330,6 +330,28 @@ fn parse_decl_application() {
             lex::Primitive::Uri,
         );
         assert!(bindings.next().is_none(), "expected no more binding");
+    })
+}
+
+#[test]
+fn parse_decl_variadic_op() {
+    parse("let a = {} ~ uri ~ bool;", |p: Prog| {
+        let decl = assert_decl(p, "a");
+
+        let op = VariadicOp::cast(decl.rhs()).expect("expected variadic operator");
+        assert_eq!(op.operator(), lex::Operator::Tilde);
+
+        let opds = &mut op.operands();
+        Object::cast(assert_term(opds.next().expect("expected operand"))).expect("expected object");
+        assert_prim(
+            assert_term(opds.next().expect("expected operand")),
+            lex::Primitive::Uri,
+        );
+        assert_prim(
+            assert_term(opds.next().expect("expected operand")),
+            lex::Primitive::Bool,
+        );
+        assert!(opds.next().is_none(), "expected no more operand");
     })
 }
 
