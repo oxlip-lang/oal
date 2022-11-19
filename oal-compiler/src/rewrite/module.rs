@@ -62,7 +62,7 @@ impl ModuleSet {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct External {
     loc: Locator,
     index: NodeIdx,
@@ -83,5 +83,17 @@ impl External {
             // All modules must be present in the module-set.
             panic!("unknown module: {}", self.loc)
         }
+    }
+}
+
+impl std::fmt::Display for External {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}#{}", &self.loc, &self.index.to_string())
+    }
+}
+
+impl std::fmt::Debug for External {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        <Self as std::fmt::Display>::fmt(&self, f)
     }
 }

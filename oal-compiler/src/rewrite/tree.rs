@@ -2,17 +2,26 @@ use crate::rewrite::module::External;
 use oal_model::grammar::{NodeRef, SyntaxTree};
 use oal_syntax::rewrite::parser::Gram;
 
+/// The internally mutable `Core` type for the syntax tree.
 #[derive(Clone, Default, Debug)]
-pub struct Inner {
+pub struct Core {
     defn: Option<External>,
 }
 
-impl Inner {
+impl Core {
+    /// Returns the definition of the current node if any.
+    pub fn definition(&self) -> Option<&External> {
+        self.defn.as_ref()
+    }
+
+    /// Sets the location of the definition for the current node.
     pub fn define(&mut self, ext: External) {
         self.defn = Some(ext);
     }
 }
 
-pub type Tree = SyntaxTree<Inner, Gram>;
+/// The syntax tree type.
+pub type Tree = SyntaxTree<Core, Gram>;
 
-pub type NRef<'a> = NodeRef<'a, Inner, Gram>;
+/// The node reference type.
+pub type NRef<'a> = NodeRef<'a, Core, Gram>;

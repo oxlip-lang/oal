@@ -4,6 +4,7 @@
         "canonicalize",
         "chumsky",
         "combinators",
+        "defn",
         "indextree",
         "interner",
         "metas",

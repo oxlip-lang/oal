@@ -33,16 +33,19 @@ impl<G: Grammar> Debug for SyntaxTrunk<G> {
 
 impl<G: Grammar> Copy for SyntaxTrunk<G> {}
 
-// Note: once Chumsky supports stateful combinators, it should be possible to build a
-// generational index tree in one pass.
-#[derive(Clone, Debug)]
-pub struct ParseNode<T, G: Grammar>(SyntaxTrunk<G>, Option<Vec<ParseNode<T, G>>>, T);
+/// A trait for internally mutable node state.
+pub trait Core: Default + Clone + Debug {}
 
-impl<T, G> ParseNode<T, G>
-where
-    T: Default + Clone,
-    G: Grammar,
-{
+impl<C: Default + Clone + Debug> Core for C {}
+
+/// The intermediary node type to build a syntax tree from a parser.
+///
+/// Note: once Chumsky supports stateful combinators, it should be possible to build a
+/// generational index tree in one pass, and get rid of this type.
+#[derive(Clone, Debug)]
+pub struct ParseNode<T: Core, G: Grammar>(SyntaxTrunk<G>, Option<Vec<ParseNode<T, G>>>, T);
+
+impl<T: Core, G: Grammar> ParseNode<T, G> {
     pub fn from_leaf(token: TokenAlias<G::Lex>) -> Self {
         ParseNode(SyntaxTrunk::Leaf(token), None, T::default())
     }
@@ -65,13 +68,9 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct SyntaxNode<T, G: Grammar>(SyntaxTrunk<G>, RefCell<T>);
+pub struct SyntaxNode<T: Core, G: Grammar>(SyntaxTrunk<G>, RefCell<T>);
 
-impl<T, G> SyntaxNode<T, G>
-where
-    T: Clone,
-    G: Grammar,
-{
+impl<T: Core, G: Grammar> SyntaxNode<T, G> {
     pub fn new(trunk: SyntaxTrunk<G>, core: T) -> Self {
         SyntaxNode(trunk, RefCell::new(core))
     }
@@ -94,14 +93,13 @@ where
 
 type TreeArena<T, G> = generational_indextree::Arena<SyntaxNode<T, G>>;
 
-#[derive(Debug)]
-pub struct SyntaxTree<T, G: Grammar> {
+pub struct SyntaxTree<T: Core, G: Grammar> {
     tokens: TokenList<G::Lex>,
     tree: TreeArena<T, G>,
     root: Option<NodeIdx>,
 }
 
-impl<T, G: Grammar> Default for SyntaxTree<T, G> {
+impl<T: Core, G: Grammar> Default for SyntaxTree<T, G> {
     fn default() -> Self {
         SyntaxTree {
             tokens: TokenList::default(),
@@ -111,7 +109,7 @@ impl<T, G: Grammar> Default for SyntaxTree<T, G> {
     }
 }
 
-impl<T, G: Grammar> Interner for SyntaxTree<T, G> {
+impl<T: Core, G: Grammar> Interner for SyntaxTree<T, G> {
     fn register<S: AsRef<str>>(&mut self, s: S) -> Symbol {
         self.tokens.register(s)
     }
@@ -121,11 +119,17 @@ impl<T, G: Grammar> Interner for SyntaxTree<T, G> {
     }
 }
 
-impl<T, G> SyntaxTree<T, G>
-where
-    T: Clone + Default,
-    G: Grammar,
-{
+impl<T: Core, G: Grammar> Debug for SyntaxTree<T, G> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        if let Some(root) = self.root {
+            NodeRef::from(self, root).fmt(f)
+        } else {
+            write!(f, "[empty tree]")
+        }
+    }
+}
+
+impl<T: Core, G: Grammar> SyntaxTree<T, G> {
     pub fn import(tokens: TokenList<G::Lex>, parse: ParseNode<T, G>) -> Self {
         let mut tree = SyntaxTree::default();
         let root = parse.to_tree(&mut tree, None);
@@ -226,10 +230,7 @@ pub struct TokenRef<'a, G: Grammar> {
     idx: TokenIdx,
 }
 
-impl<'a, G> TokenRef<'a, G>
-where
-    G: Grammar,
-{
+impl<'a, G: Grammar> TokenRef<'a, G> {
     fn from(tokens: &'a TokenList<G::Lex>, idx: TokenIdx) -> Self {
         TokenRef { tokens, idx }
     }
@@ -248,13 +249,13 @@ where
     }
 }
 
-pub struct NodeRef<'a, T, G: Grammar> {
+pub struct NodeRef<'a, T: Core, G: Grammar> {
     tree: &'a SyntaxTree<T, G>,
     idx: NodeIdx,
 }
 
 // Note: for some reason the derive macro is not doing the right thing for Clone/Copy.
-impl<'a, T, G: Grammar> Clone for NodeRef<'a, T, G> {
+impl<'a, T: Core, G: Grammar> Clone for NodeRef<'a, T, G> {
     fn clone(&self) -> Self {
         NodeRef {
             tree: self.tree,
@@ -263,23 +264,15 @@ impl<'a, T, G: Grammar> Clone for NodeRef<'a, T, G> {
     }
 }
 
-impl<'a, T, G: Grammar> Copy for NodeRef<'a, T, G> {}
+impl<'a, T: Core, G: Grammar> Copy for NodeRef<'a, T, G> {}
 
 #[derive(Debug)]
-pub enum NodeCursor<'a, T, G>
-where
-    T: Clone + Default,
-    G: Grammar,
-{
+pub enum NodeCursor<'a, T: Core, G: Grammar> {
     Start(NodeRef<'a, T, G>),
     End(NodeRef<'a, T, G>),
 }
 
-impl<'a, T, G> NodeRef<'a, T, G>
-where
-    T: Clone + Default,
-    G: Grammar,
-{
+impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     pub fn from(tree: &'a SyntaxTree<T, G>, idx: NodeIdx) -> Self {
         NodeRef { tree, idx }
     }
@@ -362,13 +355,14 @@ where
     }
 }
 
-impl<'a, T, G> Debug for NodeRef<'a, T, G>
-where
-    T: Clone + Default,
-    G: Grammar,
-{
+impl<'a, T: Core, G: Grammar> Debug for NodeRef<'a, T, G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.syntax().trunk())?;
+        write!(
+            f,
+            "{:?} ({:?})",
+            self.syntax().trunk(),
+            self.syntax().core_ref()
+        )?;
         if !self.is_empty() {
             write!(f, " -> ")?;
             f.debug_list().entries(self.children()).finish()?;
@@ -389,12 +383,10 @@ macro_rules! syntax_nodes {
         $(
             #[allow(dead_code)]
             #[derive(Debug)]
-            pub struct $node<'a, T: Default + Clone>(NodeRef<'a, T, $grammar>);
+            pub struct $node<'a, T: Core>(NodeRef<'a, T, $grammar>);
 
             #[allow(dead_code)]
-            impl<'a, T> $node<'a, T>
-            where
-                T: Default + Clone,
+            impl<'a, T: Core> $node<'a, T>
             {
                 pub fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
                     match node.syntax().trunk() {
@@ -416,13 +408,10 @@ macro_rules! terminal_node {
     ( $grammar:ident, $node:ident, $pat:pat  ) => {
         #[allow(dead_code)]
         #[derive(Debug)]
-        pub struct $node<'a, T: Default + Clone>(NodeRef<'a, T, $grammar>);
+        pub struct $node<'a, T: Core>(NodeRef<'a, T, $grammar>);
 
         #[allow(dead_code)]
-        impl<'a, T> $node<'a, T>
-        where
-            T: Default + Clone,
-        {
+        impl<'a, T: Core> $node<'a, T> {
             pub fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
                 match node.syntax().trunk() {
                     SyntaxTrunk::Leaf(t) if matches!(t.kind(), $pat) => Some(Self(node)),
@@ -443,7 +432,7 @@ pub fn tree_one<'a, P, T, G>(
 ) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
 where
     P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>> + Clone + 'a,
-    T: Default + Clone + 'a,
+    T: Core + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -457,7 +446,7 @@ pub fn tree_maybe<'a, P, T, G>(
 ) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
 where
     P: Parser<TokenAlias<G::Lex>, Option<ParseNode<T, G>>> + Clone + 'a,
-    T: Default + Clone + 'a,
+    T: Core + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -472,7 +461,7 @@ pub fn tree_many<'a, P, T, G>(
 ) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
 where
     P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + Clone + 'a,
-    T: Default + Clone + 'a,
+    T: Core + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -486,7 +475,7 @@ pub fn tree_skip<'a, P, T, G>(
 ) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
 where
     P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + Clone + 'a,
-    T: Default + Clone + 'a,
+    T: Core + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -506,7 +495,7 @@ pub fn just_token<E, T, G>(
 ) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = E> + Clone
 where
     E: chumsky::Error<TokenAlias<G::Lex>>,
-    T: Default + Clone,
+    T: Core,
     G: Grammar,
 {
     filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() == kind).map(ParseNode::from_leaf)
@@ -531,7 +520,7 @@ pub fn analyze<G, P, T>(tokens: TokenList<G::Lex>, parser: P) -> Result<SyntaxTr
 where
     G: Grammar,
     P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = Simple<TokenAlias<G::Lex>>>,
-    T: Clone + Default,
+    T: Core,
 {
     let (root, mut errs) = parser.parse_recovery(tokens.stream());
 

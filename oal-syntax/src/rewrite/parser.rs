@@ -17,7 +17,7 @@ impl Grammar for Gram {
 
 terminal_node!(Gram, Identifier, TokenKind::Identifier(_));
 
-impl<'a, T: Default + Clone> Identifier<'a, T> {
+impl<'a, T: Core> Identifier<'a, T> {
     pub fn as_ident(&self) -> Ident {
         self.node().as_str().into()
     }
@@ -29,7 +29,7 @@ terminal_node!(
     TokenKind::Keyword(lex::Keyword::Primitive(_))
 );
 
-impl<'a, T: Default + Clone> Primitive<'a, T> {
+impl<'a, T: Core> Primitive<'a, T> {
     pub fn primitive(&self) -> lex::Primitive {
         let TokenKind::Keyword(lex::Keyword::Primitive(p)) = self.node().token().kind() else { unreachable!() };
         p
@@ -38,7 +38,7 @@ impl<'a, T: Default + Clone> Primitive<'a, T> {
 
 terminal_node!(Gram, PathElement, TokenKind::PathElement(_));
 
-impl<'a, T: Default + Clone> PathElement<'a, T> {
+impl<'a, T: Core> PathElement<'a, T> {
     pub fn as_str(&self) -> &'a str {
         match self.node().token().kind() {
             TokenKind::PathElement(lex::PathElement::Root) => "/",
@@ -50,7 +50,7 @@ impl<'a, T: Default + Clone> PathElement<'a, T> {
 
 terminal_node!(Gram, PropertyName, TokenKind::Property);
 
-impl<'a, T: Default + Clone> PropertyName<'a, T> {
+impl<'a, T: Core> PropertyName<'a, T> {
     pub fn as_ident(&self) -> Ident {
         self.node().as_str().into()
     }
@@ -58,7 +58,7 @@ impl<'a, T: Default + Clone> PropertyName<'a, T> {
 
 terminal_node!(Gram, Method, TokenKind::Keyword(lex::Keyword::Method(_)));
 
-impl<'a, T: Default + Clone> Method<'a, T> {
+impl<'a, T: Core> Method<'a, T> {
     pub fn method(&self) -> lex::Method {
         let TokenKind::Keyword(lex::Keyword::Method(m)) = self.node().token().kind() else { unreachable!() };
         m
@@ -67,7 +67,7 @@ impl<'a, T: Default + Clone> Method<'a, T> {
 
 terminal_node!(Gram, Literal, TokenKind::Literal(_));
 
-impl<'a, T: Default + Clone> Literal<'a, T> {
+impl<'a, T: Core> Literal<'a, T> {
     pub fn kind(&self) -> lex::Literal {
         let TokenKind::Literal(l) = self.node().token().kind() else { unreachable!() };
         l
@@ -88,7 +88,7 @@ terminal_node!(
     TokenKind::Keyword(lex::Keyword::Content(_))
 );
 
-impl<'a, T: Default + Clone> ContentTag<'a, T> {
+impl<'a, T: Core> ContentTag<'a, T> {
     pub fn tag(&self) -> lex::Content {
         let TokenKind::Keyword(lex::Keyword::Content(t)) = self.node().token().kind() else { unreachable!() };
         t
@@ -97,7 +97,7 @@ impl<'a, T: Default + Clone> ContentTag<'a, T> {
 
 terminal_node!(Gram, Operator, TokenKind::Operator(_));
 
-impl<'a, T: Default + Clone> Operator<'a, T> {
+impl<'a, T: Core> Operator<'a, T> {
     pub fn operator(&self) -> lex::Operator {
         let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
         op
@@ -137,7 +137,7 @@ syntax_nodes!(
     Program
 );
 
-impl<'a, T: Default + Clone> Program<'a, T> {
+impl<'a, T: Core> Program<'a, T> {
     pub fn resources(&self) -> impl Iterator<Item = Resource<'a, T>> {
         self.node().children().filter_map(Resource::cast)
     }
@@ -151,19 +151,19 @@ impl<'a, T: Default + Clone> Program<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Annotations<'a, T> {
+impl<'a, T: Core> Annotations<'a, T> {
     pub fn items(&self) -> impl Iterator<Item = &'a str> {
         self.node().children().map(|c| c.as_str())
     }
 }
 
-impl<'a, T: Default + Clone> Bindings<'a, T> {
+impl<'a, T: Core> Bindings<'a, T> {
     pub fn items(&self) -> impl Iterator<Item = Identifier<'a, T>> {
         self.node().children().filter_map(Identifier::cast)
     }
 }
 
-impl<'a, T: Default + Clone> Declaration<'a, T> {
+impl<'a, T: Core> Declaration<'a, T> {
     const ANNOTATIONS_POS: usize = 0;
     const IDENTIFIER_POS: usize = 2;
     const BINDINGS_POS: usize = 3;
@@ -192,7 +192,7 @@ impl<'a, T: Default + Clone> Declaration<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Import<'a, T> {
+impl<'a, T: Core> Import<'a, T> {
     const MODULE_POS: usize = 1;
 
     pub fn module(&self) -> &'a str {
@@ -200,7 +200,7 @@ impl<'a, T: Default + Clone> Import<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Terminal<'a, T> {
+impl<'a, T: Core> Terminal<'a, T> {
     const INNER_POS: usize = 0;
     const ANN_POS: usize = 1;
 
@@ -216,7 +216,7 @@ impl<'a, T: Default + Clone> Terminal<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Array<'a, T> {
+impl<'a, T: Core> Array<'a, T> {
     const INNER_POS: usize = 1;
 
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
@@ -224,7 +224,7 @@ impl<'a, T: Default + Clone> Array<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> UriVariable<'a, T> {
+impl<'a, T: Core> UriVariable<'a, T> {
     const INNER_POS: usize = 1;
 
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
@@ -233,12 +233,12 @@ impl<'a, T: Default + Clone> UriVariable<'a, T> {
 }
 
 #[derive(Debug)]
-pub enum UriSegment<'a, T: Clone + Default> {
+pub enum UriSegment<'a, T: Core> {
     Element(PathElement<'a, T>),
     Variable(UriVariable<'a, T>),
 }
 
-impl<'a, T: Default + Clone> UriPath<'a, T> {
+impl<'a, T: Core> UriPath<'a, T> {
     pub fn segments(&self) -> impl Iterator<Item = UriSegment<'a, T>> {
         self.node().children().filter_map(|c| {
             if let Some(v) = UriVariable::cast(c) {
@@ -252,7 +252,7 @@ impl<'a, T: Default + Clone> UriPath<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> UriTemplate<'a, T> {
+impl<'a, T: Core> UriTemplate<'a, T> {
     const PATH_POS: usize = 0;
     const PARAMS_POS: usize = 1;
 
@@ -271,7 +271,7 @@ impl<'a, T: Default + Clone> UriTemplate<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> UriParams<'a, T> {
+impl<'a, T: Core> UriParams<'a, T> {
     const INNER_POS: usize = 1;
 
     pub fn params(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
@@ -281,7 +281,7 @@ impl<'a, T: Default + Clone> UriParams<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Property<'a, T> {
+impl<'a, T: Core> Property<'a, T> {
     const NAME_POS: usize = 0;
     const RHS_POS: usize = 1;
 
@@ -296,13 +296,13 @@ impl<'a, T: Default + Clone> Property<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Object<'a, T> {
+impl<'a, T: Core> Object<'a, T> {
     pub fn properties(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
         self.node().children().skip(1).step_by(2)
     }
 }
 
-impl<'a, T: Default + Clone> XferMethods<'a, T> {
+impl<'a, T: Core> XferMethods<'a, T> {
     pub fn methods(&self) -> impl Iterator<Item = lex::Method> + 'a {
         self.node()
             .children()
@@ -311,7 +311,7 @@ impl<'a, T: Default + Clone> XferMethods<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> XferParams<'a, T> {
+impl<'a, T: Core> XferParams<'a, T> {
     const INNER_POS: usize = 0;
 
     pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
@@ -323,7 +323,7 @@ impl<'a, T: Default + Clone> XferParams<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> XferDomain<'a, T> {
+impl<'a, T: Core> XferDomain<'a, T> {
     const INNER_POS: usize = 1;
 
     pub fn inner(&self) -> Option<Terminal<'a, T>> {
@@ -334,7 +334,7 @@ impl<'a, T: Default + Clone> XferDomain<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Transfer<'a, T> {
+impl<'a, T: Core> Transfer<'a, T> {
     const METHODS_POS: usize = 0;
     const PARAMS_POS: usize = 1;
     const DOMAIN_POS: usize = 2;
@@ -363,7 +363,7 @@ impl<'a, T: Default + Clone> Transfer<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> VariadicOp<'a, T> {
+impl<'a, T: Core> VariadicOp<'a, T> {
     const OPERATOR_POS: usize = 1;
 
     pub fn operator(&self) -> lex::Operator {
@@ -377,7 +377,7 @@ impl<'a, T: Default + Clone> VariadicOp<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> ContentMeta<'a, T> {
+impl<'a, T: Core> ContentMeta<'a, T> {
     const TAG_POS: usize = 0;
     const RHS_POS: usize = 2;
 
@@ -392,13 +392,13 @@ impl<'a, T: Default + Clone> ContentMeta<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> ContentMetaList<'a, T> {
+impl<'a, T: Core> ContentMetaList<'a, T> {
     pub fn items(&self) -> impl Iterator<Item = ContentMeta<'a, T>> {
         self.node().children().filter_map(ContentMeta::cast)
     }
 }
 
-impl<'a, T: Default + Clone> ContentBody<'a, T> {
+impl<'a, T: Core> ContentBody<'a, T> {
     const INNER_POS: usize = 0;
 
     pub fn inner(&self) -> Option<NodeRef<'a, T, Gram>> {
@@ -406,7 +406,7 @@ impl<'a, T: Default + Clone> ContentBody<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Content<'a, T> {
+impl<'a, T: Core> Content<'a, T> {
     const META_POS: usize = 1;
     const BODY_POS: usize = 2;
 
@@ -423,7 +423,7 @@ impl<'a, T: Default + Clone> Content<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Application<'a, T> {
+impl<'a, T: Core> Application<'a, T> {
     pub fn identifier(&self) -> Ident {
         Identifier::cast(self.node().first())
             .expect("expected an identifier")
@@ -435,13 +435,13 @@ impl<'a, T: Default + Clone> Application<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> XferList<'a, T> {
+impl<'a, T: Core> XferList<'a, T> {
     pub fn items(&self) -> impl Iterator<Item = Transfer<'a, T>> {
         self.node().children().step_by(2).filter_map(Transfer::cast)
     }
 }
 
-impl<'a, T: Default + Clone> Relation<'a, T> {
+impl<'a, T: Core> Relation<'a, T> {
     const URI_POS: usize = 0;
     const XFERS_POS: usize = 2;
 
@@ -456,7 +456,7 @@ impl<'a, T: Default + Clone> Relation<'a, T> {
     }
 }
 
-impl<'a, T: Default + Clone> Variable<'a, T> {
+impl<'a, T: Core> Variable<'a, T> {
     const INNER_POS: usize = 0;
 
     pub fn as_ident(&self) -> Ident {
@@ -473,7 +473,7 @@ fn variadic_op<'a, P, E, T>(
 where
     P: Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = E> + Clone + 'a,
     E: chumsky::Error<TokenAlias<Token>> + 'a,
-    T: Default + Clone + 'a,
+    T: Core + 'a,
 {
     tree_skip(
         p.clone().chain(
@@ -486,11 +486,8 @@ where
     )
 }
 
-pub fn parser<'a, T>(
-) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = Simple<TokenAlias<Token>>> + 'a
-where
-    T: Default + Clone + 'a,
-{
+pub fn parser<'a, T: Core + 'a>(
+) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = Simple<TokenAlias<Token>>> + 'a {
     let identifier = match_token! { TokenKind::Identifier(_) };
 
     let literal = match_token! { TokenKind::Literal(_) };

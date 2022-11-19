@@ -1,10 +1,10 @@
 use crate::errors::{Error, Result};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::path::Path;
 use std::rc::Rc;
 use url::Url;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Locator {
     pub url: Rc<Url>,
 }
@@ -17,6 +17,12 @@ impl Locator {
     pub fn join(&self, path: &str) -> Result<Locator> {
         let url = self.url.join(path).map(Rc::new)?;
         Ok(Locator { url })
+    }
+}
+
+impl Debug for Locator {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<{}>", self.url)
     }
 }
 
@@ -40,7 +46,7 @@ impl TryFrom<&Path> for Locator {
 }
 
 impl Display for Locator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.url)
     }
 }
