@@ -37,9 +37,27 @@ impl AsRef<str> for Ident {
     }
 }
 
+impl From<Ident> for String {
+    fn from(ident: Ident) -> Self {
+        ident.as_ref().to_owned()
+    }
+}
+
 impl Display for Ident {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self.0.as_ref(), f)
+    }
+}
+
+impl PartialEq<&str> for Ident {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_ref() == *other
+    }
+}
+
+impl PartialEq<Ident> for &str {
+    fn eq(&self, other: &Ident) -> bool {
+        *self == other.as_ref()
     }
 }
 

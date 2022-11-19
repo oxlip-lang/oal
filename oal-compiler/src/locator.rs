@@ -10,6 +10,10 @@ pub struct Locator {
 }
 
 impl Locator {
+    pub fn url(&self) -> &Url {
+        self.url.as_ref()
+    }
+
     pub fn join(&self, path: &str) -> Result<Locator> {
         let url = self.url.join(path).map(Rc::new)?;
         Ok(Locator { url })

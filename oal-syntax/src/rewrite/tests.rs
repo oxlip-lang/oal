@@ -3,7 +3,7 @@ use crate::atom::{HttpStatus, HttpStatusRange};
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
     Application, Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property,
-    Relation, Symbol, Terminal, Transfer, UriSegment, UriTemplate, VariadicOp,
+    Relation, Terminal, Transfer, UriSegment, UriTemplate, Variable, VariadicOp,
 };
 use oal_model::grammar::NodeRef;
 
@@ -16,11 +16,11 @@ fn parse<F: Fn(Prog)>(i: &str, f: F) {
     f(prog)
 }
 
-fn assert_decl<'a>(p: Prog<'a>, sym: &str) -> Declaration<'a, ()> {
+fn assert_decl<'a>(p: Prog<'a>, ident: &str) -> Declaration<'a, ()> {
     let decls = &mut p.declarations();
     let d = decls.next().expect("expected a declaration");
     assert!(decls.next().is_none(), "expected only one declaration");
-    assert_eq!(d.symbol().as_ref(), sym);
+    assert_eq!(d.identifier(), ident);
     d
 }
 
@@ -69,11 +69,11 @@ fn parse_decl_primitive() {
 }
 
 #[test]
-fn parse_decl_symbol() {
+fn parse_decl_ident() {
     parse("let a = b;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
-        let sym = Symbol::cast(rhs).expect("expected a symbol");
-        assert_eq!(sym.as_ident().as_ref(), "b");
+        let var = Variable::cast(rhs).expect("expected a variable");
+        assert_eq!(var.as_ident(), "b");
     })
 }
 
@@ -105,7 +105,7 @@ fn parse_decl_uri() {
         assert_eq!(assert_next_path_elem(segs).as_str(), "/");
 
         let prop = assert_next_path_var(segs);
-        assert_eq!(prop.name().as_ref(), "y");
+        assert_eq!(prop.name(), "y");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "z");
@@ -113,11 +113,11 @@ fn parse_decl_uri() {
         let props = &mut uri.params().expect("expected URI parameters");
 
         let prop = assert_next_prop(props);
-        assert_eq!(prop.name().as_ref(), "q");
+        assert_eq!(prop.name(), "q");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
         let prop = assert_next_prop(props);
-        assert_eq!(prop.name().as_ref(), "n");
+        assert_eq!(prop.name(), "n");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Num);
     })
 }
@@ -143,7 +143,7 @@ fn parse_decl_transfer() {
         let props = &mut xfer.params().expect("expected parameters");
 
         let prop = assert_next_prop(props);
-        assert_eq!(prop.name().as_ref(), "q");
+        assert_eq!(prop.name(), "q");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
 
         assert!(xfer.domain().is_some(), "expected a domain");
@@ -168,7 +168,7 @@ fn parse_decl_property() {
     parse("let a = 'q str;", |p: Prog| {
         let prop =
             Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
-        assert_eq!(prop.name().as_ref(), "q");
+        assert_eq!(prop.name(), "q");
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
     })
 }
@@ -202,7 +202,7 @@ fn parse_decl_string() {
 fn parse_decl_reference() {
     parse("let @a = {};", |p: Prog| {
         let decl = assert_decl(p, "@a");
-        assert!(decl.symbol().is_reference());
+        assert!(decl.identifier().is_reference());
     })
 }
 
@@ -286,13 +286,8 @@ fn parse_decl_content() {
 fn parse_decl_lambda() {
     parse("let f x y z = num;", |p: Prog| {
         let decl = assert_decl(p, "f");
-
-        let bindings = &mut decl.bindings();
-        assert_eq!(bindings.next().expect("expected a binding").as_ref(), "x");
-        assert_eq!(bindings.next().expect("expected a binding").as_ref(), "y");
-        assert_eq!(bindings.next().expect("expected a binding").as_ref(), "z");
-        assert!(bindings.next().is_none(), "expected no more binding");
-
+        let bindings: Vec<_> = decl.bindings().map(|b| b.as_ident()).collect();
+        assert_eq!(bindings, vec!["x", "y", "z"]);
         assert_prim(assert_term(decl.rhs()), lex::Primitive::Num);
     })
 }
@@ -303,7 +298,7 @@ fn parse_decl_application() {
         let decl = assert_decl(p, "a");
 
         let app = Application::cast(decl.rhs()).expect("expected an application");
-        assert_eq!(app.symbol().as_ref(), "f");
+        assert_eq!(app.identifier(), "f");
 
         let bindings = &mut app.bindings();
         assert_prim(

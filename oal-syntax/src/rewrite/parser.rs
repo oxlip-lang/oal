@@ -15,9 +15,9 @@ impl Grammar for Gram {
     type Kind = SyntaxKind;
 }
 
-terminal_node!(Gram, Symbol, TokenKind::Identifier(_));
+terminal_node!(Gram, Identifier, TokenKind::Identifier(_));
 
-impl<'a, T: Default + Clone> Symbol<'a, T> {
+impl<'a, T: Default + Clone> Identifier<'a, T> {
     pub fn as_ident(&self) -> Ident {
         self.node().as_str().into()
     }
@@ -104,10 +104,12 @@ impl<'a, T: Default + Clone> Operator<'a, T> {
     }
 }
 
+// TODO: add support for document attributes
 syntax_nodes!(
     Gram,
     Terminal,
     SubExpression,
+    Variable,
     ContentMeta,
     ContentMetaList,
     ContentBody,
@@ -156,17 +158,14 @@ impl<'a, T: Default + Clone> Annotations<'a, T> {
 }
 
 impl<'a, T: Default + Clone> Bindings<'a, T> {
-    pub fn items(&self) -> impl Iterator<Item = Ident> + 'a {
-        self.node()
-            .children()
-            .filter_map(Symbol::cast)
-            .map(|s| s.as_ident())
+    pub fn items(&self) -> impl Iterator<Item = Identifier<'a, T>> {
+        self.node().children().filter_map(Identifier::cast)
     }
 }
 
 impl<'a, T: Default + Clone> Declaration<'a, T> {
     const ANNOTATIONS_POS: usize = 0;
-    const SYMBOL_POS: usize = 2;
+    const IDENTIFIER_POS: usize = 2;
     const BINDINGS_POS: usize = 3;
     const RHS_POS: usize = 5;
 
@@ -176,13 +175,13 @@ impl<'a, T: Default + Clone> Declaration<'a, T> {
             .items()
     }
 
-    pub fn symbol(&self) -> Ident {
-        Symbol::cast(self.node().nth(Self::SYMBOL_POS))
-            .expect("declaration lhs must be a symbol")
+    pub fn identifier(&self) -> Ident {
+        Identifier::cast(self.node().nth(Self::IDENTIFIER_POS))
+            .expect("declaration lhs must be an identifier")
             .as_ident()
     }
 
-    pub fn bindings(&self) -> impl Iterator<Item = Ident> + 'a {
+    pub fn bindings(&self) -> impl Iterator<Item = Identifier<'a, T>> {
         Bindings::cast(self.node().nth(Self::BINDINGS_POS))
             .expect("expected bindings")
             .items()
@@ -425,9 +424,9 @@ impl<'a, T: Default + Clone> Content<'a, T> {
 }
 
 impl<'a, T: Default + Clone> Application<'a, T> {
-    pub fn symbol(&self) -> Ident {
-        Symbol::cast(self.node().first())
-            .expect("expected a symbol")
+    pub fn identifier(&self) -> Ident {
+        Identifier::cast(self.node().first())
+            .expect("expected an identifier")
             .as_ident()
     }
 
@@ -457,6 +456,16 @@ impl<'a, T: Default + Clone> Relation<'a, T> {
     }
 }
 
+impl<'a, T: Default + Clone> Variable<'a, T> {
+    const INNER_POS: usize = 0;
+
+    pub fn as_ident(&self) -> Ident {
+        Identifier::cast(self.node().nth(Self::INNER_POS))
+            .expect("expected an identifier")
+            .as_ident()
+    }
+}
+
 fn variadic_op<'a, P, E, T>(
     op: lex::Operator,
     p: P,
@@ -482,13 +491,11 @@ pub fn parser<'a, T>(
 where
     T: Default + Clone + 'a,
 {
-    let binding = just_token(TokenKind::Identifier(lex::Identifier::Value));
+    let identifier = match_token! { TokenKind::Identifier(_) };
 
-    let variable = match_token! { TokenKind::Identifier(_) };
+    let literal = match_token! { TokenKind::Literal(_) };
 
-    let literal_type = match_token! { TokenKind::Literal(_) };
-
-    let prim_type = match_token! { TokenKind::Keyword(lex::Keyword::Primitive(_)) };
+    let primitive = match_token! { TokenKind::Keyword(lex::Keyword::Primitive(_)) };
 
     let uri_root = just_token(TokenKind::PathElement(lex::PathElement::Root));
 
@@ -510,8 +517,8 @@ where
 
     let inline_ann = just_token(TokenKind::Annotation(lex::Annotation::Inline));
 
-    let expr_type = recursive(|expr| {
-        let object_type = tree_many(
+    let expr_kind = recursive(|expr| {
+        let object = tree_many(
             just_token(TokenKind::Control(lex::Control::BraceLeft))
                 .chain(
                     expr.clone()
@@ -547,25 +554,25 @@ where
         );
 
         let uri_params = tree_many(
-            just_token(TokenKind::Operator(lex::Operator::QuestionMark)).chain(object_type.clone()),
+            just_token(TokenKind::Operator(lex::Operator::QuestionMark)).chain(object.clone()),
             SyntaxKind::UriParams,
         );
 
         let uri_template = tree_many(uri_path.chain(uri_params.or_not()), SyntaxKind::UriTemplate);
 
-        let uri_type = just_token(TokenKind::Keyword(lex::Keyword::Primitive(
+        let uri_kind = just_token(TokenKind::Keyword(lex::Keyword::Primitive(
             lex::Primitive::Uri,
         )))
         .or(uri_template);
 
-        let array_type = tree_many(
+        let array = tree_many(
             just_token(TokenKind::Control(lex::Control::BracketLeft))
                 .chain(expr.clone())
                 .chain(just_token(TokenKind::Control(lex::Control::BracketRight))),
             SyntaxKind::Array,
         );
 
-        let property_type = tree_many(
+        let property = tree_many(
             just_token(TokenKind::Property).chain(expr.clone()),
             SyntaxKind::Property,
         );
@@ -587,7 +594,7 @@ where
 
         let content_body = tree_maybe(expr.clone().or_not(), SyntaxKind::ContentBody);
 
-        let content_type = tree_many(
+        let content = tree_many(
             just_token(TokenKind::Control(lex::Control::ChevronLeft))
                 .chain(content_meta_list)
                 .chain(content_body)
@@ -595,48 +602,50 @@ where
             SyntaxKind::Content,
         );
 
-        let subexpr_type = tree_many(
+        let subexpr = tree_many(
             just_token(TokenKind::Control(lex::Control::ParenLeft))
                 .chain(expr.clone())
                 .chain(just_token(TokenKind::Control(lex::Control::ParenRight))),
             SyntaxKind::SubExpression,
         );
 
-        let term_type = tree_many(
-            literal_type
-                .or(prim_type)
-                .or(uri_type)
-                .or(array_type)
-                .or(property_type)
-                .or(object_type.clone())
-                .or(content_type)
-                .or(subexpr_type)
+        let variable = tree_one(identifier, SyntaxKind::Variable);
+
+        let term_kind = tree_many(
+            literal
+                .or(primitive)
+                .or(uri_kind)
+                .or(array)
+                .or(property)
+                .or(object.clone())
+                .or(content)
+                .or(subexpr)
                 .or(variable)
                 .chain(inline_ann.or_not()),
             SyntaxKind::Terminal,
         );
 
-        let apply = tree_many(
+        let application = tree_many(
             just_token(TokenKind::Identifier(lex::Identifier::Value))
-                .chain(term_type.clone().repeated().at_least(1)),
+                .chain(term_kind.clone().repeated().at_least(1)),
             SyntaxKind::Application,
         );
 
-        let app_type = apply.or(term_type.clone());
+        let apply_kind = application.or(term_kind.clone());
 
-        let range_type = variadic_op(lex::Operator::DoubleColon, app_type);
+        let range_kind = variadic_op(lex::Operator::DoubleColon, apply_kind);
 
-        let join_type = variadic_op(lex::Operator::Ampersand, range_type.clone());
+        let join_kind = variadic_op(lex::Operator::Ampersand, range_kind.clone());
 
-        let any_type = variadic_op(lex::Operator::Tilde, join_type);
+        let any_kind = variadic_op(lex::Operator::Tilde, join_kind);
 
-        let sum_type = variadic_op(lex::Operator::VerticalBar, any_type);
+        let sum_kind = variadic_op(lex::Operator::VerticalBar, any_kind);
 
-        let xfer_params = tree_maybe(object_type.or_not(), SyntaxKind::XferParams);
+        let xfer_params = tree_maybe(object.or_not(), SyntaxKind::XferParams);
 
         let xfer_domain = tree_many(
             just_token(TokenKind::Operator(lex::Operator::Colon))
-                .chain(term_type.clone())
+                .chain(term_kind.clone())
                 .or_not()
                 .flatten(),
             SyntaxKind::XferDomain,
@@ -647,51 +656,54 @@ where
                 .chain(xfer_params)
                 .chain(xfer_domain)
                 .chain(just_token(TokenKind::Operator(lex::Operator::Arrow)))
-                .chain(range_type),
+                .chain(range_kind),
             SyntaxKind::Transfer,
         );
 
-        let xfer_type = transfer.or(sum_type);
+        let xfer_kind = transfer.or(sum_kind);
 
         let xfer_list = tree_many(
-            xfer_type.clone().chain(
+            xfer_kind.clone().chain(
                 just_token(TokenKind::Control(lex::Control::Comma))
-                    .chain(xfer_type.clone())
+                    .chain(xfer_kind.clone())
                     .repeated()
                     .flatten(),
             ),
             SyntaxKind::XferList,
         );
 
-        let rel_type = tree_many(
-            term_type
+        let relation = tree_many(
+            term_kind
                 .chain(just_token(TokenKind::Control(lex::Control::ParenLeft)))
                 .chain(xfer_list)
                 .chain(just_token(TokenKind::Control(lex::Control::ParenRight))),
             SyntaxKind::Relation,
         );
 
-        rel_type.or(xfer_type)
+        relation.or(xfer_kind)
     });
 
     let annotations = tree_many(line_ann.repeated(), SyntaxKind::Annotations);
 
-    let bindings = tree_many(binding.repeated(), SyntaxKind::Bindings);
+    let bindings = tree_many(
+        just_token(TokenKind::Identifier(lex::Identifier::Value)).repeated(),
+        SyntaxKind::Bindings,
+    );
 
     let declaration = tree_many(
         annotations
             .chain(just_token(TokenKind::Keyword(lex::Keyword::Let)))
-            .chain(variable)
+            .chain(identifier)
             .chain(bindings)
             .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
-            .chain(expr_type.clone())
+            .chain(expr_kind.clone())
             .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
         SyntaxKind::Declaration,
     );
 
     let resource = tree_many(
         just_token(TokenKind::Keyword(lex::Keyword::Res))
-            .chain(expr_type)
+            .chain(expr_kind)
             .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
         SyntaxKind::Resource,
     );

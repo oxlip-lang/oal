@@ -1,12 +1,16 @@
 {
     "cSpell.words": [
         "anns",
+        "canonicalize",
         "chumsky",
+        "combinators",
+        "indextree",
         "interner",
         "metas",
         "opds",
         "segs",
         "subexpr",
+        "typecheck",
         "xfer",
         "xfers"
     ]

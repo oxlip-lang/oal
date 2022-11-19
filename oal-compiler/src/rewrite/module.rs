@@ -10,6 +10,10 @@ pub struct Module {
 }
 
 impl Module {
+    pub fn new(loc: Locator, tree: Tree) -> Self {
+        Module { loc, tree }
+    }
+
     pub fn locator(&self) -> &Locator {
         &self.loc
     }
@@ -26,10 +30,10 @@ pub struct ModuleSet {
 }
 
 impl ModuleSet {
-    pub fn new(base: Locator) -> Self {
+    pub fn new(base: Module) -> Self {
         ModuleSet {
-            base,
-            mods: Default::default(),
+            base: base.locator().clone(),
+            mods: HashMap::from([(base.locator().clone(), base)]),
         }
     }
 
@@ -41,8 +45,8 @@ impl ModuleSet {
         self.mods.get(&self.base).unwrap()
     }
 
-    pub fn insert(&mut self, l: Locator, m: Module) {
-        self.mods.insert(l, m);
+    pub fn insert(&mut self, m: Module) {
+        self.mods.insert(m.locator().clone(), m);
     }
 
     pub fn len(&self) -> usize {

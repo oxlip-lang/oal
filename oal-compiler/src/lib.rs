@@ -1,5 +1,3 @@
-extern crate core;
-
 mod annotation;
 mod compile;
 mod errors;
