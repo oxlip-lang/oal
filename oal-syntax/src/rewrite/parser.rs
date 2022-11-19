@@ -18,7 +18,7 @@ impl Grammar for Gram {
 terminal_node!(Gram, Identifier, TokenKind::Identifier(_));
 
 impl<'a, T: Core> Identifier<'a, T> {
-    pub fn as_ident(&self) -> Ident {
+    pub fn ident(&self) -> Ident {
         self.node().as_str().into()
     }
 }
@@ -175,10 +175,10 @@ impl<'a, T: Core> Declaration<'a, T> {
             .items()
     }
 
-    pub fn identifier(&self) -> Ident {
+    pub fn ident(&self) -> Ident {
         Identifier::cast(self.node().nth(Self::IDENTIFIER_POS))
             .expect("declaration lhs must be an identifier")
-            .as_ident()
+            .ident()
     }
 
     pub fn bindings(&self) -> impl Iterator<Item = Identifier<'a, T>> {
@@ -424,10 +424,10 @@ impl<'a, T: Core> Content<'a, T> {
 }
 
 impl<'a, T: Core> Application<'a, T> {
-    pub fn identifier(&self) -> Ident {
+    pub fn ident(&self) -> Ident {
         Identifier::cast(self.node().first())
             .expect("expected an identifier")
-            .as_ident()
+            .ident()
     }
 
     pub fn bindings(&self) -> impl Iterator<Item = Terminal<'a, T>> {
@@ -459,10 +459,10 @@ impl<'a, T: Core> Relation<'a, T> {
 impl<'a, T: Core> Variable<'a, T> {
     const INNER_POS: usize = 0;
 
-    pub fn as_ident(&self) -> Ident {
+    pub fn ident(&self) -> Ident {
         Identifier::cast(self.node().nth(Self::INNER_POS))
             .expect("expected an identifier")
-            .as_ident()
+            .ident()
     }
 }
 

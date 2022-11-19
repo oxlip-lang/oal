@@ -1,6 +1,6 @@
+use super::module::ModuleSet;
+use super::resolve::resolve;
 use crate::errors::Result;
-use crate::rewrite::module::ModuleSet;
-use crate::rewrite::resolve::resolve;
 use crate::spec::Spec;
 
 #[allow(unused_variables, unreachable_code)]

@@ -20,7 +20,7 @@ fn assert_decl<'a>(p: Prog<'a>, ident: &str) -> Declaration<'a, ()> {
     let decls = &mut p.declarations();
     let d = decls.next().expect("expected a declaration");
     assert!(decls.next().is_none(), "expected only one declaration");
-    assert_eq!(d.identifier(), ident);
+    assert_eq!(d.ident(), ident);
     d
 }
 
@@ -73,7 +73,7 @@ fn parse_decl_ident() {
     parse("let a = b;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let var = Variable::cast(rhs).expect("expected a variable");
-        assert_eq!(var.as_ident(), "b");
+        assert_eq!(var.ident(), "b");
     })
 }
 
@@ -202,7 +202,7 @@ fn parse_decl_string() {
 fn parse_decl_reference() {
     parse("let @a = {};", |p: Prog| {
         let decl = assert_decl(p, "@a");
-        assert!(decl.identifier().is_reference());
+        assert!(decl.ident().is_reference());
     })
 }
 
@@ -286,7 +286,7 @@ fn parse_decl_content() {
 fn parse_decl_lambda() {
     parse("let f x y z = num;", |p: Prog| {
         let decl = assert_decl(p, "f");
-        let bindings: Vec<_> = decl.bindings().map(|b| b.as_ident()).collect();
+        let bindings: Vec<_> = decl.bindings().map(|b| b.ident()).collect();
         assert_eq!(bindings, vec!["x", "y", "z"]);
         assert_prim(assert_term(decl.rhs()), lex::Primitive::Num);
     })
@@ -298,7 +298,7 @@ fn parse_decl_application() {
         let decl = assert_decl(p, "a");
 
         let app = Application::cast(decl.rhs()).expect("expected an application");
-        assert_eq!(app.identifier(), "f");
+        assert_eq!(app.ident(), "f");
 
         let bindings = &mut app.bindings();
         assert_prim(
