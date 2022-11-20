@@ -424,3 +424,13 @@ let r = {};
         },
     )
 }
+
+#[test]
+fn parse_resource() {
+    parse("res / (get -> <>);", |p: Prog| {
+        let res = p.resources().next().expect("expected a resource");
+        let rel = res.relation();
+        UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
+        rel.transfers().next().expect("expected a transfer");
+    })
+}

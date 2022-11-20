@@ -1,22 +1,16 @@
-use super::{
-    module::{Module, ModuleSet},
-    resolve::resolve,
-};
-use crate::Locator;
+use super::resolve::resolve;
+use super::tests::mods_from;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser::{Primitive, Program, Terminal, Variable};
 
 #[test]
 fn resolve_simple() -> anyhow::Result<()> {
-    let code = r#"
-        let a = num;
-        let b = a;
-    "#;
-    
-    let tree = oal_syntax::rewrite::parse(code)?;
-    let loc = Locator::try_from("file:///base")?;
-    let main = Module::new(loc, tree);
-    let mods = &mut ModuleSet::new(main);
+    let mods = mods_from(
+        r#"
+    let a = num;
+    let b = a;
+"#,
+    )?;
 
     resolve(&mods).expect("expected resolution");
 
@@ -37,7 +31,7 @@ fn resolve_simple() -> anyhow::Result<()> {
         .core_ref()
         .definition()
         .expect("expected a definition")
-        .node(mods);
+        .node(&mods);
 
     assert_eq!(
         Primitive::cast(Terminal::cast(defn).expect("expected a terminal").inner())

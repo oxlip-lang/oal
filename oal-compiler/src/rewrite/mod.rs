@@ -6,4 +6,10 @@ pub mod resolve;
 pub mod tree;
 
 #[cfg(test)]
+mod tests;
+
+#[cfg(test)]
 mod resolve_tests;
+
+#[cfg(test)]
+mod eval_tests;

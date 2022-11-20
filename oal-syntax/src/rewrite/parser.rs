@@ -151,6 +151,14 @@ impl<'a, T: Core> Program<'a, T> {
     }
 }
 
+impl<'a, T: Core> Resource<'a, T> {
+    const RELATION_POS: usize = 1;
+
+    pub fn relation(&self) -> Relation<'a, T> {
+        Relation::cast(self.node().nth(Self::RELATION_POS)).expect("expected a relation")
+    }
+}
+
 impl<'a, T: Core> Annotations<'a, T> {
     pub fn items(&self) -> impl Iterator<Item = &'a str> {
         self.node().children().map(|c| c.as_str())
