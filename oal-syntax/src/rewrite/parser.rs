@@ -41,7 +41,8 @@ terminal_node!(Gram, PathElement, TokenKind::PathElement(_));
 impl<'a, T: Core> PathElement<'a, T> {
     pub fn as_str(&self) -> &'a str {
         match self.node().token().kind() {
-            TokenKind::PathElement(lex::PathElement::Root) => "/",
+            // Note that path separators are omitted from the string representation.
+            TokenKind::PathElement(lex::PathElement::Root) => "",
             TokenKind::PathElement(lex::PathElement::Segment) => self.node().as_str(),
             _ => unreachable!(),
         }

@@ -88,13 +88,13 @@ fn parse_decl_array() {
 
 #[test]
 fn parse_decl_uri() {
-    parse("let a = /;", |p: Prog| {
+    parse("let a = /p;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let segs = &mut UriTemplate::cast(rhs)
             .expect("expected an URI template")
             .segments();
         let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
-        assert_eq!(elem.as_str(), "/");
+        assert_eq!(elem.as_str(), "p");
     });
     parse("let a = /x/{ 'y str }/z?{ 'q str, 'n num };", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
@@ -102,7 +102,7 @@ fn parse_decl_uri() {
         let segs = &mut uri.segments();
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "x");
-        assert_eq!(assert_next_path_elem(segs).as_str(), "/");
+        assert_eq!(assert_next_path_elem(segs).as_str(), "");
 
         let prop = assert_next_path_var(segs);
         assert_eq!(prop.name(), "y");
@@ -339,14 +339,14 @@ fn parse_decl_variadic_op() {
 
 #[test]
 fn parse_decl_relation() {
-    parse("let a = / ( put : <{}> -> <{}> );", |p: Prog| {
+    parse("let a = /p ( put : <{}> -> <{}> );", |p: Prog| {
         let decl = assert_decl(p, "a");
         let rel = Relation::cast(decl.rhs()).expect("expected a relation");
 
         let uri = UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
         let segs = &mut uri.segments();
         let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else { panic!("expected path element") };
-        assert_eq!(elem.as_str(), "/");
+        assert_eq!(elem.as_str(), "p");
         assert!(segs.next().is_none(), "expected no more URI segment");
 
         let xfers = &mut rel.transfers();
@@ -359,7 +359,7 @@ fn parse_decl_relation() {
     });
     parse(
         r#"
-let a = / (
+let a = /p (
     patch, put : <{}> -> <{}>,
     get               -> <{}>
 );
@@ -371,7 +371,7 @@ let a = / (
             let uri = UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
             let segs = &mut uri.segments();
             let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else { panic!("expected path element") };
-            assert_eq!(elem.as_str(), "/");
+            assert_eq!(elem.as_str(), "p");
             assert!(segs.next().is_none(), "expected no more URI segment");
 
             let xfers = &mut rel.transfers();

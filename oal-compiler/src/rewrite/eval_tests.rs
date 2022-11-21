@@ -10,7 +10,10 @@ fn eval_simple() -> anyhow::Result<()> {
     )?;
 
     resolve(&mods)?;
-    eval(&mods)?;
+
+    let spec = eval(&mods)?;
+
+    println!("{:#?}", spec);
 
     Ok(())
 }
