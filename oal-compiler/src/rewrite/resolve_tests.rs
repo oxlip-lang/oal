@@ -1,7 +1,7 @@
 use super::resolve::resolve;
 use super::tests::mods_from;
 use oal_syntax::rewrite::lexer as lex;
-use oal_syntax::rewrite::parser::{Primitive, Program, Terminal, Variable};
+use oal_syntax::rewrite::parser::{Declaration, Primitive, Program, Terminal, Variable};
 
 #[test]
 fn resolve_simple() -> anyhow::Result<()> {
@@ -33,10 +33,16 @@ fn resolve_simple() -> anyhow::Result<()> {
         .expect("expected a definition")
         .node(&mods);
 
+    let decl = Declaration::cast(defn).expect("expected a declaration");
+
     assert_eq!(
-        Primitive::cast(Terminal::cast(defn).expect("expected a terminal").inner())
-            .expect("expected a primitive")
-            .primitive(),
+        Primitive::cast(
+            Terminal::cast(decl.rhs())
+                .expect("expected a terminal")
+                .inner()
+        )
+        .expect("expected a primitive")
+        .primitive(),
         lex::Primitive::Num
     );
 

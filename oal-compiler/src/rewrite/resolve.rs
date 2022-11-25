@@ -29,7 +29,7 @@ pub fn resolve(mods: &ModuleSet) -> Result<()> {
                     let program =
                         Program::cast(module.tree().root()).expect("module root must be a program");
                     for decl in program.declarations() {
-                        let ext = External::new(module, decl.rhs());
+                        let ext = External::new(module, decl.node());
                         env.declare(decl.ident().clone(), ext);
                     }
                 } else if let Some(decl) = Declaration::cast(node) {
@@ -47,7 +47,7 @@ pub fn resolve(mods: &ModuleSet) -> Result<()> {
             NodeCursor::End(node) => {
                 if let Some(decl) = Declaration::cast(node) {
                     env.close();
-                    let ext = External::new(mods.main(), decl.rhs());
+                    let ext = External::new(mods.main(), node);
                     env.declare(decl.ident(), ext);
                 }
             }
