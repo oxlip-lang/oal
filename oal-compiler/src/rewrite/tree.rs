@@ -1,4 +1,4 @@
-use crate::rewrite::module::External;
+use super::module::{External, ModuleSet};
 use oal_model::grammar::{NodeRef, SyntaxTree};
 use oal_syntax::rewrite::parser::Gram;
 
@@ -25,3 +25,8 @@ pub type Tree = SyntaxTree<Core, Gram>;
 
 /// The node reference type.
 pub type NRef<'a> = NodeRef<'a, Core, Gram>;
+
+/// Returns the definition of the given node if any.
+pub fn definition<'a>(mods: &'a ModuleSet, node: NRef<'a>) -> Option<NRef<'a>> {
+    node.syntax().core_ref().definition().map(|n| n.node(mods))
+}

@@ -4,17 +4,6 @@ use oal_model::lexicon::*;
 use std::fmt::Debug;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Method {
-    Get,
-    Put,
-    Post,
-    Patch,
-    Delete,
-    Options,
-    Head,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Primitive {
     Num,
     Str,
@@ -32,7 +21,7 @@ pub enum Content {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Keyword {
-    Method(Method),
+    Method(atom::Method),
     Primitive(Primitive),
     Content(Content),
     Let,
@@ -209,13 +198,13 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char>>
             "uri" => Ok(Keyword::Primitive(Primitive::Uri)),
             "bool" => Ok(Keyword::Primitive(Primitive::Bool)),
             "int" => Ok(Keyword::Primitive(Primitive::Int)),
-            "get" => Ok(Keyword::Method(Method::Get)),
-            "put" => Ok(Keyword::Method(Method::Put)),
-            "post" => Ok(Keyword::Method(Method::Post)),
-            "patch" => Ok(Keyword::Method(Method::Patch)),
-            "delete" => Ok(Keyword::Method(Method::Delete)),
-            "options" => Ok(Keyword::Method(Method::Options)),
-            "head" => Ok(Keyword::Method(Method::Head)),
+            "get" => Ok(Keyword::Method(atom::Method::Get)),
+            "put" => Ok(Keyword::Method(atom::Method::Put)),
+            "post" => Ok(Keyword::Method(atom::Method::Post)),
+            "patch" => Ok(Keyword::Method(atom::Method::Patch)),
+            "delete" => Ok(Keyword::Method(atom::Method::Delete)),
+            "options" => Ok(Keyword::Method(atom::Method::Options)),
+            "head" => Ok(Keyword::Method(atom::Method::Head)),
             "media" => Ok(Keyword::Content(Content::Media)),
             "headers" => Ok(Keyword::Content(Content::Headers)),
             "status" => Ok(Keyword::Content(Content::Status)),

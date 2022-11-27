@@ -1,4 +1,4 @@
-use crate::atom::Ident;
+use crate::atom;
 use crate::rewrite::lexer as lex;
 use crate::rewrite::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
@@ -18,7 +18,7 @@ impl Grammar for Gram {
 terminal_node!(Gram, Identifier, TokenKind::Identifier(_));
 
 impl<'a, T: Core> Identifier<'a, T> {
-    pub fn ident(&self) -> Ident {
+    pub fn ident(&self) -> atom::Ident {
         self.node().as_str().into()
     }
 }
@@ -52,7 +52,7 @@ impl<'a, T: Core> PathElement<'a, T> {
 terminal_node!(Gram, PropertyName, TokenKind::Property);
 
 impl<'a, T: Core> PropertyName<'a, T> {
-    pub fn as_ident(&self) -> Ident {
+    pub fn as_ident(&self) -> atom::Ident {
         self.node().as_str().into()
     }
 }
@@ -60,7 +60,7 @@ impl<'a, T: Core> PropertyName<'a, T> {
 terminal_node!(Gram, Method, TokenKind::Keyword(lex::Keyword::Method(_)));
 
 impl<'a, T: Core> Method<'a, T> {
-    pub fn method(&self) -> lex::Method {
+    pub fn method(&self) -> atom::Method {
         let TokenKind::Keyword(lex::Keyword::Method(m)) = self.node().token().kind() else { unreachable!() };
         m
     }
@@ -184,7 +184,7 @@ impl<'a, T: Core> Declaration<'a, T> {
             .items()
     }
 
-    pub fn ident(&self) -> Ident {
+    pub fn ident(&self) -> atom::Ident {
         Identifier::cast(self.node().nth(Self::IDENTIFIER_POS))
             .expect("declaration lhs must be an identifier")
             .ident()
@@ -294,7 +294,7 @@ impl<'a, T: Core> Property<'a, T> {
     const NAME_POS: usize = 0;
     const RHS_POS: usize = 1;
 
-    pub fn name(&self) -> Ident {
+    pub fn name(&self) -> atom::Ident {
         PropertyName::cast(self.node().nth(Self::NAME_POS))
             .expect("expected a property name")
             .as_ident()
@@ -312,7 +312,7 @@ impl<'a, T: Core> Object<'a, T> {
 }
 
 impl<'a, T: Core> XferMethods<'a, T> {
-    pub fn methods(&self) -> impl Iterator<Item = lex::Method> + 'a {
+    pub fn methods(&self) -> impl Iterator<Item = atom::Method> + 'a {
         self.node()
             .children()
             .filter_map(Method::cast)
@@ -349,7 +349,7 @@ impl<'a, T: Core> Transfer<'a, T> {
     const DOMAIN_POS: usize = 2;
     const RANGE_POS: usize = 4;
 
-    pub fn methods(&self) -> impl Iterator<Item = lex::Method> + 'a {
+    pub fn methods(&self) -> impl Iterator<Item = atom::Method> + 'a {
         XferMethods::cast(self.node().nth(Self::METHODS_POS))
             .expect("expected transfer methods")
             .methods()
@@ -433,7 +433,7 @@ impl<'a, T: Core> Content<'a, T> {
 }
 
 impl<'a, T: Core> Application<'a, T> {
-    pub fn ident(&self) -> Ident {
+    pub fn ident(&self) -> atom::Ident {
         Identifier::cast(self.node().first())
             .expect("expected an identifier")
             .ident()
@@ -468,7 +468,7 @@ impl<'a, T: Core> Relation<'a, T> {
 impl<'a, T: Core> Variable<'a, T> {
     const INNER_POS: usize = 0;
 
-    pub fn ident(&self) -> Ident {
+    pub fn ident(&self) -> atom::Ident {
         Identifier::cast(self.node().nth(Self::INNER_POS))
             .expect("expected an identifier")
             .ident()

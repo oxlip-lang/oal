@@ -1,5 +1,5 @@
 use super::parser::PathElement;
-use crate::atom::{HttpStatus, HttpStatusRange};
+use crate::atom;
 use crate::rewrite::lexer as lex;
 use crate::rewrite::parser::{
     Application, Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property,
@@ -128,7 +128,7 @@ fn parse_decl_transfer() {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
         let methods: Vec<_> = xfer.methods().collect();
-        assert_eq!(methods, vec![lex::Method::Get]);
+        assert_eq!(methods, vec![atom::Method::Get]);
 
         assert!(xfer.params().is_none());
         assert!(xfer.domain().is_none());
@@ -138,7 +138,7 @@ fn parse_decl_transfer() {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
 
         let methods: Vec<_> = xfer.methods().collect();
-        assert_eq!(methods, vec![lex::Method::Get, lex::Method::Put]);
+        assert_eq!(methods, vec![atom::Method::Get, atom::Method::Put]);
 
         let props = &mut xfer.params().expect("expected parameters");
 
@@ -185,7 +185,10 @@ fn parse_decl_number() {
         let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
         assert_eq!(lit.kind(), lex::Literal::HttpStatus);
         let lex::TokenValue::HttpStatus(status) = lit.value() else { panic!("expected a status") };
-        assert_eq!(*status, HttpStatus::Range(HttpStatusRange::ClientError));
+        assert_eq!(
+            *status,
+            atom::HttpStatus::Range(atom::HttpStatusRange::ClientError)
+        );
     })
 }
 
@@ -353,7 +356,7 @@ fn parse_decl_relation() {
 
         let xfer = xfers.next().expect("expected a transfer");
         let methods: Vec<_> = xfer.methods().collect();
-        assert_eq!(methods, vec![lex::Method::Put]);
+        assert_eq!(methods, vec![atom::Method::Put]);
 
         assert!(xfers.next().is_none(), "expected no more transfer");
     });
@@ -378,11 +381,11 @@ let a = /p (
 
             let xfer = xfers.next().expect("expected a transfer");
             let methods: Vec<_> = xfer.methods().collect();
-            assert_eq!(methods, vec![lex::Method::Patch, lex::Method::Put]);
+            assert_eq!(methods, vec![atom::Method::Patch, atom::Method::Put]);
 
             let xfer = xfers.next().expect("expected a transfer");
             let methods: Vec<_> = xfer.methods().collect();
-            assert_eq!(methods, vec![lex::Method::Get]);
+            assert_eq!(methods, vec![atom::Method::Get]);
 
             assert!(xfers.next().is_none(), "expected no more transfer");
         },
