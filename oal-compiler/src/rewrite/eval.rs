@@ -1,5 +1,6 @@
 use super::module::ModuleSet;
 use super::tree::{definition, Core, NRef};
+use crate::annotation::Annotation;
 use crate::errors::Result;
 use crate::spec::{
     Content, Object, Ranges, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri,
@@ -10,7 +11,7 @@ use indexmap::IndexMap;
 use oal_syntax::rewrite::parser as syn;
 
 #[derive(Debug)]
-enum Expr {
+enum Value {
     Spec(Box<Spec>),
     Uri(Box<Uri>),
     Relation(Box<Relation>),
@@ -19,25 +20,62 @@ enum Expr {
     Object(Box<Object>),
 }
 
+#[derive(Debug)]
+struct Expr {
+    value: Value,
+    ann: Option<Annotation>,
+}
+
+impl Expr {
+    fn annotate(&mut self, other: Annotation) {
+        if let Some(a) = &mut self.ann {
+            a.extend(other)
+        } else {
+            self.ann = Some(other)
+        }
+    }
+}
+
+impl From<Value> for Expr {
+    fn from(value: Value) -> Self {
+        Expr { value, ann: None }
+    }
+}
+
 struct Context<'a> {
     mods: &'a ModuleSet,
-    // TODO: keep the current annotation here
     // TODO: keep track of references here
 }
 
-fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Expr {
+fn eval_annotations<'a, I>(mut iter: I) -> Result<Option<Annotation>>
+where
+    I: Iterator<Item = &'a str>,
+{
+    if let Some(text) = iter.next() {
+        let mut ann = Annotation::try_from(text)?;
+        for text in iter {
+            let other = Annotation::try_from(text)?;
+            ann.extend(other);
+        }
+        Ok(Some(ann))
+    } else {
+        Ok(None)
+    }
+}
+
+fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
     eval_any(ctx, terminal.inner())
 }
 
-fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Expr {
+fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Expr> {
     let mut methods = EnumMap::default();
     for m in transfer.methods() {
         methods[m] = true;
     }
 
     let domain = match transfer.domain() {
-        Some(term) => match eval_terminal(ctx, term) {
-            Expr::Content(c) => *c,
+        Some(term) => match eval_terminal(ctx, term)?.value {
+            Value::Content(c) => *c,
             _ => panic!("expected a content"),
         },
         None => Content::default(),
@@ -66,17 +104,18 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Expr {
         id,
     };
 
-    Expr::Transfer(Box::new(xfer))
+    Ok(Value::Transfer(Box::new(xfer)).into())
 }
 
-fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Expr {
-    let Expr::Uri(uri) = eval_terminal(ctx, relation.uri())
+fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Expr> {
+    let Value::Uri(uri) = eval_terminal(ctx, relation.uri())?.value
         else { panic!("expected a URI") };
 
     let mut xfers = Transfers::default();
 
     for x in relation.transfers() {
-        let Expr::Transfer(xfer) = eval_transfer(ctx, x) else { panic!("expected a transfer") };
+        let Value::Transfer(xfer) = eval_transfer(ctx, x)?.value
+            else { panic!("expected a transfer") };
         for (m, b) in xfer.methods {
             if b {
                 xfers[m] = Some(xfer.as_ref().clone());
@@ -86,14 +125,14 @@ fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Expr {
 
     let rel = Relation { uri: *uri, xfers };
 
-    Expr::Relation(Box::new(rel))
+    Ok(Value::Relation(Box::new(rel)).into())
 }
 
-fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Expr {
+fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> {
     let mut rels = IndexMap::new();
 
     for res in program.resources() {
-        let Expr::Relation(rel) = eval_relation(ctx, res.relation())
+        let Value::Relation(rel) = eval_relation(ctx, res.relation())?.value
             else { panic!("expected a relation") };
         rels.insert(rel.uri.pattern(), *rel);
     }
@@ -103,16 +142,16 @@ fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Expr {
         refs: Default::default(),
     };
 
-    Expr::Spec(Box::new(spec))
+    Ok(Value::Spec(Box::new(spec)).into())
 }
 
-fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Expr {
+fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Result<Expr> {
     let mut path = Vec::new();
     for seg in template.segments() {
         match seg {
             syn::UriSegment::Element(elem) => path.push(UriSegment::Literal(elem.as_str().into())),
             syn::UriSegment::Variable(var) => {
-                eval_any(ctx, var.inner());
+                eval_any(ctx, var.inner())?;
             }
         }
     }
@@ -121,27 +160,33 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Exp
         example: None,
         params: None,
     };
-    Expr::Uri(Box::new(uri))
+
+    Ok(Value::Uri(Box::new(uri)).into())
 }
 
-fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Expr {
+fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Expr> {
     let definition = definition(ctx.mods, variable.node()).expect("variable is not defined");
+
     if let Some(decl) = syn::Declaration::cast(definition) {
-        eval_any(ctx, decl.rhs())
+        let mut expr = eval_any(ctx, decl.rhs())?;
+        if let Some(other) = eval_annotations(decl.annotations())? {
+            expr.annotate(other)
+        }
+        Ok(expr)
     } else if let Some(binding) = syn::Identifier::cast(definition) {
-        panic!("cannot evaluate the unbound variable {}", binding.ident())
+        panic!("unexpected unbound variable {}", binding.ident())
     } else {
         panic!("expected definition to be either a declaration or a binding")
     }
 }
 
 fn cast_schema(_ctx: &mut Context, from: Expr) -> Schema {
-    let expr = match from {
-        Expr::Object(o) => SchemaExpr::Object(*o),
+    let expr = match from.value {
+        Value::Object(o) => SchemaExpr::Object(*o),
         _ => panic!("not a schema expression {:?}", from),
     };
 
-    let desc = None;
+    let desc = from.ann.and_then(|a| a.get_string("description"));
     let title = None;
     let required = None;
     let examples = None;
@@ -155,12 +200,15 @@ fn cast_schema(_ctx: &mut Context, from: Expr) -> Schema {
     }
 }
 
-fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Expr {
-    let schema = content.body().map(|body| {
-        let expr = eval_any(ctx, body);
-        let schema = cast_schema(ctx, expr);
-        Box::new(schema)
-    });
+fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> {
+    let schema = match content.body() {
+        Some(body) => {
+            let expr = eval_any(ctx, body)?;
+            let schema = cast_schema(ctx, expr);
+            Some(Box::new(schema))
+        }
+        None => None,
+    };
 
     let status = None;
     let media = None;
@@ -178,17 +226,17 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Expr {
         examples,
     };
 
-    Expr::Content(Box::new(cnt))
+    Ok(Value::Content(Box::new(cnt)).into())
 }
 
-fn eval_object(_ctx: &mut Context, _object: syn::Object<Core>) -> Expr {
+fn eval_object(_ctx: &mut Context, _object: syn::Object<Core>) -> Result<Expr> {
     let obj = Object {
         ..Default::default()
     };
-    Expr::Object(Box::new(obj))
+    Ok(Value::Object(Box::new(obj)).into())
 }
 
-fn eval_any(ctx: &mut Context, node: NRef) -> Expr {
+fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
     if let Some(program) = syn::Program::cast(node) {
         eval_program(ctx, program)
     } else if let Some(relation) = syn::Relation::cast(node) {
@@ -212,7 +260,7 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Expr {
 
 pub fn eval(mods: &ModuleSet) -> Result<Spec> {
     let ctx = &mut Context { mods };
-    let Expr::Spec(spec) = eval_any(ctx, mods.main().tree().root())
-        else { panic!("evaluation must return a specification") };
+    let expr = eval_any(ctx, mods.main().tree().root())?;
+    let Value::Spec(spec) = expr.value else { panic!("expected a specification") };
     Ok(*spec)
 }
