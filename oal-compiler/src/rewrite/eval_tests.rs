@@ -3,7 +3,6 @@ use crate::spec::{Object, SchemaExpr, UriSegment};
 use oal_syntax::atom;
 
 #[test]
-#[ignore]
 fn eval_simple() -> anyhow::Result<()> {
     let mods = mods_from(
         r#"
@@ -17,8 +16,6 @@ fn eval_simple() -> anyhow::Result<()> {
     resolve(&mods)?;
 
     let s = eval(&mods)?;
-
-    println!("{:#?}", s);
 
     assert_eq!(s.rels.len(), 1);
 

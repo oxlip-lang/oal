@@ -18,6 +18,7 @@ enum Value {
     Transfer(Box<Transfer>),
     Content(Box<Content>),
     Object(Box<Object>),
+    Ranges(Box<Ranges>),
 }
 
 #[derive(Debug)]
@@ -47,7 +48,7 @@ struct Context<'a> {
     // TODO: keep track of references here
 }
 
-fn eval_annotations<'a, I>(mut iter: I) -> Result<Option<Annotation>>
+fn compose_annotations<'a, I>(mut iter: I) -> Result<Option<Annotation>>
 where
     I: Iterator<Item = &'a str>,
 {
@@ -63,6 +64,43 @@ where
     }
 }
 
+fn cast_schema(from: Expr) -> Schema {
+    let expr = match from.value {
+        Value::Object(o) => SchemaExpr::Object(*o),
+        _ => panic!("not a schema expression {:?}", from),
+    };
+
+    let desc = from.ann.and_then(|a| a.get_string("description"));
+    let title = None;
+    let required = None;
+    let examples = None;
+
+    Schema {
+        expr,
+        desc,
+        title,
+        required,
+        examples,
+    }
+}
+
+fn cast_content(from: Expr) -> Content {
+    match from.value {
+        Value::Content(c) => *c,
+        _ => Content::from(cast_schema(from)),
+    }
+}
+
+fn cast_ranges(from: Expr) -> Ranges {
+    match from.value {
+        Value::Ranges(r) => *r,
+        _ => {
+            let c = cast_content(from);
+            Ranges::from([((c.status, c.media.clone()), c)])
+        }
+    }
+}
+
 fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
     eval_any(ctx, terminal.inner())
 }
@@ -74,15 +112,11 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Exp
     }
 
     let domain = match transfer.domain() {
-        Some(term) => match eval_terminal(ctx, term)?.value {
-            Value::Content(c) => *c,
-            _ => panic!("expected a content"),
-        },
+        Some(term) => cast_content(eval_terminal(ctx, term)?),
         None => Content::default(),
     };
 
-    // TODO: evaluate ranges
-    let ranges = Ranges::default();
+    let ranges = cast_ranges(eval_any(ctx, transfer.range())?);
 
     // TODO: evaluate params
     let params = None;
@@ -169,7 +203,7 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
 
     if let Some(decl) = syn::Declaration::cast(definition) {
         let mut expr = eval_any(ctx, decl.rhs())?;
-        if let Some(other) = eval_annotations(decl.annotations())? {
+        if let Some(other) = compose_annotations(decl.annotations())? {
             expr.annotate(other)
         }
         Ok(expr)
@@ -180,33 +214,9 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
     }
 }
 
-fn cast_schema(_ctx: &mut Context, from: Expr) -> Schema {
-    let expr = match from.value {
-        Value::Object(o) => SchemaExpr::Object(*o),
-        _ => panic!("not a schema expression {:?}", from),
-    };
-
-    let desc = from.ann.and_then(|a| a.get_string("description"));
-    let title = None;
-    let required = None;
-    let examples = None;
-
-    Schema {
-        expr,
-        desc,
-        title,
-        required,
-        examples,
-    }
-}
-
 fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> {
     let schema = match content.body() {
-        Some(body) => {
-            let expr = eval_any(ctx, body)?;
-            let schema = cast_schema(ctx, expr);
-            Some(Box::new(schema))
-        }
+        Some(body) => Some(Box::new(cast_schema(eval_any(ctx, body)?))),
         None => None,
     };
 
