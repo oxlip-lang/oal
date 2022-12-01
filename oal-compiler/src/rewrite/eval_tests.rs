@@ -1,21 +1,24 @@
-use super::{eval::eval, resolve::resolve, tests::mods_from};
-use crate::spec::{Object, SchemaExpr, UriSegment};
+use super::{resolve::resolve, tests::mods_from};
+use crate::spec::{Object, SchemaExpr, Spec, UriSegment};
 use oal_syntax::atom;
+
+fn eval(code: &str) -> anyhow::Result<Spec> {
+    let mods = mods_from(code)?;
+    resolve(&mods)?;
+    let spec = super::eval::eval(&mods)?;
+    Ok(spec)
+}
 
 #[test]
 fn eval_simple() -> anyhow::Result<()> {
-    let mods = mods_from(
+    let s = eval(
         r#"
-    # description: "some record"
-    let r = {};
-    let a = /;
-    res a ( put : <r> -> <r> );
+        # description: "some record"
+        let r = {};
+        let a = /;
+        res a ( put : <r> -> <r> );
     "#,
     )?;
-
-    resolve(&mods)?;
-
-    let s = eval(&mods)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -35,6 +38,33 @@ fn eval_simple() -> anyhow::Result<()> {
     } else {
         panic!("expected transfer on HTTP PUT");
     }
+
+    Ok(())
+}
+
+#[test]
+fn eval_content() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let r = {};
+        res / ( put : r -> <r> );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn eval_ranges() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        res / ( get -> <status=200,{}> :: <status=500,media="text/plain",headers={},{}> );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
 
     Ok(())
 }

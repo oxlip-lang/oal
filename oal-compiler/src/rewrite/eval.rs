@@ -8,6 +8,8 @@ use crate::spec::{
 };
 use enum_map::EnumMap;
 use indexmap::IndexMap;
+use oal_syntax::atom;
+use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
 
 #[derive(Debug)]
@@ -19,6 +21,9 @@ enum Value {
     Content(Box<Content>),
     Object(Box<Object>),
     Ranges(Box<Ranges>),
+    String(String),
+    Number(u64),
+    HttpStatus(atom::HttpStatus),
 }
 
 #[derive(Debug)]
@@ -67,7 +72,7 @@ where
 fn cast_schema(from: Expr) -> Schema {
     let expr = match from.value {
         Value::Object(o) => SchemaExpr::Object(*o),
-        _ => panic!("not a schema expression {:?}", from),
+        _ => panic!("not a schema expression: {:?}", from),
     };
 
     let desc = from.ann.and_then(|a| a.get_string("description"));
@@ -98,6 +103,24 @@ fn cast_ranges(from: Expr) -> Ranges {
             let c = cast_content(from);
             Ranges::from([((c.status, c.media.clone()), c)])
         }
+    }
+}
+
+fn cast_string(from: Expr) -> String {
+    match from.value {
+        Value::String(s) => s,
+        _ => panic!("not a string: {:?}", from),
+    }
+}
+
+fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
+    match from.value {
+        Value::HttpStatus(s) => Ok(s),
+        Value::Number(n) => {
+            let s = atom::HttpStatus::try_from(n)?;
+            Ok(s)
+        }
+        _ => panic!("not an HTTP status: {:?}", from),
     }
 }
 
@@ -186,6 +209,7 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Res
             syn::UriSegment::Element(elem) => path.push(UriSegment::Literal(elem.as_str().into())),
             syn::UriSegment::Variable(var) => {
                 eval_any(ctx, var.inner())?;
+                todo!()
             }
         }
     }
@@ -220,9 +244,17 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
         None => None,
     };
 
-    let status = None;
-    let media = None;
-    let headers = None;
+    let mut status = None;
+    let mut media = None;
+    let mut headers = None;
+    for meta in content.meta() {
+        let rhs = eval_any(ctx, meta.rhs())?;
+        match meta.tag() {
+            lex::Content::Media => media = Some(cast_string(rhs)),
+            lex::Content::Headers => headers = None,
+            lex::Content::Status => status = Some(cast_http_status(rhs)?),
+        }
+    }
 
     let desc = None;
     let examples = None;
@@ -246,6 +278,39 @@ fn eval_object(_ctx: &mut Context, _object: syn::Object<Core>) -> Result<Expr> {
     Ok(Value::Object(Box::new(obj)).into())
 }
 
+fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result<Expr> {
+    match operation.operator() {
+        lex::Operator::DoubleColon => {
+            let mut ranges = Ranges::new();
+            for operand in operation.operands() {
+                let c = cast_content(eval_any(ctx, operand)?);
+                ranges.insert((c.status, c.media.clone()), c);
+            }
+            Ok(Value::Ranges(Box::new(ranges)).into())
+        }
+        _ => todo!(),
+    }
+}
+
+fn eval_literal(_ctx: &mut Context, literal: syn::Literal<Core>) -> Result<Expr> {
+    match literal.kind() {
+        lex::Literal::HttpStatus => {
+            let lex::TokenValue::HttpStatus(status) = literal.value()
+                else { panic!("expected an HTTP status") };
+            Ok(Value::HttpStatus(*status).into())
+        }
+        lex::Literal::Number => {
+            let lex::TokenValue::Number(number) = literal.value()
+                else { panic!("expected a number") };
+            Ok(Value::Number(*number).into())
+        }
+        lex::Literal::String => {
+            let string = literal.as_str().to_owned();
+            Ok(Value::String(string).into())
+        }
+    }
+}
+
 fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
     if let Some(program) = syn::Program::cast(node) {
         eval_program(ctx, program)
@@ -261,6 +326,10 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
         eval_content(ctx, content)
     } else if let Some(object) = syn::Object::cast(node) {
         eval_object(ctx, object)
+    } else if let Some(operation) = syn::VariadicOp::cast(node) {
+        eval_operation(ctx, operation)
+    } else if let Some(literal) = syn::Literal::cast(node) {
+        eval_literal(ctx, literal)
     } else if let Some(_app) = syn::Application::cast(node) {
         todo!("application not implemented")
     } else {
