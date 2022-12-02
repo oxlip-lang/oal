@@ -124,6 +124,7 @@ syntax_nodes!(
     UriPath,
     UriParams,
     UriTemplate,
+    PropertyList,
     Object,
     Application,
     VariadicOp,
@@ -305,9 +306,19 @@ impl<'a, T: Core> Property<'a, T> {
     }
 }
 
+impl<'a, T: Core> PropertyList<'a, T> {
+    pub fn items(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
+        self.node().children().step_by(2)
+    }
+}
+
 impl<'a, T: Core> Object<'a, T> {
+    const PROPS_POS: usize = 1;
+
     pub fn properties(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
-        self.node().children().skip(1).step_by(2)
+        PropertyList::cast(self.node().nth(Self::PROPS_POS))
+            .expect("expected property list")
+            .items()
     }
 }
 
@@ -524,19 +535,22 @@ pub fn parser<'a, T: Core + 'a>(
     let inline_ann = just_token(TokenKind::Annotation(lex::Annotation::Inline));
 
     let expr_kind = recursive(|expr| {
-        let object = tree_many(
-            just_token(TokenKind::Control(lex::Control::BraceLeft))
+        let property_list = tree_many(
+            expr.clone()
                 .chain(
-                    expr.clone()
-                        .chain(
-                            just_token(TokenKind::Control(lex::Control::Comma))
-                                .chain(expr.clone())
-                                .repeated()
-                                .flatten(),
-                        )
-                        .or_not()
+                    just_token(TokenKind::Control(lex::Control::Comma))
+                        .chain(expr.clone())
+                        .repeated()
                         .flatten(),
                 )
+                .or_not()
+                .flatten(),
+            SyntaxKind::PropertyList,
+        );
+
+        let object = tree_many(
+            just_token(TokenKind::Control(lex::Control::BraceLeft))
+                .chain(property_list)
                 .chain(just_token(TokenKind::Control(lex::Control::BraceRight))),
             SyntaxKind::Object,
         );
