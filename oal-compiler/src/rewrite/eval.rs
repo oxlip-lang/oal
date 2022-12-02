@@ -3,8 +3,8 @@ use super::tree::{definition, Core, NRef};
 use crate::annotation::Annotation;
 use crate::errors::Result;
 use crate::spec::{
-    Content, Object, Ranges, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri,
-    UriSegment,
+    Content, Object, PrimNumber, PrimString, Property, Ranges, Relation, Schema, SchemaExpr, Spec,
+    Transfer, Transfers, Uri, UriSegment,
 };
 use enum_map::EnumMap;
 use indexmap::IndexMap;
@@ -21,6 +21,9 @@ enum Value {
     Content(Box<Content>),
     Object(Box<Object>),
     Ranges(Box<Ranges>),
+    Property(Box<Property>),
+    PrimNumber(Box<PrimNumber>),
+    PrimString(Box<PrimString>),
     String(String),
     Number(u64),
     HttpStatus(atom::HttpStatus),
@@ -72,6 +75,8 @@ where
 fn cast_schema(from: Expr) -> Schema {
     let expr = match from.value {
         Value::Object(o) => SchemaExpr::Object(*o),
+        Value::PrimNumber(p) => SchemaExpr::Num(*p),
+        Value::PrimString(s) => SchemaExpr::Str(*s),
         _ => panic!("not a schema expression: {:?}", from),
     };
 
@@ -113,6 +118,13 @@ fn cast_string(from: Expr) -> String {
     }
 }
 
+fn cast_property(from: Expr) -> Property {
+    match from.value {
+        Value::Property(p) => *p,
+        _ => panic!("not a property: {:?}", from),
+    }
+}
+
 fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
     match from.value {
         Value::HttpStatus(s) => Ok(s),
@@ -125,7 +137,12 @@ fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
 }
 
 fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
-    eval_any(ctx, terminal.inner())
+    // FIXME: annotations must be known to the inner expression
+    let mut expr = eval_any(ctx, terminal.inner())?;
+    if let Some(other) = compose_annotations(terminal.annotation().into_iter())? {
+        expr.annotate(other)
+    }
+    Ok(expr)
 }
 
 fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Expr> {
@@ -271,10 +288,12 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
     Ok(Value::Content(Box::new(cnt)).into())
 }
 
-fn eval_object(_ctx: &mut Context, _object: syn::Object<Core>) -> Result<Expr> {
-    let obj = Object {
-        ..Default::default()
-    };
+fn eval_object(ctx: &mut Context, object: syn::Object<Core>) -> Result<Expr> {
+    let mut props = Vec::new();
+    for prop in object.properties() {
+        props.push(cast_property(eval_any(ctx, prop)?));
+    }
+    let obj = Object { props };
     Ok(Value::Object(Box::new(obj)).into())
 }
 
@@ -311,6 +330,42 @@ fn eval_literal(_ctx: &mut Context, literal: syn::Literal<Core>) -> Result<Expr>
     }
 }
 
+fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Expr> {
+    let prop = Property {
+        name: property.name(),
+        schema: cast_schema(eval_any(ctx, property.rhs())?),
+        desc: None,
+        required: None,
+    };
+    Ok(Value::Property(Box::new(prop)).into())
+}
+
+fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result<Expr> {
+    let value = match primitive.primitive() {
+        lex::Primitive::Num => {
+            let p = PrimNumber {
+                minimum: None,
+                maximum: None,
+                multiple_of: None,
+                example: None,
+            };
+            Value::PrimNumber(Box::new(p))
+        }
+        lex::Primitive::Str => {
+            let p = PrimString {
+                pattern: None,
+                enumeration: Default::default(),
+                example: None,
+            };
+            Value::PrimString(Box::new(p))
+        }
+        lex::Primitive::Uri => todo!(),
+        lex::Primitive::Bool => todo!(),
+        lex::Primitive::Int => todo!(),
+    };
+    Ok(value.into())
+}
+
 fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
     if let Some(program) = syn::Program::cast(node) {
         eval_program(ctx, program)
@@ -330,6 +385,10 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
         eval_operation(ctx, operation)
     } else if let Some(literal) = syn::Literal::cast(node) {
         eval_literal(ctx, literal)
+    } else if let Some(property) = syn::Property::cast(node) {
+        eval_property(ctx, property)
+    } else if let Some(primitive) = syn::Primitive::cast(node) {
+        eval_primitive(ctx, primitive)
     } else if let Some(_app) = syn::Application::cast(node) {
         todo!("application not implemented")
     } else {
