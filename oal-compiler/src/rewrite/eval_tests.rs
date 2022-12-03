@@ -12,13 +12,13 @@ fn eval(code: &str) -> anyhow::Result<Spec> {
 }
 
 #[test]
-fn eval_simple() -> anyhow::Result<()> {
+fn eval_annotation() -> anyhow::Result<()> {
     let s = eval(
         r#"
         # description: "some record"
         let r = {};
         let a = /;
-        res a ( put : <r> -> <r> );
+        res a ( put : <r `title: xyz`> -> <r> `description: some content`);
     "#,
     )?;
 
@@ -35,13 +35,17 @@ fn eval_simple() -> anyhow::Result<()> {
 
     let d = x.domain.schema.as_ref().unwrap();
     assert_eq!(d.expr, SchemaExpr::Object(Object::default()));
-    assert_eq!(d.desc, Some("some record".to_owned()));
+    assert_eq!(d.desc.as_ref().unwrap(), "some record");
+    assert_eq!(d.title.as_ref().unwrap(), "xyz");
 
     assert_eq!(x.ranges.len(), 1);
-    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    assert_eq!(r.expr, SchemaExpr::Object(Object::default()));
-    assert_eq!(r.desc, Some("some record".to_owned()));
-
+    let c = x.ranges.values().next().unwrap();
+    assert_eq!(c.desc.as_ref().unwrap(), "some content");
+    let s = c.schema.as_ref().unwrap();
+    assert_eq!(s.expr, SchemaExpr::Object(Object::default()));
+    assert_eq!(s.desc.as_ref().unwrap(), "some record");
+    assert!(s.title.is_none());
+    
     Ok(())
 }
 

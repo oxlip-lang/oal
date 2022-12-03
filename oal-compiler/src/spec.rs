@@ -150,7 +150,7 @@ impl Schema {
         let desc = ann.and_then(|a| a.get_string("description"));
         let title = ann.and_then(|a| a.get_string("title"));
         let required = ann.and_then(|a| a.get_bool("required"));
-        let examples = e.annotation().and_then(|a| a.get_props("examples"));
+        let examples = ann.and_then(|a| a.get_props("examples"));
         Ok(Schema {
             expr,
             desc,

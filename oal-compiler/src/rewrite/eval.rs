@@ -31,11 +31,23 @@ enum Value {
 
 #[derive(Debug)]
 struct Expr {
+    // TODO: eventually get rid of the indirection
     value: Value,
-    ann: Option<Annotation>,
 }
 
-impl Expr {
+impl From<Value> for Expr {
+    fn from(value: Value) -> Self {
+        Expr { value }
+    }
+}
+
+struct Context<'a> {
+    mods: &'a ModuleSet,
+    ann: Option<Annotation>,
+    // TODO: keep track of references here
+}
+
+impl<'a> Context<'a> {
     fn annotate(&mut self, other: Annotation) {
         if let Some(a) = &mut self.ann {
             a.extend(other)
@@ -43,17 +55,10 @@ impl Expr {
             self.ann = Some(other)
         }
     }
-}
 
-impl From<Value> for Expr {
-    fn from(value: Value) -> Self {
-        Expr { value, ann: None }
+    fn annotation(&mut self) -> Option<Annotation> {
+        self.ann.take()
     }
-}
-
-struct Context<'a> {
-    mods: &'a ModuleSet,
-    // TODO: keep track of references here
 }
 
 fn compose_annotations<'a, I>(mut iter: I) -> Result<Option<Annotation>>
@@ -72,18 +77,19 @@ where
     }
 }
 
-fn cast_schema(from: Expr) -> Schema {
+fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
+    let ann = ctx.annotation();
+    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
+    let title = ann.as_ref().and_then(|a| a.get_string("title"));
+    let required = ann.as_ref().and_then(|a| a.get_bool("required"));
+    let examples = ann.as_ref().and_then(|a| a.get_props("examples"));
+
     let expr = match from.value {
         Value::Object(o) => SchemaExpr::Object(*o),
         Value::PrimNumber(p) => SchemaExpr::Num(*p),
         Value::PrimString(s) => SchemaExpr::Str(*s),
         _ => panic!("not a schema expression: {:?}", from),
     };
-
-    let desc = from.ann.and_then(|a| a.get_string("description"));
-    let title = None;
-    let required = None;
-    let examples = None;
 
     Schema {
         expr,
@@ -94,18 +100,18 @@ fn cast_schema(from: Expr) -> Schema {
     }
 }
 
-fn cast_content(from: Expr) -> Content {
+fn cast_content(ctx: &mut Context, from: Expr) -> Content {
     match from.value {
         Value::Content(c) => *c,
-        _ => Content::from(cast_schema(from)),
+        _ => Content::from(cast_schema(ctx, from)),
     }
 }
 
-fn cast_ranges(from: Expr) -> Ranges {
+fn cast_ranges(ctx: &mut Context, from: Expr) -> Ranges {
     match from.value {
         Value::Ranges(r) => *r,
         _ => {
-            let c = cast_content(from);
+            let c = cast_content(ctx, from);
             Ranges::from([((c.status, c.media.clone()), c)])
         }
     }
@@ -137,35 +143,42 @@ fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
 }
 
 fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
-    // FIXME: annotations must be known to the inner expression
-    let mut expr = eval_any(ctx, terminal.inner())?;
     if let Some(other) = compose_annotations(terminal.annotation().into_iter())? {
-        expr.annotate(other)
+        ctx.annotate(other)
     }
-    Ok(expr)
+    eval_any(ctx, terminal.inner())
 }
 
 fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Expr> {
+    let ann = ctx.annotation();
+    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
+    let summary = ann.as_ref().and_then(|a| a.get_string("summary"));
+    let tags = ann
+        .as_ref()
+        .and_then(|a| a.get_enum("tags"))
+        .unwrap_or_default();
+    let id = ann.as_ref().and_then(|a| a.get_string("operationId"));
+
     let mut methods = EnumMap::default();
     for m in transfer.methods() {
         methods[m] = true;
     }
 
     let domain = match transfer.domain() {
-        Some(term) => cast_content(eval_terminal(ctx, term)?),
+        Some(term) => {
+            let c = eval_terminal(ctx, term)?;
+            cast_content(ctx, c)
+        }
         None => Content::default(),
     };
 
-    let ranges = cast_ranges(eval_any(ctx, transfer.range())?);
+    let ranges = {
+        let r = eval_any(ctx, transfer.range())?;
+        cast_ranges(ctx, r)
+    };
 
     // TODO: evaluate params
     let params = None;
-
-    // TODO: evaluate annotations
-    let desc = None;
-    let summary = None;
-    let tags = Vec::default();
-    let id = None;
 
     let xfer = Transfer {
         methods,
@@ -220,6 +233,9 @@ fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> 
 }
 
 fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Result<Expr> {
+    let ann = ctx.annotation();
+    let example = ann.as_ref().and_then(|a| a.get_string("example"));
+
     let mut path = Vec::new();
     for seg in template.segments() {
         match seg {
@@ -230,10 +246,13 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Res
             }
         }
     }
+
+    let params = None;
+
     let uri = Uri {
         path,
-        example: None,
-        params: None,
+        example,
+        params,
     };
 
     Ok(Value::Uri(Box::new(uri)).into())
@@ -243,11 +262,10 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
     let definition = definition(ctx.mods, variable.node()).expect("variable is not defined");
 
     if let Some(decl) = syn::Declaration::cast(definition) {
-        let mut expr = eval_any(ctx, decl.rhs())?;
         if let Some(other) = compose_annotations(decl.annotations())? {
-            expr.annotate(other)
+            ctx.annotate(other)
         }
-        Ok(expr)
+        eval_any(ctx, decl.rhs())
     } else if let Some(binding) = syn::Identifier::cast(definition) {
         panic!("unexpected unbound variable {}", binding.ident())
     } else {
@@ -256,8 +274,15 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
 }
 
 fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> {
+    let ann = ctx.annotation();
+    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
+    let examples = ann.as_ref().and_then(|a| a.get_props("examples"));
+
     let schema = match content.body() {
-        Some(body) => Some(Box::new(cast_schema(eval_any(ctx, body)?))),
+        Some(body) => {
+            let s = eval_any(ctx, body)?;
+            Some(Box::new(cast_schema(ctx, s)))
+        }
         None => None,
     };
 
@@ -272,9 +297,6 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
             lex::Content::Status => status = Some(cast_http_status(rhs)?),
         }
     }
-
-    let desc = None;
-    let examples = None;
 
     let cnt = Content {
         schema,
@@ -302,7 +324,8 @@ fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result
         lex::Operator::DoubleColon => {
             let mut ranges = Ranges::new();
             for operand in operation.operands() {
-                let c = cast_content(eval_any(ctx, operand)?);
+                let o = eval_any(ctx, operand)?;
+                let c = cast_content(ctx, o);
                 ranges.insert((c.status, c.media.clone()), c);
             }
             Ok(Value::Ranges(Box::new(ranges)).into())
@@ -331,12 +354,21 @@ fn eval_literal(_ctx: &mut Context, literal: syn::Literal<Core>) -> Result<Expr>
 }
 
 fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Expr> {
+    let ann = ctx.annotation();
+    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
+    let required = ann.as_ref().and_then(|a| a.get_bool("required"));
+
+    let name = property.name();
+    let s = eval_any(ctx, property.rhs())?;
+    let schema = cast_schema(ctx, s);
+
     let prop = Property {
-        name: property.name(),
-        schema: cast_schema(eval_any(ctx, property.rhs())?),
-        desc: None,
-        required: None,
+        name,
+        schema,
+        desc,
+        required,
     };
+
     Ok(Value::Property(Box::new(prop)).into())
 }
 
@@ -397,7 +429,7 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
 }
 
 pub fn eval(mods: &ModuleSet) -> Result<Spec> {
-    let ctx = &mut Context { mods };
+    let ctx = &mut Context { mods, ann: None };
     let expr = eval_any(ctx, mods.main().tree().root())?;
     let Value::Spec(spec) = expr.value else { panic!("expected a specification") };
     Ok(*spec)
