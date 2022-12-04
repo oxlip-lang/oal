@@ -161,3 +161,17 @@ fn eval_content_schema() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn eval_operation_any() -> anyhow::Result<()> {
+    let s = eval(r#"
+        let a = { 'b [bool], 'c / } ~ num ~ uri;
+        res / ( get -> a );
+    "#)?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    // TODO: complete assertions
+
+    Ok(())
+}

@@ -3,8 +3,8 @@ use super::tree::{definition, Core, NRef};
 use crate::annotation::Annotation;
 use crate::errors::Result;
 use crate::spec::{
-    Content, Object, PrimNumber, PrimString, Property, Ranges, Relation, Schema, SchemaExpr, Spec,
-    Transfer, Transfers, Uri, UriSegment,
+    Array, Content, Object, PrimBoolean, PrimNumber, PrimString, Property, Ranges, Relation,
+    Schema, SchemaExpr, Spec, Transfer, Transfers, Uri, UriSegment, VariadicOp,
 };
 use enum_map::EnumMap;
 use indexmap::IndexMap;
@@ -12,6 +12,7 @@ use oal_syntax::atom;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
 
+// TODO: we might not need to box all the composite values.
 #[derive(Debug)]
 enum Value {
     Spec(Box<Spec>),
@@ -24,6 +25,9 @@ enum Value {
     Property(Box<Property>),
     PrimNumber(Box<PrimNumber>),
     PrimString(Box<PrimString>),
+    PrimBoolean(Box<PrimBoolean>),
+    VariadicOp(Box<VariadicOp>),
+    Array(Box<Array>),
     String(String),
     Number(u64),
     HttpStatus(atom::HttpStatus),
@@ -88,6 +92,10 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
         Value::Object(o) => SchemaExpr::Object(*o),
         Value::PrimNumber(p) => SchemaExpr::Num(*p),
         Value::PrimString(s) => SchemaExpr::Str(*s),
+        Value::PrimBoolean(b) => SchemaExpr::Bool(*b),
+        Value::Array(a) => SchemaExpr::Array(a),
+        Value::Uri(u) => SchemaExpr::Uri(*u),
+        Value::VariadicOp(o) => SchemaExpr::Op(*o),
         _ => panic!("not a schema expression: {:?}", from),
     };
 
@@ -330,6 +338,17 @@ fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result
             }
             Ok(Value::Ranges(Box::new(ranges)).into())
         }
+        lex::Operator::Tilde => {
+            let mut schemas = Vec::new();
+            for operand in operation.operands() {
+                let o = eval_any(ctx, operand)?;
+                schemas.push(cast_schema(ctx, o));
+            }
+            // TODO: replace dependency with deprecated AST types.
+            let op = oal_syntax::ast::Operator::Any;
+            let var_op = VariadicOp { op, schemas };
+            Ok(Value::VariadicOp(Box::new(var_op)).into())
+        }
         _ => todo!(),
     }
 }
@@ -391,11 +410,26 @@ fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result
             };
             Value::PrimString(Box::new(p))
         }
-        lex::Primitive::Uri => todo!(),
-        lex::Primitive::Bool => todo!(),
+        lex::Primitive::Uri => {
+            let p = Uri {
+                path: Default::default(),
+                params: None,
+                example: None,
+            };
+            Value::Uri(Box::new(p))
+        }
+        lex::Primitive::Bool => Value::PrimBoolean(Box::new(PrimBoolean {})),
         lex::Primitive::Int => todo!(),
     };
     Ok(value.into())
+}
+
+fn eval_array(ctx: &mut Context, array: syn::Array<Core>) -> Result<Expr> {
+    let item = eval_any(ctx, array.inner())?;
+    let array = Array {
+        item: cast_schema(ctx, item),
+    };
+    Ok(Value::Array(Box::new(array)).into())
 }
 
 fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
@@ -421,6 +455,8 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
         eval_property(ctx, property)
     } else if let Some(primitive) = syn::Primitive::cast(node) {
         eval_primitive(ctx, primitive)
+    } else if let Some(array) = syn::Array::cast(node) {
+        eval_array(ctx, array)
     } else if let Some(_app) = syn::Application::cast(node) {
         todo!("application not implemented")
     } else {
