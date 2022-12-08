@@ -102,7 +102,6 @@ fn parse_decl_uri() {
         let segs = &mut uri.segments();
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "x");
-        assert_eq!(assert_next_path_elem(segs).as_str(), "");
 
         let prop = assert_next_path_var(segs);
         assert_eq!(prop.name(), "y");
@@ -110,7 +109,8 @@ fn parse_decl_uri() {
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "z");
 
-        let props = &mut uri.params().expect("expected URI parameters");
+        let params = uri.params().expect("expected URI parameters");
+        let props = &mut params.properties();
 
         let prop = assert_next_prop(props);
         assert_eq!(prop.name(), "q");
@@ -140,7 +140,8 @@ fn parse_decl_transfer() {
         let methods: Vec<_> = xfer.methods().collect();
         assert_eq!(methods, vec![atom::Method::Get, atom::Method::Put]);
 
-        let props = &mut xfer.params().expect("expected parameters");
+        let params = xfer.params().expect("expected parameters");
+        let props = &mut params.properties();
 
         let prop = assert_next_prop(props);
         assert_eq!(prop.name(), "q");

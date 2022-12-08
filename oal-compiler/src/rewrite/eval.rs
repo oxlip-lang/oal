@@ -150,6 +150,13 @@ fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
     }
 }
 
+fn cast_object(from: Expr) -> Object {
+    match from.value {
+        Value::Object(o) => *o,
+        _ => panic!("not an object: {:?}", from),
+    }
+}
+
 fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
     if let Some(other) = compose_annotations(terminal.annotation().into_iter())? {
         ctx.annotate(other)
@@ -247,15 +254,22 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Res
     let mut path = Vec::new();
     for seg in template.segments() {
         match seg {
-            syn::UriSegment::Element(elem) => path.push(UriSegment::Literal(elem.as_str().into())),
+            syn::UriSegment::Element(elem) => {
+                let s = UriSegment::Literal(elem.as_str().into());
+                path.push(s);
+            }
             syn::UriSegment::Variable(var) => {
-                eval_any(ctx, var.inner())?;
-                todo!()
+                let p = eval_any(ctx, var.inner())?;
+                let s = UriSegment::Variable(Box::new(cast_property(p)));
+                path.push(s);
             }
         }
     }
 
-    let params = None;
+    let params = match template.params() {
+        Some(p) => Some(cast_object(eval_object(ctx, p)?)),
+        None => None,
+    };
 
     let uri = Uri {
         path,

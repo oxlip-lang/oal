@@ -272,11 +272,11 @@ impl<'a, T: Core> UriTemplate<'a, T> {
             .segments()
     }
 
-    pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
+    pub fn params(&self) -> Option<Object<'a, T>> {
         self.node().children().nth(Self::PARAMS_POS).map(|inner| {
             UriParams::cast(inner)
                 .expect("expected URI parameters")
-                .params()
+                .inner()
         })
     }
 }
@@ -284,10 +284,8 @@ impl<'a, T: Core> UriTemplate<'a, T> {
 impl<'a, T: Core> UriParams<'a, T> {
     const INNER_POS: usize = 1;
 
-    pub fn params(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
-        Object::cast(self.node().nth(Self::INNER_POS))
-            .expect("URI parameters must be an object")
-            .properties()
+    pub fn inner(&self) -> Object<'a, T> {
+        Object::cast(self.node().nth(Self::INNER_POS)).expect("URI parameters must be an object")
     }
 }
 
@@ -334,12 +332,11 @@ impl<'a, T: Core> XferMethods<'a, T> {
 impl<'a, T: Core> XferParams<'a, T> {
     const INNER_POS: usize = 0;
 
-    pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
-        self.node().children().nth(Self::INNER_POS).map(|inner| {
-            Object::cast(inner)
-                .expect("transfer parameters must be an object")
-                .properties()
-        })
+    pub fn inner(&self) -> Option<Object<'a, T>> {
+        self.node()
+            .children()
+            .nth(Self::INNER_POS)
+            .map(|inner| Object::cast(inner).expect("transfer parameters must be an object"))
     }
 }
 
@@ -366,10 +363,10 @@ impl<'a, T: Core> Transfer<'a, T> {
             .methods()
     }
 
-    pub fn params(&self) -> Option<impl Iterator<Item = NodeRef<'a, T, Gram>>> {
+    pub fn params(&self) -> Option<Object<'a, T>> {
         XferParams::cast(self.node().nth(Self::PARAMS_POS))
             .expect("expected transfer parameters")
-            .params()
+            .inner()
     }
 
     pub fn domain(&self) -> Option<Terminal<'a, T>> {
@@ -564,11 +561,10 @@ pub fn parser<'a, T: Core + 'a>(
 
         let uri_path = tree_many(
             uri_segment
-                .map(|l| vec![l])
-                .or(uri_root.chain(uri_var.or_not()))
+                .or(uri_root.clone().ignore_then(uri_var))
+                .or(uri_root)
                 .repeated()
                 .at_least(1)
-                .flatten()
                 .collect(),
             SyntaxKind::UriPath,
         );

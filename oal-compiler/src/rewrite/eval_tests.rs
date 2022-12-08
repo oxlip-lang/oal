@@ -45,7 +45,7 @@ fn eval_annotation() -> anyhow::Result<()> {
     assert_eq!(s.expr, SchemaExpr::Object(Object::default()));
     assert_eq!(s.desc.as_ref().unwrap(), "some record");
     assert!(s.title.is_none());
-    
+
     Ok(())
 }
 
@@ -164,14 +164,61 @@ fn eval_content_schema() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_any() -> anyhow::Result<()> {
-    let s = eval(r#"
+    let s = eval(
+        r#"
         let a = { 'b [bool], 'c / } ~ num ~ uri;
         res / ( get -> a );
-    "#)?;
+    "#,
+    )?;
 
     assert_eq!(s.rels.len(), 1);
 
-    // TODO: complete assertions
+    let (_, p) = s.rels.iter().next().unwrap();
+    let x = p.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
+    let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
+    assert_eq!(op.op, oal_syntax::ast::Operator::Any);
+
+    let s = op.schemas.get(0).expect("expected a schema");
+    let SchemaExpr::Object(o) = &s.expr else { panic!("expected an object") };
+    assert_eq!(o.props.len(), 2);
+    let p = &o.props[0];
+    assert_eq!(p.name, "b");
+    let SchemaExpr::Array(a) = &p.schema.expr else { panic!("expected an array") };
+    assert!(matches!(a.item.expr, SchemaExpr::Bool(_)));
+    let p = &o.props[1];
+    assert_eq!(p.name, "c");
+    assert!(matches!(p.schema.expr, SchemaExpr::Uri(_)));
+
+    let s = op.schemas.get(1).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Num(_)));
+
+    let s = op.schemas.get(2).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Uri(_)));
+
+    Ok(())
+}
+
+#[test]
+fn eval_uri() -> anyhow::Result<()> {
+    let s = eval(r#"res /a/{ 'id num }/b?{ 'c str } ( get -> <> );"#)?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    let (_, r) = s.rels.iter().next().unwrap();
+
+    assert!(matches!(r.uri.path[0], UriSegment::Literal(_)));
+    let UriSegment::Variable(v) = &r.uri.path[1] else { panic!("expected uri variable") };
+    assert!(matches!(v.schema.expr, SchemaExpr::Num(_)));
+    assert!(matches!(r.uri.path[2], UriSegment::Literal(_)));
+
+    let o = r.uri.params.as_ref().unwrap();
+    assert_eq!(o.props.len(), 1);
+    let p = &o.props[0];
+    assert_eq!(p.name, "c");
+    assert!(matches!(p.schema.expr, SchemaExpr::Str(_)));
 
     Ok(())
 }
