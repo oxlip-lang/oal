@@ -94,6 +94,6 @@ impl std::fmt::Display for External {
 
 impl std::fmt::Debug for External {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        <Self as std::fmt::Display>::fmt(&self, f)
+        <Self as std::fmt::Display>::fmt(self, f)
     }
 }

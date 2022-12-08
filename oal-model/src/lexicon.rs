@@ -105,6 +105,7 @@ where
         self.len() == 0
     }
 
+    #[allow(clippy::needless_lifetimes)]
     pub fn stream<'a>(
         &'a self,
     ) -> Stream<TokenAlias<L>, Span, impl Iterator<Item = (TokenAlias<L>, Span)> + 'a> {

@@ -249,6 +249,7 @@ pub enum UriSegment<'a, T: Core> {
 }
 
 impl<'a, T: Core> UriPath<'a, T> {
+    #[allow(clippy::manual_map)]
     pub fn segments(&self) -> impl Iterator<Item = UriSegment<'a, T>> {
         self.node().children().filter_map(|c| {
             if let Some(v) = UriVariable::cast(c) {
@@ -332,6 +333,7 @@ impl<'a, T: Core> XferMethods<'a, T> {
 impl<'a, T: Core> XferParams<'a, T> {
     const INNER_POS: usize = 0;
 
+    #[allow(clippy::iter_nth_zero)]
     pub fn inner(&self) -> Option<Object<'a, T>> {
         self.node()
             .children()
@@ -418,6 +420,7 @@ impl<'a, T: Core> ContentMetaList<'a, T> {
 impl<'a, T: Core> ContentBody<'a, T> {
     const INNER_POS: usize = 0;
 
+    #[allow(clippy::iter_nth_zero)]
     pub fn inner(&self) -> Option<NodeRef<'a, T, Gram>> {
         self.node().children().nth(Self::INNER_POS)
     }
