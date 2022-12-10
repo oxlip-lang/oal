@@ -1,5 +1,6 @@
 target/
 .idea/
+.vscode/
 *.iml
 Cargo.lock
 gen/

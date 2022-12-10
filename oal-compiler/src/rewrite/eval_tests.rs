@@ -222,3 +222,25 @@ fn eval_uri() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn eval_uri_params() -> anyhow::Result<()> {
+    let s = eval(r#"res / ( patch, put { 'n num } : {} -> <> );"#)?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    let (_, r) = s.rels.iter().next().unwrap();
+
+    assert!(r.xfers[Method::Put].is_some());
+    let x = r.xfers[Method::Patch]
+        .as_ref()
+        .expect("expected transfer on HTTP PATCH");
+
+    let o = x.params.as_ref().expect("expected transfer params");
+    assert_eq!(o.props.len(), 1);
+    let p = &o.props[0];
+    assert_eq!(p.name, "n");
+    assert!(matches!(p.schema.expr, SchemaExpr::Num(_)));
+
+    Ok(())
+}

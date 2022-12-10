@@ -192,8 +192,10 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Exp
         cast_ranges(ctx, r)
     };
 
-    // TODO: evaluate params
-    let params = None;
+    let params = match transfer.params() {
+        Some(object) => Some(cast_object(eval_object(ctx, object)?)),
+        None => None,
+    };
 
     let xfer = Transfer {
         methods,
