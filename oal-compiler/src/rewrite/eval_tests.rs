@@ -175,12 +175,7 @@ fn eval_content_schema() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_any() -> anyhow::Result<()> {
-    let s = eval(
-        r#"
-        let a = { 'b [bool], 'c / } ~ num ~ uri;
-        res / ( get -> a );
-    "#,
-    )?;
+    let s = eval(r#"res / ( get -> < { 'b [bool], 'c / } ~ num ~ uri > );"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -191,6 +186,7 @@ fn eval_operation_any() -> anyhow::Result<()> {
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
     let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
     assert_eq!(op.op, Operator::Any);
+    assert_eq!(op.schemas.len(), 3);
 
     let s = op.schemas.get(0).expect("expected a schema");
     let SchemaExpr::Object(o) = &s.expr else { panic!("expected an object") };
@@ -208,6 +204,30 @@ fn eval_operation_any() -> anyhow::Result<()> {
 
     let s = op.schemas.get(2).expect("expected a schema");
     assert!(matches!(s.expr, SchemaExpr::Uri(_)));
+
+    Ok(())
+}
+
+#[test]
+fn eval_operation_sum() -> anyhow::Result<()> {
+    let s = eval(r#"res / ( get -> < num | str > );"#)?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    let (_, p) = s.rels.iter().next().unwrap();
+    let x = p.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
+    let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
+    assert_eq!(op.op, Operator::Sum);
+    assert_eq!(op.schemas.len(), 2);
+
+    let s = op.schemas.get(0).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Num(_)));
+
+    let s = op.schemas.get(1).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Str(_)));
 
     Ok(())
 }

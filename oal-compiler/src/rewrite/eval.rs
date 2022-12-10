@@ -13,7 +13,6 @@ use oal_syntax::atom;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
 
-// TODO: we might not need to box all the composite values.
 #[derive(Debug)]
 enum Expr {
     Spec(Box<Spec>),
@@ -344,27 +343,28 @@ fn eval_object(ctx: &mut Context, object: syn::Object<Core>) -> Result<Expr> {
 }
 
 fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result<Expr> {
-    match operation.operator() {
-        lex::Operator::DoubleColon => {
-            let mut ranges = Ranges::new();
-            for operand in operation.operands() {
-                let o = eval_any(ctx, operand)?;
-                let c = cast_content(ctx, o);
-                ranges.insert((c.status, c.media.clone()), c);
-            }
-            Ok(Expr::Ranges(Box::new(ranges)))
+    if operation.operator() == lex::Operator::DoubleColon {
+        let mut ranges = Ranges::new();
+        for operand in operation.operands() {
+            let o = eval_any(ctx, operand)?;
+            let c = cast_content(ctx, o);
+            ranges.insert((c.status, c.media.clone()), c);
         }
-        lex::Operator::Tilde => {
-            let mut schemas = Vec::new();
-            for operand in operation.operands() {
-                let o = eval_any(ctx, operand)?;
-                schemas.push(cast_schema(ctx, o));
-            }
-            let op = atom::Operator::Any;
-            let var_op = VariadicOp { op, schemas };
-            Ok(Expr::VariadicOp(Box::new(var_op)))
+        Ok(Expr::Ranges(Box::new(ranges)))
+    } else {
+        let op = match operation.operator() {
+            lex::Operator::Ampersand => atom::Operator::Join,
+            lex::Operator::Tilde => atom::Operator::Any,
+            lex::Operator::VerticalBar => atom::Operator::Sum,
+            _ => panic!("unexpected operator {:?}", operation.operator()),
+        };
+        let mut schemas = Vec::new();
+        for operand in operation.operands() {
+            let o = eval_any(ctx, operand)?;
+            schemas.push(cast_schema(ctx, o));
         }
-        _ => todo!(),
+        let var_op = VariadicOp { op, schemas };
+        Ok(Expr::VariadicOp(Box::new(var_op)))
     }
 }
 
