@@ -1,5 +1,5 @@
 use super::{resolve::resolve, tests::mods_from};
-use crate::spec::{Object, SchemaExpr, Spec, UriSegment};
+use crate::spec::{Object, SchemaExpr, Spec, UriSegment, Reference};
 use oal_syntax::atom::{HttpStatus, Method};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
@@ -112,7 +112,10 @@ fn eval_ranges() -> anyhow::Result<()> {
         SchemaExpr::Object(Object::default())
     );
     assert_eq!(c.media.as_ref().expect("expected media"), "text/plain");
-    assert_eq!(c.status.expect("expected status"), HttpStatus::try_from(500).unwrap());
+    assert_eq!(
+        c.status.expect("expected status"),
+        HttpStatus::try_from(500).unwrap()
+    );
     let o = c.headers.as_ref().expect("expected headers");
     assert_eq!(o.props.len(), 1);
     let p = &o.props[0];
@@ -249,6 +252,36 @@ fn eval_uri_params() -> anyhow::Result<()> {
     let p = &o.props[0];
     assert_eq!(p.name, "n");
     assert!(matches!(p.schema.expr, SchemaExpr::Num(_)));
+
+    Ok(())
+}
+
+#[test]
+fn eval_reference() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let @a = {};
+        res / ( get -> @a );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    let r = s.rels.values().next().unwrap();
+
+    let x = r.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP PATCH");
+
+    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
+    let SchemaExpr::Ref(i) = &r.expr else { panic!("expected an reference") };
+    assert_eq!(*i, "@a");
+
+    assert_eq!(s.refs.len(), 1);
+
+    let Reference::Schema(r) = s.refs.values().next().unwrap();
+    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+    assert!(o.props.is_empty());
 
     Ok(())
 }

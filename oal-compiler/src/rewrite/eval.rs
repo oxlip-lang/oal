@@ -3,8 +3,9 @@ use super::tree::{definition, Core, NRef};
 use crate::annotation::Annotation;
 use crate::errors::Result;
 use crate::spec::{
-    Array, Content, Object, PrimBoolean, PrimNumber, PrimString, Property, Ranges, Relation,
-    Schema, SchemaExpr, Spec, Transfer, Transfers, Uri, UriSegment, VariadicOp,
+    Array, Content, Object, PrimBoolean, PrimNumber, PrimString, Property, Ranges, Reference,
+    References, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri, UriSegment,
+    VariadicOp,
 };
 use enum_map::EnumMap;
 use indexmap::IndexMap;
@@ -27,6 +28,7 @@ enum Value {
     PrimString(Box<PrimString>),
     PrimBoolean(Box<PrimBoolean>),
     VariadicOp(Box<VariadicOp>),
+    Reference(atom::Ident),
     Array(Box<Array>),
     String(String),
     Number(u64),
@@ -48,7 +50,7 @@ impl From<Value> for Expr {
 struct Context<'a> {
     mods: &'a ModuleSet,
     ann: Option<Annotation>,
-    // TODO: keep track of references here
+    refs: Option<References>,
 }
 
 impl<'a> Context<'a> {
@@ -96,6 +98,7 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
         Value::Array(a) => SchemaExpr::Array(a),
         Value::Uri(u) => SchemaExpr::Uri(*u),
         Value::VariadicOp(o) => SchemaExpr::Op(*o),
+        Value::Reference(r) => SchemaExpr::Ref(r),
         _ => panic!("not a schema expression: {:?}", from),
     };
 
@@ -234,7 +237,6 @@ fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Exp
 
 fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> {
     let mut rels = IndexMap::new();
-
     for res in program.resources() {
         let Value::Relation(rel) = eval_relation(ctx, res.relation())?.value
             else { panic!("expected a relation") };
@@ -243,7 +245,7 @@ fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> 
 
     let spec = Spec {
         rels,
-        refs: Default::default(),
+        refs: ctx.refs.take().unwrap_or_default(),
     };
 
     Ok(Value::Spec(Box::new(spec)).into())
@@ -289,7 +291,17 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
         if let Some(other) = compose_annotations(decl.annotations())? {
             ctx.annotate(other)
         }
-        eval_any(ctx, decl.rhs())
+        let expr = eval_any(ctx, decl.rhs())?;
+        let ident = variable.ident();
+        if ident.is_reference() {
+            let reference = Reference::Schema(cast_schema(ctx, expr));
+            ctx.refs
+                .get_or_insert_with(|| Default::default())
+                .insert(ident.clone(), reference);
+            Ok(Value::Reference(ident).into())
+        } else {
+            Ok(expr)
+        }
     } else if let Some(binding) = syn::Identifier::cast(definition) {
         panic!("unexpected unbound variable {}", binding.ident())
     } else {
@@ -481,7 +493,11 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
 }
 
 pub fn eval(mods: &ModuleSet) -> Result<Spec> {
-    let ctx = &mut Context { mods, ann: None };
+    let ctx = &mut Context {
+        mods,
+        ann: None,
+        refs: None,
+    };
     let expr = eval_any(ctx, mods.main().tree().root())?;
     let Value::Spec(spec) = expr.value else { panic!("expected a specification") };
     Ok(*spec)
