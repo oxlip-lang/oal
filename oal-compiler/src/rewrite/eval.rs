@@ -15,7 +15,7 @@ use oal_syntax::rewrite::parser as syn;
 
 // TODO: we might not need to box all the composite values.
 #[derive(Debug)]
-enum Value {
+enum Expr {
     Spec(Box<Spec>),
     Uri(Box<Uri>),
     Relation(Box<Relation>),
@@ -33,18 +33,6 @@ enum Value {
     String(String),
     Number(u64),
     HttpStatus(atom::HttpStatus),
-}
-
-#[derive(Debug)]
-struct Expr {
-    // TODO: eventually get rid of the indirection
-    value: Value,
-}
-
-impl From<Value> for Expr {
-    fn from(value: Value) -> Self {
-        Expr { value }
-    }
 }
 
 struct Context<'a> {
@@ -90,15 +78,15 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
     let required = ann.as_ref().and_then(|a| a.get_bool("required"));
     let examples = ann.as_ref().and_then(|a| a.get_props("examples"));
 
-    let expr = match from.value {
-        Value::Object(o) => SchemaExpr::Object(*o),
-        Value::PrimNumber(p) => SchemaExpr::Num(*p),
-        Value::PrimString(s) => SchemaExpr::Str(*s),
-        Value::PrimBoolean(b) => SchemaExpr::Bool(*b),
-        Value::Array(a) => SchemaExpr::Array(a),
-        Value::Uri(u) => SchemaExpr::Uri(*u),
-        Value::VariadicOp(o) => SchemaExpr::Op(*o),
-        Value::Reference(r) => SchemaExpr::Ref(r),
+    let expr = match from {
+        Expr::Object(o) => SchemaExpr::Object(*o),
+        Expr::PrimNumber(p) => SchemaExpr::Num(*p),
+        Expr::PrimString(s) => SchemaExpr::Str(*s),
+        Expr::PrimBoolean(b) => SchemaExpr::Bool(*b),
+        Expr::Array(a) => SchemaExpr::Array(a),
+        Expr::Uri(u) => SchemaExpr::Uri(*u),
+        Expr::VariadicOp(o) => SchemaExpr::Op(*o),
+        Expr::Reference(r) => SchemaExpr::Ref(r),
         _ => panic!("not a schema expression: {:?}", from),
     };
 
@@ -112,15 +100,15 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
 }
 
 fn cast_content(ctx: &mut Context, from: Expr) -> Content {
-    match from.value {
-        Value::Content(c) => *c,
+    match from {
+        Expr::Content(c) => *c,
         _ => Content::from(cast_schema(ctx, from)),
     }
 }
 
 fn cast_ranges(ctx: &mut Context, from: Expr) -> Ranges {
-    match from.value {
-        Value::Ranges(r) => *r,
+    match from {
+        Expr::Ranges(r) => *r,
         _ => {
             let c = cast_content(ctx, from);
             Ranges::from([((c.status, c.media.clone()), c)])
@@ -129,23 +117,23 @@ fn cast_ranges(ctx: &mut Context, from: Expr) -> Ranges {
 }
 
 fn cast_string(from: Expr) -> String {
-    match from.value {
-        Value::String(s) => s,
+    match from {
+        Expr::String(s) => s,
         _ => panic!("not a string: {:?}", from),
     }
 }
 
 fn cast_property(from: Expr) -> Property {
-    match from.value {
-        Value::Property(p) => *p,
+    match from {
+        Expr::Property(p) => *p,
         _ => panic!("not a property: {:?}", from),
     }
 }
 
 fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
-    match from.value {
-        Value::HttpStatus(s) => Ok(s),
-        Value::Number(n) => {
+    match from {
+        Expr::HttpStatus(s) => Ok(s),
+        Expr::Number(n) => {
             let s = atom::HttpStatus::try_from(n)?;
             Ok(s)
         }
@@ -154,8 +142,8 @@ fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
 }
 
 fn cast_object(from: Expr) -> Object {
-    match from.value {
-        Value::Object(o) => *o,
+    match from {
+        Expr::Object(o) => *o,
         _ => panic!("not an object: {:?}", from),
     }
 }
@@ -211,17 +199,17 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Exp
         id,
     };
 
-    Ok(Value::Transfer(Box::new(xfer)).into())
+    Ok(Expr::Transfer(Box::new(xfer)))
 }
 
 fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Expr> {
-    let Value::Uri(uri) = eval_terminal(ctx, relation.uri())?.value
+    let Expr::Uri(uri) = eval_terminal(ctx, relation.uri())?
         else { panic!("expected a URI") };
 
     let mut xfers = Transfers::default();
 
     for x in relation.transfers() {
-        let Value::Transfer(xfer) = eval_transfer(ctx, x)?.value
+        let Expr::Transfer(xfer) = eval_transfer(ctx, x)?
             else { panic!("expected a transfer") };
         for (m, b) in xfer.methods {
             if b {
@@ -232,13 +220,13 @@ fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Exp
 
     let rel = Relation { uri: *uri, xfers };
 
-    Ok(Value::Relation(Box::new(rel)).into())
+    Ok(Expr::Relation(Box::new(rel)))
 }
 
 fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> {
     let mut rels = IndexMap::new();
     for res in program.resources() {
-        let Value::Relation(rel) = eval_relation(ctx, res.relation())?.value
+        let Expr::Relation(rel) = eval_relation(ctx, res.relation())?
             else { panic!("expected a relation") };
         rels.insert(rel.uri.pattern(), *rel);
     }
@@ -248,7 +236,7 @@ fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> 
         refs: ctx.refs.take().unwrap_or_default(),
     };
 
-    Ok(Value::Spec(Box::new(spec)).into())
+    Ok(Expr::Spec(Box::new(spec)))
 }
 
 fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Result<Expr> {
@@ -281,7 +269,7 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Res
         params,
     };
 
-    Ok(Value::Uri(Box::new(uri)).into())
+    Ok(Expr::Uri(Box::new(uri)))
 }
 
 fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Expr> {
@@ -298,7 +286,7 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
             ctx.refs
                 .get_or_insert_with(|| Default::default())
                 .insert(ident.clone(), reference);
-            Ok(Value::Reference(ident).into())
+            Ok(Expr::Reference(ident))
         } else {
             Ok(expr)
         }
@@ -343,7 +331,7 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
         examples,
     };
 
-    Ok(Value::Content(Box::new(cnt)).into())
+    Ok(Expr::Content(Box::new(cnt)))
 }
 
 fn eval_object(ctx: &mut Context, object: syn::Object<Core>) -> Result<Expr> {
@@ -352,7 +340,7 @@ fn eval_object(ctx: &mut Context, object: syn::Object<Core>) -> Result<Expr> {
         props.push(cast_property(eval_any(ctx, prop)?));
     }
     let obj = Object { props };
-    Ok(Value::Object(Box::new(obj)).into())
+    Ok(Expr::Object(Box::new(obj)))
 }
 
 fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result<Expr> {
@@ -364,7 +352,7 @@ fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result
                 let c = cast_content(ctx, o);
                 ranges.insert((c.status, c.media.clone()), c);
             }
-            Ok(Value::Ranges(Box::new(ranges)).into())
+            Ok(Expr::Ranges(Box::new(ranges)))
         }
         lex::Operator::Tilde => {
             let mut schemas = Vec::new();
@@ -375,7 +363,7 @@ fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result
             // TODO: replace dependency with deprecated AST types.
             let op = oal_syntax::ast::Operator::Any;
             let var_op = VariadicOp { op, schemas };
-            Ok(Value::VariadicOp(Box::new(var_op)).into())
+            Ok(Expr::VariadicOp(Box::new(var_op)))
         }
         _ => todo!(),
     }
@@ -386,16 +374,16 @@ fn eval_literal(_ctx: &mut Context, literal: syn::Literal<Core>) -> Result<Expr>
         lex::Literal::HttpStatus => {
             let lex::TokenValue::HttpStatus(status) = literal.value()
                 else { panic!("expected an HTTP status") };
-            Ok(Value::HttpStatus(*status).into())
+            Ok(Expr::HttpStatus(*status))
         }
         lex::Literal::Number => {
             let lex::TokenValue::Number(number) = literal.value()
                 else { panic!("expected a number") };
-            Ok(Value::Number(*number).into())
+            Ok(Expr::Number(*number))
         }
         lex::Literal::String => {
             let string = literal.as_str().to_owned();
-            Ok(Value::String(string).into())
+            Ok(Expr::String(string))
         }
     }
 }
@@ -416,7 +404,7 @@ fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Exp
         required,
     };
 
-    Ok(Value::Property(Box::new(prop)).into())
+    Ok(Expr::Property(Box::new(prop)))
 }
 
 fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result<Expr> {
@@ -428,7 +416,7 @@ fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result
                 multiple_of: None,
                 example: None,
             };
-            Value::PrimNumber(Box::new(p))
+            Expr::PrimNumber(Box::new(p))
         }
         lex::Primitive::Str => {
             let p = PrimString {
@@ -436,7 +424,7 @@ fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result
                 enumeration: Default::default(),
                 example: None,
             };
-            Value::PrimString(Box::new(p))
+            Expr::PrimString(Box::new(p))
         }
         lex::Primitive::Uri => {
             let p = Uri {
@@ -444,12 +432,12 @@ fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result
                 params: None,
                 example: None,
             };
-            Value::Uri(Box::new(p))
+            Expr::Uri(Box::new(p))
         }
-        lex::Primitive::Bool => Value::PrimBoolean(Box::new(PrimBoolean {})),
+        lex::Primitive::Bool => Expr::PrimBoolean(Box::new(PrimBoolean {})),
         lex::Primitive::Int => todo!(),
     };
-    Ok(value.into())
+    Ok(value)
 }
 
 fn eval_array(ctx: &mut Context, array: syn::Array<Core>) -> Result<Expr> {
@@ -457,7 +445,7 @@ fn eval_array(ctx: &mut Context, array: syn::Array<Core>) -> Result<Expr> {
     let array = Array {
         item: cast_schema(ctx, item),
     };
-    Ok(Value::Array(Box::new(array)).into())
+    Ok(Expr::Array(Box::new(array)))
 }
 
 fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
@@ -499,6 +487,6 @@ pub fn eval(mods: &ModuleSet) -> Result<Spec> {
         refs: None,
     };
     let expr = eval_any(ctx, mods.main().tree().root())?;
-    let Value::Spec(spec) = expr.value else { panic!("expected a specification") };
+    let Expr::Spec(spec) = expr else { panic!("expected a specification") };
     Ok(*spec)
 }
