@@ -1,6 +1,6 @@
 use super::{resolve::resolve, tests::mods_from};
-use crate::spec::{Object, SchemaExpr, Spec, UriSegment, Reference};
-use oal_syntax::atom::{HttpStatus, Method};
+use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
+use oal_syntax::atom::{HttpStatus, Method, Operator};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
@@ -190,7 +190,7 @@ fn eval_operation_any() -> anyhow::Result<()> {
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
     let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
-    assert_eq!(op.op, oal_syntax::ast::Operator::Any);
+    assert_eq!(op.op, Operator::Any);
 
     let s = op.schemas.get(0).expect("expected a schema");
     let SchemaExpr::Object(o) = &s.expr else { panic!("expected an object") };

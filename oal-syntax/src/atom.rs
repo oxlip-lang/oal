@@ -90,7 +90,7 @@ impl TryFrom<u64> for HttpStatus {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Primitive {
     Number,
     String,
@@ -107,4 +107,11 @@ pub enum Method {
     Delete,
     Options,
     Head,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Operator {
+    Join,
+    Any,
+    Sum,
 }

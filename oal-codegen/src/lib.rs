@@ -4,8 +4,7 @@ use crate::oas::into_box_ref;
 use indexmap::{indexmap, IndexMap};
 use oal_compiler::spec;
 use oal_compiler::spec::SchemaExpr;
-use oal_syntax::atom::HttpStatusRange;
-use oal_syntax::{ast, atom};
+use oal_syntax::atom;
 use openapiv3::*;
 use std::iter::once;
 
@@ -259,10 +258,9 @@ impl Builder {
                 spec::SchemaExpr::Object(obj) => self.object_schema(obj),
                 spec::SchemaExpr::Array(array) => self.array_schema(array),
                 spec::SchemaExpr::Op(operation) => match operation.op {
-                    ast::Operator::Join => self.join_schema(&operation.schemas),
-                    ast::Operator::Sum => self.sum_schema(&operation.schemas),
-                    ast::Operator::Any => self.any_schema(&operation.schemas),
-                    ast::Operator::Range => unreachable!(),
+                    atom::Operator::Join => self.join_schema(&operation.schemas),
+                    atom::Operator::Sum => self.sum_schema(&operation.schemas),
+                    atom::Operator::Any => self.any_schema(&operation.schemas),
                 },
                 spec::SchemaExpr::Ref(_) => unreachable!(),
             };
@@ -374,11 +372,11 @@ impl Builder {
         match *status {
             atom::HttpStatus::Code(code) => StatusCode::Code(code.into()),
             atom::HttpStatus::Range(range) => StatusCode::Range(match range {
-                HttpStatusRange::Info => 1,
-                HttpStatusRange::Success => 2,
-                HttpStatusRange::Redirect => 3,
-                HttpStatusRange::ClientError => 4,
-                HttpStatusRange::ServerError => 5,
+                atom::HttpStatusRange::Info => 1,
+                atom::HttpStatusRange::Success => 2,
+                atom::HttpStatusRange::Redirect => 3,
+                atom::HttpStatusRange::ClientError => 4,
+                atom::HttpStatusRange::ServerError => 5,
             }),
         }
     }

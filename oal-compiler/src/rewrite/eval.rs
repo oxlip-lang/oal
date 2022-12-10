@@ -284,7 +284,7 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
         if ident.is_reference() {
             let reference = Reference::Schema(cast_schema(ctx, expr));
             ctx.refs
-                .get_or_insert_with(|| Default::default())
+                .get_or_insert_with(Default::default)
                 .insert(ident.clone(), reference);
             Ok(Expr::Reference(ident))
         } else {
@@ -360,8 +360,7 @@ fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result
                 let o = eval_any(ctx, operand)?;
                 schemas.push(cast_schema(ctx, o));
             }
-            // TODO: replace dependency with deprecated AST types.
-            let op = oal_syntax::ast::Operator::Any;
+            let op = atom::Operator::Any;
             let var_op = VariadicOp { op, schemas };
             Ok(Expr::VariadicOp(Box::new(var_op)))
         }

@@ -119,15 +119,21 @@ impl Array {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VariadicOp {
-    pub op: ast::Operator,
+    pub op: atom::Operator,
     pub schemas: Vec<Schema>,
 }
 
 impl VariadicOp {
     fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
-        if let ast::Expr::Op(op) = e.as_node().as_expr() {
-            let schemas: Result<Vec<_>> = op.exprs.iter().map(Schema::try_from).collect();
-            schemas.map(|schemas| VariadicOp { op: op.op, schemas })
+        if let ast::Expr::Op(operation) = e.as_node().as_expr() {
+            let schemas: Result<Vec<_>> = operation.exprs.iter().map(Schema::try_from).collect();
+            let op = match operation.op {
+                ast::Operator::Join => Ok(atom::Operator::Join),
+                ast::Operator::Any => Ok(atom::Operator::Any),
+                ast::Operator::Sum => Ok(atom::Operator::Sum),
+                _ => Err(Error::new(Kind::UnexpectedExpression, "not a valid operator").with(e)),
+            }?;
+            schemas.map(|schemas| VariadicOp { op, schemas })
         } else {
             Err(Error::new(Kind::UnexpectedExpression, "not an operation").with(e))
         }
