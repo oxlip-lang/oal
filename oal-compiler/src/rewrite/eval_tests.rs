@@ -75,7 +75,8 @@ fn eval_content() -> anyhow::Result<()> {
 fn eval_ranges() -> anyhow::Result<()> {
     let s = eval(
         r#"
-        res / ( get -> <status=200,{}> :: <status=500,media="text/plain",headers={},{}> );
+        res / ( get -> <status=200, {}>
+                    :: <status=500, media="text/plain", headers={ 'h str }, {}> );
     "#,
     )?;
 
@@ -110,6 +111,13 @@ fn eval_ranges() -> anyhow::Result<()> {
         c.schema.as_ref().unwrap().expr,
         SchemaExpr::Object(Object::default())
     );
+    assert_eq!(c.media.as_ref().expect("expected media"), "text/plain");
+    assert_eq!(c.status.expect("expected status"), HttpStatus::try_from(500).unwrap());
+    let o = c.headers.as_ref().expect("expected headers");
+    assert_eq!(o.props.len(), 1);
+    let p = &o.props[0];
+    assert_eq!(p.name, "h");
+    assert!(matches!(p.schema.expr, SchemaExpr::Str(_)));
 
     Ok(())
 }

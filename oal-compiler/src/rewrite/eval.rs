@@ -317,7 +317,7 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
         let rhs = eval_any(ctx, meta.rhs())?;
         match meta.tag() {
             lex::Content::Media => media = Some(cast_string(rhs)),
-            lex::Content::Headers => headers = None,
+            lex::Content::Headers => headers = Some(cast_object(rhs)),
             lex::Content::Status => status = Some(cast_http_status(rhs)?),
         }
     }
