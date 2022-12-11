@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+/// Deprecated span type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     pub start: (usize, usize),

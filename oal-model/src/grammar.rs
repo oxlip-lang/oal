@@ -2,6 +2,7 @@ use crate::errors::Result;
 use crate::lexicon::{
     Intern, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList, TokenSpan,
 };
+use crate::rewrite::span::Span;
 use chumsky::prelude::*;
 use generational_indextree::NodeEdge;
 use std::cell::{Ref, RefCell, RefMut};
@@ -20,6 +21,7 @@ pub trait Grammar: Clone + Default + Debug {
 pub enum SyntaxTrunk<G: Grammar> {
     Leaf(TokenAlias<G::Lex>),
     Tree(G::Kind),
+    Error,
 }
 
 impl<G: Grammar> Debug for SyntaxTrunk<G> {
@@ -27,6 +29,7 @@ impl<G: Grammar> Debug for SyntaxTrunk<G> {
         match self {
             SyntaxTrunk::Leaf(t) => write!(f, "Leaf[{:?}]", t.kind()),
             SyntaxTrunk::Tree(k) => write!(f, "Tree[{:?}]", k),
+            SyntaxTrunk::Error => write!(f, "Error"),
         }
     }
 }
@@ -42,6 +45,7 @@ impl<C: Default + Clone + Debug> Core for C {}
 ///
 /// Note: once Chumsky supports stateful combinators, it should be possible to build a
 /// generational index tree in one pass, and get rid of this type.
+// TODO: get rid of the Core element as it's always set to a default value.
 #[derive(Clone, Debug)]
 pub struct ParseNode<T: Core, G: Grammar>(SyntaxTrunk<G>, Option<Vec<ParseNode<T, G>>>, T);
 
@@ -52,6 +56,10 @@ impl<T: Core, G: Grammar> ParseNode<T, G> {
 
     pub fn from_tree(kind: G::Kind, children: Vec<ParseNode<T, G>>) -> Self {
         ParseNode(SyntaxTrunk::Tree(kind), Some(children), T::default())
+    }
+
+    pub fn from_error() -> Self {
+        ParseNode(SyntaxTrunk::Error, None, T::default())
     }
 
     pub fn to_tree(self, tree: &mut SyntaxTree<T, G>, parent: Option<NodeIdx>) -> NodeIdx {
@@ -515,11 +523,13 @@ macro_rules! match_token {
     });
 }
 
+pub type Error<G> = Simple<TokenAlias<<G as Grammar>::Lex>, Span>;
+
 /// Perform syntax analysis over a list of tokens, yielding a concrete syntax tree.
 pub fn analyze<G, P, T>(tokens: TokenList<G::Lex>, parser: P) -> Result<SyntaxTree<T, G>>
 where
     G: Grammar,
-    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = Simple<TokenAlias<G::Lex>>>,
+    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = Error<G>>,
     T: Core,
 {
     let (root, mut errs) = parser.parse_recovery(tokens.stream());

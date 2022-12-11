@@ -1,11 +1,11 @@
-use super::parser::PathElement;
-use crate::atom;
-use crate::rewrite::lexer as lex;
-use crate::rewrite::parser::{
-    Application, Array, Content, Declaration, Gram, Literal, Object, Primitive, Program, Property,
-    Relation, Terminal, Transfer, UriSegment, UriTemplate, Variable, VariadicOp,
+use super::lexer as lex;
+use super::parser::{
+    Application, Array, Content, Declaration, Gram, Literal, Object, PathElement, Primitive,
+    Program, Property, Relation, Terminal, Transfer, UriSegment, UriTemplate, Variable, VariadicOp,
 };
+use crate::atom;
 use oal_model::grammar::NodeRef;
+use std::error::Error;
 
 type Prog<'a> = Program<'a, ()>;
 type NRef<'a> = NodeRef<'a, (), Gram>;
@@ -437,4 +437,13 @@ fn parse_resource() {
         UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
         rel.transfers().next().expect("expected a transfer");
     })
+}
+
+#[test]
+fn parse_error() {
+    let Err(err) = crate::rewrite::parse::<_, ()>("res / ( get -> );")
+        else { panic!("expected an error") };
+    let err = err.source().expect("expected a source error");
+    err.downcast_ref::<oal_model::errors::Error>()
+        .expect("expected a parser error");
 }

@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 
+// TODO: maybe use 'thiserror' crate.
 #[derive(Debug, Clone)]
 pub struct Error {
     msg: String,
@@ -20,10 +21,14 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-impl<I: Display + Hash> From<chumsky::error::Simple<I>> for Error {
-    fn from(e: chumsky::error::Simple<I>) -> Self {
+impl<I, S> From<chumsky::error::Simple<I, S>> for Error
+where
+    I: Display + Hash,
+    S: chumsky::Span,
+{
+    fn from(e: chumsky::error::Simple<I, S>) -> Self {
         Error {
-            msg: format!("parsing failed\n{}", e),
+            msg: format!("parsing failed: {}", e),
         }
     }
 }

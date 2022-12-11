@@ -1,10 +1,9 @@
 use crate::errors::Result;
+use crate::rewrite::span::Span;
 use chumsky::{prelude::*, Stream};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use string_interner::{DefaultSymbol, StringInterner};
-
-pub type Span = std::ops::Range<usize>;
 
 pub type Symbol = DefaultSymbol;
 
@@ -121,7 +120,7 @@ where
                     Some((TokenAlias::new(token.kind(), index), span.clone()))
                 }
             });
-        Stream::from_iter(len..len + 1, iter)
+        Stream::from_iter(Span::from(len..len + 1), iter)
     }
 }
 
@@ -130,11 +129,19 @@ pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>>
 where
     L: Lexeme,
     I: AsRef<str>,
-    P: Parser<char, Vec<TokenSpan<L>>, Error = Simple<char>>,
+    P: Parser<char, Vec<TokenSpan<L>>, Error = Simple<char, Span>>,
 {
     let mut token_list = TokenList::<L>::default();
 
-    let (tokens, mut errs) = lexer.parse_recovery(input.as_ref());
+    let len = input.as_ref().len();
+    let iter = input
+        .as_ref()
+        .chars()
+        .enumerate()
+        .map(|(i, c)| (c, Span::from(i..i + 1)));
+    let stream = Stream::from_iter(Span::from(len..len + 1), iter);
+
+    let (tokens, mut errs) = lexer.parse_recovery(stream);
 
     if !errs.is_empty() {
         Err(errs.swap_remove(0).into())

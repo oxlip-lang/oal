@@ -507,7 +507,7 @@ where
 }
 
 pub fn parser<'a, T: Core + 'a>(
-) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = Simple<TokenAlias<Token>>> + 'a {
+) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = Error<Gram>> + 'a {
     let identifier = match_token! { TokenKind::Identifier(_) };
 
     let literal = match_token! { TokenKind::Literal(_) };
@@ -734,10 +734,11 @@ pub fn parser<'a, T: Core + 'a>(
         SyntaxKind::Import,
     );
 
+    // TODO: implement skip_until for composite input types.
     let statement = declaration
         .or(resource)
         .or(import)
-        .recover_with(skip_then_retry_until([]));
+        .recover_with(skip_until([], |_| ParseNode::from_error()));
 
     tree_many(statement.repeated(), SyntaxKind::Program)
 }
