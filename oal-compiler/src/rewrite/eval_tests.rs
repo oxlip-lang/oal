@@ -291,7 +291,7 @@ fn eval_reference() -> anyhow::Result<()> {
 
     let x = r.xfers[Method::Get]
         .as_ref()
-        .expect("expected transfer on HTTP PATCH");
+        .expect("expected transfer on HTTP GET");
 
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
     let SchemaExpr::Ref(i) = &r.expr else { panic!("expected an reference") };
@@ -302,6 +302,45 @@ fn eval_reference() -> anyhow::Result<()> {
     let Reference::Schema(r) = s.refs.values().next().unwrap();
     let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
     assert!(o.props.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn eval_application() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let g x = x | bool;
+        let f x = { 'p g int, 'q x };
+        res / ( get -> < f str > );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let r = s.rels.values().next().unwrap();
+    let x = r.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
+    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+
+    assert_eq!(o.props.len(), 2);
+
+    let p = &o.props[0];
+    assert_eq!(p.name, "p");
+    let SchemaExpr::Op(op) = &p.schema.expr else { panic!("expected an operation") };
+    assert_eq!(op.op, Operator::Sum);
+    assert_eq!(op.schemas.len(), 2);
+
+    let s = op.schemas.get(0).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Int(_)));
+
+    let s = op.schemas.get(1).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Bool(_)));
+
+    let p = &o.props[1];
+    assert_eq!(p.name, "q");
+    assert!(matches!(p.schema.expr, SchemaExpr::Str(_)));
 
     Ok(())
 }

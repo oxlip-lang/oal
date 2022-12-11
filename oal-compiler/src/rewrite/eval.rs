@@ -3,17 +3,18 @@ use super::tree::{definition, Core, NRef};
 use crate::annotation::Annotation;
 use crate::errors::Result;
 use crate::spec::{
-    Array, Content, Object, PrimBoolean, PrimNumber, PrimString, Property, Ranges, Reference,
-    References, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri, UriSegment,
-    VariadicOp,
+    Array, Content, Object, PrimBoolean, PrimInteger, PrimNumber, PrimString, Property, Ranges,
+    Reference, References, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri,
+    UriSegment, VariadicOp,
 };
 use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_syntax::atom;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
+use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Expr {
     Spec(Box<Spec>),
     Uri(Box<Uri>),
@@ -23,6 +24,7 @@ enum Expr {
     Object(Box<Object>),
     Ranges(Box<Ranges>),
     Property(Box<Property>),
+    PrimInteger(Box<PrimInteger>),
     PrimNumber(Box<PrimNumber>),
     PrimString(Box<PrimString>),
     PrimBoolean(Box<PrimBoolean>),
@@ -38,9 +40,19 @@ struct Context<'a> {
     mods: &'a ModuleSet,
     ann: Option<Annotation>,
     refs: Option<References>,
+    scopes: Vec<HashMap<atom::Ident, Expr>>,
 }
 
 impl<'a> Context<'a> {
+    fn new(mods: &'a ModuleSet) -> Self {
+        Context {
+            mods,
+            ann: None,
+            refs: None,
+            scopes: Vec::new(),
+        }
+    }
+
     fn annotate(&mut self, other: Annotation) {
         if let Some(a) = &mut self.ann {
             a.extend(other)
@@ -72,13 +84,15 @@ where
 
 fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
     let ann = ctx.annotation();
-    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
-    let title = ann.as_ref().and_then(|a| a.get_string("title"));
-    let required = ann.as_ref().and_then(|a| a.get_bool("required"));
-    let examples = ann.as_ref().and_then(|a| a.get_props("examples"));
+    let ann = ann.as_ref();
+    let desc = ann.and_then(|a| a.get_string("description"));
+    let title = ann.and_then(|a| a.get_string("title"));
+    let required = ann.and_then(|a| a.get_bool("required"));
+    let examples = ann.and_then(|a| a.get_props("examples"));
 
     let expr = match from {
         Expr::Object(o) => SchemaExpr::Object(*o),
+        Expr::PrimInteger(i) => SchemaExpr::Int(*i),
         Expr::PrimNumber(p) => SchemaExpr::Num(*p),
         Expr::PrimString(s) => SchemaExpr::Str(*s),
         Expr::PrimBoolean(b) => SchemaExpr::Bool(*b),
@@ -86,6 +100,7 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
         Expr::Uri(u) => SchemaExpr::Uri(*u),
         Expr::VariadicOp(o) => SchemaExpr::Op(*o),
         Expr::Reference(r) => SchemaExpr::Ref(r),
+        Expr::Relation(r) => SchemaExpr::Rel(r),
         _ => panic!("not a schema expression: {:?}", from),
     };
 
@@ -156,13 +171,11 @@ fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Exp
 
 fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Expr> {
     let ann = ctx.annotation();
-    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
-    let summary = ann.as_ref().and_then(|a| a.get_string("summary"));
-    let tags = ann
-        .as_ref()
-        .and_then(|a| a.get_enum("tags"))
-        .unwrap_or_default();
-    let id = ann.as_ref().and_then(|a| a.get_string("operationId"));
+    let ann = ann.as_ref();
+    let desc = ann.and_then(|a| a.get_string("description"));
+    let summary = ann.and_then(|a| a.get_string("summary"));
+    let tags = ann.and_then(|a| a.get_enum("tags")).unwrap_or_default();
+    let id = ann.and_then(|a| a.get_string("operationId"));
 
     let mut methods = EnumMap::default();
     for m in transfer.methods() {
@@ -290,16 +303,19 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
             Ok(expr)
         }
     } else if let Some(binding) = syn::Identifier::cast(definition) {
-        panic!("unexpected unbound variable {}", binding.ident())
+        let scope = ctx.scopes.last().expect("scope is missing");
+        let expr = scope.get(&binding.ident()).expect("binding is undefined");
+        Ok(expr.clone())
     } else {
-        panic!("expected definition to be either a declaration or a binding")
+        panic!("expected variable definition to be either a declaration or a binding")
     }
 }
 
 fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> {
     let ann = ctx.annotation();
-    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
-    let examples = ann.as_ref().and_then(|a| a.get_props("examples"));
+    let ann = ann.as_ref();
+    let desc = ann.and_then(|a| a.get_string("description"));
+    let examples = ann.and_then(|a| a.get_props("examples"));
 
     let schema = match content.body() {
         Some(body) => {
@@ -389,8 +405,9 @@ fn eval_literal(_ctx: &mut Context, literal: syn::Literal<Core>) -> Result<Expr>
 
 fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Expr> {
     let ann = ctx.annotation();
-    let desc = ann.as_ref().and_then(|a| a.get_string("description"));
-    let required = ann.as_ref().and_then(|a| a.get_bool("required"));
+    let ann = ann.as_ref();
+    let desc = ann.and_then(|a| a.get_string("description"));
+    let required = ann.and_then(|a| a.get_bool("required"));
 
     let name = property.name();
     let s = eval_any(ctx, property.rhs())?;
@@ -406,35 +423,45 @@ fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Exp
     Ok(Expr::Property(Box::new(prop)))
 }
 
-fn eval_primitive(_ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result<Expr> {
+fn eval_primitive(ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result<Expr> {
+    let ann = ctx.annotation();
+    let ann = ann.as_ref();
     let value = match primitive.primitive() {
+        lex::Primitive::Bool => Expr::PrimBoolean(Box::new(PrimBoolean {})),
+        lex::Primitive::Int => {
+            let p = PrimInteger {
+                minimum: ann.and_then(|a| a.get_int("minimum")),
+                maximum: ann.and_then(|a| a.get_int("maximum")),
+                multiple_of: ann.and_then(|a| a.get_int("multipleOf")),
+                example: ann.and_then(|a| a.get_int("example")),
+            };
+            Expr::PrimInteger(Box::new(p))
+        }
         lex::Primitive::Num => {
             let p = PrimNumber {
-                minimum: None,
-                maximum: None,
-                multiple_of: None,
-                example: None,
+                minimum: ann.and_then(|a| a.get_num("minimum")),
+                maximum: ann.and_then(|a| a.get_num("maximum")),
+                multiple_of: ann.and_then(|a| a.get_num("multipleOf")),
+                example: ann.and_then(|a| a.get_num("example")),
             };
             Expr::PrimNumber(Box::new(p))
         }
         lex::Primitive::Str => {
             let p = PrimString {
-                pattern: None,
-                enumeration: Default::default(),
-                example: None,
+                pattern: ann.and_then(|a| a.get_string("pattern")),
+                enumeration: ann.and_then(|a| a.get_enum("enum")).unwrap_or_default(),
+                example: ann.and_then(|a| a.get_string("example")),
             };
             Expr::PrimString(Box::new(p))
         }
         lex::Primitive::Uri => {
             let p = Uri {
-                path: Default::default(),
+                path: Vec::new(),
                 params: None,
-                example: None,
+                example: ann.and_then(|a| a.get_string("example")),
             };
             Expr::Uri(Box::new(p))
         }
-        lex::Primitive::Bool => Expr::PrimBoolean(Box::new(PrimBoolean {})),
-        lex::Primitive::Int => todo!(),
     };
     Ok(value)
 }
@@ -445,6 +472,27 @@ fn eval_array(ctx: &mut Context, array: syn::Array<Core>) -> Result<Expr> {
         item: cast_schema(ctx, item),
     };
     Ok(Expr::Array(Box::new(array)))
+}
+
+fn eval_application(ctx: &mut Context, app: syn::Application<Core>) -> Result<Expr> {
+    let definition = definition(ctx.mods, app.node()).expect("function is not defined");
+
+    if let Some(decl) = syn::Declaration::cast(definition) {
+        if let Some(other) = compose_annotations(decl.annotations())? {
+            ctx.annotate(other)
+        }
+        let mut scope = HashMap::new();
+        for (identifier, terminal) in decl.bindings().zip(app.bindings()) {
+            let binding = eval_terminal(ctx, terminal)?;
+            scope.insert(identifier.ident(), binding);
+        }
+        ctx.scopes.push(scope);
+        let expr = eval_any(ctx, decl.rhs())?;
+        ctx.scopes.pop();
+        Ok(expr)
+    } else {
+        panic!("expected function definition to be a declaration")
+    }
 }
 
 fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
@@ -472,19 +520,15 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
         eval_primitive(ctx, primitive)
     } else if let Some(array) = syn::Array::cast(node) {
         eval_array(ctx, array)
-    } else if let Some(_app) = syn::Application::cast(node) {
-        todo!("application not implemented")
+    } else if let Some(app) = syn::Application::cast(node) {
+        eval_application(ctx, app)
     } else {
         panic!("unexpected node: {:#?}", node)
     }
 }
 
 pub fn eval(mods: &ModuleSet) -> Result<Spec> {
-    let ctx = &mut Context {
-        mods,
-        ann: None,
-        refs: None,
-    };
+    let ctx = &mut Context::new(mods);
     let expr = eval_any(ctx, mods.main().tree().root())?;
     let Expr::Spec(spec) = expr else { panic!("expected a specification") };
     Ok(*spec)
