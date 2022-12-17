@@ -444,6 +444,6 @@ fn parse_error() {
     let Err(err) = crate::rewrite::parse::<_, ()>("res / ( get -> );")
         else { panic!("expected an error") };
     let err = err.source().expect("expected a source error");
-    err.downcast_ref::<oal_model::errors::Error>()
-        .expect("expected a parser error");
+    err.downcast_ref::<oal_model::errors::Error<lex::Token>>()
+        .expect("expected a syntax error");
 }

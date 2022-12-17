@@ -124,12 +124,15 @@ where
     }
 }
 
+/// The tokenizer error type.
+pub type ParserError = Simple<char, Span>;
+
 /// Parse a string of characters, yielding a list of tokens.
-pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>>
+pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>, L>
 where
     L: Lexeme,
     I: AsRef<str>,
-    P: Parser<char, Vec<TokenSpan<L>>, Error = Simple<char, Span>>,
+    P: Parser<char, Vec<TokenSpan<L>>, Error = ParserError>,
 {
     let mut token_list = TokenList::<L>::default();
 
@@ -144,7 +147,7 @@ where
     let (tokens, mut errs) = lexer.parse_recovery(stream);
 
     if !errs.is_empty() {
-        Err(errs.swap_remove(0).into())
+        Err(Box::new(errs.swap_remove(0)).into())
     } else {
         if let Some(tokens) = tokens {
             // Note: Chumsky does not support stateful combinators at the moment.

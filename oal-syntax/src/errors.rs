@@ -1,4 +1,4 @@
-use crate::Rule;
+use crate::{rewrite::lexer::Token, Rule};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
@@ -48,8 +48,8 @@ impl From<pest::error::Error<Rule>> for Error {
     }
 }
 
-impl From<oal_model::errors::Error> for Error {
-    fn from(e: oal_model::errors::Error) -> Self {
+impl From<oal_model::errors::Error<Token>> for Error {
+    fn from(e: oal_model::errors::Error<Token>) -> Self {
         Error::new("").by(e)
     }
 }

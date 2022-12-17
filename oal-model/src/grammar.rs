@@ -523,19 +523,23 @@ macro_rules! match_token {
     });
 }
 
-pub type Error<G> = Simple<TokenAlias<<G as Grammar>::Lex>, Span>;
+/// The syntax analyzer error type.
+pub type ParserError<L> = Simple<TokenAlias<L>, Span>;
 
 /// Perform syntax analysis over a list of tokens, yielding a concrete syntax tree.
-pub fn analyze<G, P, T>(tokens: TokenList<G::Lex>, parser: P) -> Result<SyntaxTree<T, G>>
+pub fn analyze<G, P, T>(
+    tokens: TokenList<G::Lex>,
+    parser: P,
+) -> Result<SyntaxTree<T, G>, <G as Grammar>::Lex>
 where
     G: Grammar,
-    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = Error<G>>,
+    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = ParserError<<G as Grammar>::Lex>>,
     T: Core,
 {
     let (root, mut errs) = parser.parse_recovery(tokens.stream());
 
     if !errs.is_empty() {
-        Err(errs.swap_remove(0).into())
+        Err(Box::new(errs.swap_remove(0)).into())
     } else {
         let root = root.expect("a successful parsing must return a syntax tree");
         Ok(SyntaxTree::import(tokens, root))

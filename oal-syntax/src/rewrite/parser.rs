@@ -507,7 +507,7 @@ where
 }
 
 pub fn parser<'a, T: Core + 'a>(
-) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = Error<Gram>> + 'a {
+) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = ParserError<Token>> + 'a {
     let identifier = match_token! { TokenKind::Identifier(_) };
 
     let literal = match_token! { TokenKind::Literal(_) };

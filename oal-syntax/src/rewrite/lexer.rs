@@ -1,7 +1,6 @@
 use crate::atom;
 use chumsky::prelude::*;
 use oal_model::lexicon::*;
-use oal_model::rewrite::span::Span;
 use std::fmt::Debug;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -162,7 +161,7 @@ impl Lexeme for Token {
     }
 }
 
-pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = Simple<char, Span>> {
+pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = ParserError> {
     let ident_chars =
         filter(|c: &char| c.is_ascii_alphanumeric() || *c == '$' || *c == '-' || *c == '_')
             .repeated();
