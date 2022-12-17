@@ -539,7 +539,7 @@ where
     let (root, mut errs) = parser.parse_recovery(tokens.stream());
 
     if !errs.is_empty() {
-        Err(Box::new(errs.swap_remove(0)).into())
+        Err(errs.swap_remove(0).into())
     } else {
         let root = root.expect("a successful parsing must return a syntax tree");
         Ok(SyntaxTree::import(tokens, root))

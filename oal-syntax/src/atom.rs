@@ -85,7 +85,7 @@ impl TryFrom<u64> for HttpStatus {
                 NonZeroU16::new_unchecked(v.try_into().unwrap())
             }))
         } else {
-            Err(Error::new("status not in range"))
+            Err(Error::Domain(format!("{}", v)))
         }
     }
 }

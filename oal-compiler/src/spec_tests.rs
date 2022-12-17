@@ -1,5 +1,5 @@
 use crate::compile::compile;
-use crate::errors::{Error, Kind};
+use crate::errors;
 use crate::spec::{
     Content, Object, Property, Reference, Schema, SchemaExpr, Spec, Uri, UriSegment,
 };
@@ -150,14 +150,14 @@ fn evaluate_invalid_status() -> anyhow::Result<()> {
         res / ( get -> <status=999,{}> );
     "#;
 
-    assert_eq!(
+    assert!(matches!(
         eval(code)
             .expect_err(format!("expected error evaluating: {}", code).as_str())
-            .downcast_ref::<Error>()
+            .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
             .kind,
-        Kind::InvalidSyntax
-    );
+        errors::Kind::Syntax(_)
+    ));
 
     anyhow::Ok(())
 }

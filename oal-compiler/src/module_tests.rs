@@ -1,4 +1,4 @@
-use crate::errors::{Kind, Result};
+use crate::errors::{self, Result};
 use crate::locator::Locator;
 use crate::module::load;
 use crate::{ModuleSet, Program};
@@ -26,10 +26,10 @@ fn module_cycle() {
         Ok(parse(r#"use "test:module.oal";"#).expect("parsing failed"))
     };
     let compiler = |_mods: &ModuleSet, _l: &Locator, p: Program| -> Result<Program> { Ok(p) };
-    assert_eq!(
+    assert!(matches!(
         load(loc, loader, compiler)
             .expect_err("expected cycle")
             .kind,
-        Kind::CycleDetected
-    );
+        errors::Kind::CycleDetected
+    ));
 }

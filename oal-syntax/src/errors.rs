@@ -1,56 +1,25 @@
 use crate::{rewrite::lexer::Token, Rule};
-use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
-pub struct Error {
-    msg: String,
-    source: Option<Box<dyn std::error::Error + Sync + Send>>,
-}
-
-impl Error {
-    pub fn new<S: Into<String>>(msg: S) -> Self {
-        Error {
-            msg: msg.into(),
-            source: None,
-        }
-    }
-
-    pub fn by<E>(mut self, source: E) -> Self
-    where
-        E: std::error::Error + Sync + Send + 'static,
-    {
-        self.source = Some(Box::new(source));
-        self
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        if self.msg.is_empty() && self.source.is_some() {
-            self.source.as_ref().unwrap().fmt(f)
-        } else {
-            write!(f, "{}", self.msg)
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source
-            .as_ref()
-            .map(|s| s.as_ref() as &(dyn std::error::Error))
-    }
+/// The syntax analysis error type.
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("parsing failed (deprecated)")]
+    OldParser(#[from] Box<pest::error::Error<Rule>>),
+    #[error("parsing failed")]
+    Parser(#[from] Box<oal_model::errors::Error<Token>>),
+    #[error("value not valid for the domain: {0}")]
+    Domain(String),
 }
 
 impl From<pest::error::Error<Rule>> for Error {
     fn from(e: pest::error::Error<Rule>) -> Self {
-        Error::new("parsing failed").by(e)
+        Error::from(Box::new(e))
     }
 }
 
 impl From<oal_model::errors::Error<Token>> for Error {
     fn from(e: oal_model::errors::Error<Token>) -> Self {
-        Error::new("").by(e)
+        Error::from(Box::new(e))
     }
 }
 

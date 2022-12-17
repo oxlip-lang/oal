@@ -1,4 +1,4 @@
-use crate::errors::{Error, Kind};
+use crate::errors;
 use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
 use crate::reduction::reduce;
 use crate::scan::Scan;
@@ -64,13 +64,13 @@ fn typecheck_error() {
     ];
 
     for c in cases {
-        assert_eq!(
+        assert!(matches!(
             eval(c)
                 .expect_err(format!("expected error evaluating: {}", c).as_str())
-                .downcast_ref::<Error>()
+                .downcast_ref::<errors::Error>()
                 .expect("expected compiler error")
                 .kind,
-            Kind::InvalidTypes
-        );
+            errors::Kind::InvalidTypes
+        ));
     }
 }

@@ -147,7 +147,7 @@ where
     let (tokens, mut errs) = lexer.parse_recovery(stream);
 
     if !errs.is_empty() {
-        Err(Box::new(errs.swap_remove(0)).into())
+        Err(errs.swap_remove(0).into())
     } else {
         if let Some(tokens) = tokens {
             // Note: Chumsky does not support stateful combinators at the moment.

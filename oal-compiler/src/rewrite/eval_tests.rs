@@ -1,4 +1,5 @@
 use super::{resolve::resolve, tests::mods_from};
+use crate::errors;
 use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
 use oal_syntax::atom::{HttpStatus, Method, Operator};
 
@@ -131,14 +132,14 @@ fn eval_invalid_status() -> anyhow::Result<()> {
         res / ( get -> <status=999,{}> );
     "#;
 
-    assert_eq!(
+    assert!(matches!(
         eval(code)
             .expect_err(format!("expected error evaluating: {}", code).as_str())
-            .downcast_ref::<crate::errors::Error>()
+            .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
             .kind,
-        crate::errors::Kind::InvalidSyntax
-    );
+        errors::Kind::Syntax(_)
+    ));
 
     Ok(())
 }

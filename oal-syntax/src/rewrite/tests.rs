@@ -5,7 +5,6 @@ use super::parser::{
 };
 use crate::atom;
 use oal_model::grammar::NodeRef;
-use std::error::Error;
 
 type Prog<'a> = Program<'a, ()>;
 type NRef<'a> = NodeRef<'a, (), Gram>;
@@ -440,10 +439,25 @@ fn parse_resource() {
 }
 
 #[test]
-fn parse_error() {
+fn parse_grammar_error() {
     let Err(err) = crate::rewrite::parse::<_, ()>("res / ( get -> );")
         else { panic!("expected an error") };
-    let err = err.source().expect("expected a source error");
-    err.downcast_ref::<oal_model::errors::Error<lex::Token>>()
-        .expect("expected a syntax error");
+    let crate::errors::Error::Parser(err) = err
+        else { panic!("expected a parser error") };
+    assert!(
+        matches!(*err, oal_model::errors::Error::Grammar(_)),
+        "expected a grammar error"
+    );
+}
+
+#[test]
+fn parse_lexicon_error() {
+    let Err(err) = crate::rewrite::parse::<_, ()>("!!! / ( get -> );")
+        else { panic!("expected an error") };
+    let crate::errors::Error::Parser(err) = err
+        else { panic!("expected a parser error") };
+    assert!(
+        matches!(*err, oal_model::errors::Error::Lexicon(_)),
+        "expected a lexicon error"
+    );
 }

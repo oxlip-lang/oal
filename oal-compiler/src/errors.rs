@@ -1,43 +1,60 @@
 use oal_model::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+#[derive(thiserror::Error, Debug, Default)]
 pub enum Kind {
-    Unknown,
+    #[error("invalid YAML content")]
+    Yaml(#[from] serde_yaml::Error),
+    #[error("input/output error")]
+    IO(#[from] std::io::Error),
+    #[error("invalid URL")]
+    Url(#[from] url::ParseError),
+    #[error("invalid syntax")]
+    Syntax(#[from] oal_syntax::errors::Error),
+    #[error("not in scope")]
     NotInScope,
+    #[error("not a function")]
     NotAFunction,
+    #[error("invalid types")]
     InvalidTypes,
+    #[error("conflict")]
     Conflict,
+    #[error("unexpected expression")]
     UnexpectedExpression,
-    InvalidYAML,
+    #[error("cycle detected")]
     CycleDetected,
-    IO,
-    InvalidURL,
+    #[error("invalid HTTP status")]
     InvalidHttpStatus,
-    InvalidSyntax,
+    #[default]
+    #[error("unknown error")]
+    Unknown,
 }
 
-impl Default for Kind {
-    fn default() -> Self {
-        Kind::Unknown
-    }
-}
-
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Error {
-    pub kind: Kind,
     msg: String,
     details: Vec<String>,
     span: Option<Span>,
+    pub kind: Kind,
+}
+
+impl<E: Into<Kind>> From<E> for Error {
+    fn from(e: E) -> Self {
+        Error {
+            kind: e.into(),
+            ..Default::default()
+        }
+    }
 }
 
 impl Error {
-    pub fn new<S: Into<String>>(kind: Kind, msg: S) -> Error {
+    pub fn new<S: Into<String>>(kind: Kind, msg: S) -> Self {
         Error {
-            kind,
             msg: msg.into(),
             details: Vec::new(),
             span: None,
+            kind,
         }
     }
 
@@ -69,35 +86,5 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-impl From<serde_yaml::Error> for Error {
-    fn from(e: serde_yaml::Error) -> Self {
-        Error::new(Kind::InvalidYAML, e.to_string())
-    }
-}
-
-impl From<()> for Error {
-    fn from(_: ()) -> Self {
-        Error::new(Kind::Unknown, "")
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::new(Kind::IO, e.to_string())
-    }
-}
-
-impl From<url::ParseError> for Error {
-    fn from(e: url::ParseError) -> Self {
-        Error::new(Kind::InvalidURL, e.to_string())
-    }
-}
-
-impl From<oal_syntax::errors::Error> for Error {
-    fn from(e: oal_syntax::errors::Error) -> Self {
-        Error::new(Kind::InvalidSyntax, e.to_string())
-    }
-}
 
 pub type Result<T> = std::result::Result<T, Error>;
