@@ -2,6 +2,7 @@ use super::module::ModuleSet;
 use super::tree::{definition, Core, NRef};
 use crate::annotation::Annotation;
 use crate::errors::Result;
+use crate::locator::Locator;
 use crate::spec::{
     Array, Content, Object, PrimBoolean, PrimInteger, PrimNumber, PrimString, Property, Ranges,
     Reference, References, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri,
@@ -527,9 +528,9 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
     }
 }
 
-pub fn eval(mods: &ModuleSet) -> Result<Spec> {
+pub fn eval(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
     let ctx = &mut Context::new(mods);
-    let expr = eval_any(ctx, mods.main().tree().root())?;
+    let expr = eval_any(ctx, mods.get(loc).unwrap().tree().root())?;
     let Expr::Spec(spec) = expr else { panic!("expected a specification") };
     Ok(*spec)
 }

@@ -1,25 +1,25 @@
 use super::env::Env;
 use super::module::{External, ModuleSet};
 use super::tree::NRef;
-use crate::errors::{Error, Kind};
-use crate::Result;
+use crate::errors::{Error, Kind, Result};
+use crate::locator::Locator;
 use oal_model::grammar::NodeCursor;
 use oal_syntax::atom::Ident;
 use oal_syntax::rewrite::parser::{Application, Declaration, Import, Program, Variable};
 
 fn define(env: &mut Env, ident: Ident, node: NRef) -> Result<()> {
     if let Some(ext) = env.lookup(&ident) {
-        node.syntax().core_mut(|mut c| c.define(ext.clone()));
+        node.syntax().core_mut().define(ext.clone());
         Ok(())
     } else {
         Err(Error::new(Kind::NotInScope, "resolve").with(&ident))
     }
 }
 
-pub fn resolve(mods: &ModuleSet) -> Result<()> {
+pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let env = &mut Env::new();
 
-    for cursor in mods.main().tree().root().traverse() {
+    for cursor in mods.get(loc).unwrap().tree().root().traverse() {
         match cursor {
             NodeCursor::Start(node) => {
                 if let Some(import) = Import::cast(node) {

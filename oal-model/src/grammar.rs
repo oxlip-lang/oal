@@ -91,11 +91,8 @@ impl<T: Core, G: Grammar> SyntaxNode<T, G> {
         self.1.borrow()
     }
 
-    pub fn core_mut<F>(&self, mut f: F)
-    where
-        F: FnMut(RefMut<T>),
-    {
-        f(self.1.borrow_mut())
+    pub fn core_mut(&self) -> RefMut<T> {
+        self.1.borrow_mut()
     }
 }
 

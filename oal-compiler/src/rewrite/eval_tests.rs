@@ -5,10 +5,14 @@ use oal_syntax::atom::{HttpStatus, Method, Operator};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
-    resolve(&mods)?;
+    resolve(&mods, mods.base())?;
+    // TODO: tag and infer types
+    // tag(&mods, mods.base())?;
+
     // Uncomment for debugging purpose:
     // println!("{:#?}", mods.main().tree().root());
-    let spec = super::eval::eval(&mods)?;
+
+    let spec = super::eval::eval(&mods, mods.base())?;
     Ok(spec)
 }
 

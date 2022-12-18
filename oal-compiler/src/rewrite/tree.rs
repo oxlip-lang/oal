@@ -1,4 +1,5 @@
 use super::module::{External, ModuleSet};
+use crate::inference::tag::Tag;
 use oal_model::grammar::{NodeRef, SyntaxTree};
 use oal_syntax::rewrite::parser::Gram;
 
@@ -6,6 +7,7 @@ use oal_syntax::rewrite::parser::Gram;
 #[derive(Clone, Default, Debug)]
 pub struct Core {
     defn: Option<External>,
+    tag: Option<Tag>,
 }
 
 impl Core {
@@ -17,6 +19,23 @@ impl Core {
     /// Sets the location of the definition for the current node.
     pub fn define(&mut self, ext: External) {
         self.defn = Some(ext);
+    }
+
+    pub fn tag(&self) -> Option<&Tag> {
+        self.tag.as_ref()
+    }
+
+    pub fn set_tag(&mut self, t: Tag) {
+        self.tag.replace(t);
+    }
+
+    pub fn unwrap_tag(&self) -> Tag {
+        self.tag.as_ref().expect("tag missing").clone()
+    }
+
+    pub fn with_tag(mut self, t: Tag) -> Self {
+        self.tag = Some(t);
+        self
     }
 }
 
