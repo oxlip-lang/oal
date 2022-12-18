@@ -1,6 +1,6 @@
 use crate::expr::TypedExpr;
 use crate::scope::Env;
-use crate::tag::{Tag, Tagged};
+use crate::inference::tag::{Tag, Tagged};
 use oal_syntax::ast::Expr;
 use oal_syntax::atom::{Ident, Primitive};
 

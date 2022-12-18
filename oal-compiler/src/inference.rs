@@ -1,26 +1,12 @@
+mod disjoint;
+pub mod tag;
+pub mod unify;
+
 use crate::errors::{Error, Kind, Result};
-use crate::locator::Locator;
 use crate::node::{NodeMut, NodeRef};
 use crate::scope::Env;
-use crate::tag::{FuncTag, Tag, Tagged};
-use oal_model::span::Span;
 use oal_syntax::ast::{AsExpr, Expr, Literal, Operator, UriSegment};
-use std::collections::HashMap;
-
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct TagSeq(Option<Locator>, usize);
-
-impl TagSeq {
-    pub fn new(m: Locator) -> Self {
-        TagSeq(Some(m), 0)
-    }
-
-    pub fn next(&mut self) -> usize {
-        let n = self.1;
-        self.1 += 1;
-        n
-    }
-}
+use tag::{FuncTag, Tag, Tagged};
 
 fn from_lit(l: &Literal) -> Tag {
     match l {
@@ -30,7 +16,7 @@ fn from_lit(l: &Literal) -> Tag {
     }
 }
 
-pub fn tag_type<T>(seq: &mut TagSeq, env: &mut Env<T>, node_ref: NodeMut<T>) -> Result<()>
+pub fn tag_type<T>(seq: &mut tag::Seq, env: &mut Env<T>, node_ref: NodeMut<T>) -> Result<()>
 where
     T: AsExpr + Tagged,
 {
@@ -113,146 +99,22 @@ where
     }
 }
 
-/// A naive implementation of a union-find/disjoint-set data structure
-/// for storing equivalences between Tag values
-/// and substituting a representative Tag from each equivalence class.
-
-#[derive(Debug, Default)]
-pub struct Subst(HashMap<usize, Tag>);
-
-impl Subst {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn extend(&mut self, v: usize, t: Tag) {
-        self.0.insert(v, t);
-    }
-
-    pub fn substitute(&self, tag: &Tag) -> Tag {
-        match tag {
-            Tag::Var(v) => {
-                if let Some(t) = self.0.get(v) {
-                    self.substitute(t)
-                } else {
-                    tag.clone()
-                }
-            }
-            Tag::Func(FuncTag { bindings, range }) => {
-                let bindings = bindings.iter().map(|b| self.substitute(b)).collect();
-                let range = self.substitute(range).into();
-                Tag::Func(FuncTag { bindings, range })
-            }
-            _ => tag.clone(),
-        }
-    }
-}
-
-pub fn substitute<T: Tagged>(subst: &mut Subst, _env: &mut Env<T>, node: NodeMut<T>) -> Result<()> {
+pub fn substitute<T: Tagged>(
+    subst: &mut disjoint::Set,
+    _env: &mut Env<T>,
+    node: NodeMut<T>,
+) -> Result<()> {
     if let NodeMut::Expr(e) = node {
         e.set_tag(subst.substitute(e.tag().unwrap()))
     }
     Ok(())
 }
 
-fn occurs(a: &Tag, b: &Tag) -> bool {
-    assert!(a.is_variable());
-    if a == b {
-        true
-    } else if let Tag::Func(FuncTag { bindings, range }) = b {
-        occurs(a, range) || bindings.iter().any(|binding| occurs(a, binding))
-    } else {
-        false
-    }
-}
-
-fn unify(s: &mut Subst, left: &Tag, right: &Tag) -> Result<()> {
-    let left = s.substitute(left);
-    let right = s.substitute(right);
-
-    if left == right {
-        Ok(())
-    } else if let Tag::Var(v) = left {
-        if occurs(&left, &right) {
-            Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(left, right)))
-        } else {
-            s.extend(v, right);
-            Ok(())
-        }
-    } else if let Tag::Var(v) = right {
-        if occurs(&right, &left) {
-            Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(right, left)))
-        } else {
-            s.extend(v, left);
-            Ok(())
-        }
-    } else if let (
-        Tag::Func(FuncTag {
-            bindings: left_bindings,
-            range: left_range,
-        }),
-        Tag::Func(FuncTag {
-            bindings: right_bindings,
-            range: right_range,
-        }),
-    ) = (&left, &right)
-    {
-        if left_bindings.len() != right_bindings.len() {
-            Err(Error::new(Kind::InvalidTypes, "wrong arity")
-                .with(&(left_bindings, right_bindings)))
-        } else {
-            unify(s, left_range, right_range).and_then(|_| {
-                left_bindings
-                    .iter()
-                    .zip(right_bindings.iter())
-                    .try_for_each(|(l, r)| unify(s, l, r))
-            })
-        }
-    } else {
-        Err(Error::new(Kind::InvalidTypes, "type mismatch").with(&(left, right)))
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeEquation {
-    pub left: Tag,
-    pub right: Tag,
-    pub span: Option<Span>,
-}
-
-impl TypeEquation {
-    pub fn unify(&self, s: &mut Subst) -> Result<()> {
-        unify(s, &self.left, &self.right)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct InferenceSet(Vec<TypeEquation>);
-
-impl InferenceSet {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn push(&mut self, left: Tag, right: Tag, span: Option<Span>) {
-        self.0.push(TypeEquation { left, right, span });
-    }
-
-    pub fn unify(&self) -> Result<Subst> {
-        let mut s = Subst::new();
-        self.0
-            .iter()
-            .try_for_each(|eq| eq.unify(&mut s).map_err(|err| err.at(eq.span)))?;
-        Ok(s)
-    }
-
-    #[cfg(test)]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-pub fn constrain<T>(c: &mut InferenceSet, env: &mut Env<T>, node_ref: NodeRef<T>) -> Result<()>
+pub fn constrain<T>(
+    c: &mut unify::InferenceSet,
+    env: &mut Env<T>,
+    node_ref: NodeRef<T>,
+) -> Result<()>
 where
     T: AsExpr + Tagged,
 {

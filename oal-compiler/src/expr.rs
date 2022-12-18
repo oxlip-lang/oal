@@ -1,7 +1,7 @@
 use crate::annotation::{Annotated, Annotation};
 use crate::reduction::Semigroup;
 use crate::spec::Aliased;
-use crate::tag::{Tag, Tagged};
+use crate::inference::tag::{Tag, Tagged};
 use oal_syntax::ast::{AsMutNode, AsRefNode, Expr, NodeExpr};
 use oal_syntax::atom::Ident;
 

@@ -1,7 +1,7 @@
 use crate::errors::{Error, Kind, Result};
+use crate::inference::tag::{Tag, Tagged};
 use crate::node::NodeRef;
 use crate::scope::Env;
-use crate::tag::{Tag, Tagged};
 use oal_syntax::ast::{
     Array, AsExpr, Content, Declaration, Expr, Object, Operator, Property, Relation, Transfer, Uri,
     UriSegment, VariadicOp,

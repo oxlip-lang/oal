@@ -1,12 +1,13 @@
 use crate::annotation::{annotate, Annotated};
 use crate::errors::Result;
-use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::inference::tag::{Seq, Tagged};
+use crate::inference::unify::InferenceSet;
+use crate::inference::{constrain, substitute, tag_type};
 use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::reduction::{reduce, Semigroup};
 use crate::scan::Scan;
 use crate::scope::Env;
-use crate::tag::Tagged;
 use crate::transform::Transform;
 use crate::typecheck::type_check;
 use oal_syntax::ast;
@@ -22,7 +23,7 @@ where
 {
     let new_env = || Env::new(Some(mods));
 
-    prg.transform(&mut TagSeq::new(loc.clone()), &mut new_env(), &mut tag_type)?;
+    prg.transform(&mut Seq::new(loc.clone()), &mut new_env(), &mut tag_type)?;
 
     let constraint = &mut InferenceSet::new();
 

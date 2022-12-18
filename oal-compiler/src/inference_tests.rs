@@ -1,10 +1,11 @@
 use crate::errors::{Error, Kind};
 use crate::expr::TypedExpr;
-use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::inference::tag::{Seq, Tag, Tagged};
+use crate::inference::unify::InferenceSet;
+use crate::inference::{constrain, substitute, tag_type};
 use crate::node::NodeRef;
 use crate::scan::Scan;
 use crate::scope::Env;
-use crate::tag::{Tag, Tagged};
 use crate::transform::Transform;
 use crate::Program;
 use oal_syntax::ast::{AsRefNode, Expr, Lambda, Statement};
@@ -16,7 +17,7 @@ fn tag_var_decl() {
 
     assert_eq!(d.stmts.len(), 1);
 
-    d.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
+    d.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
@@ -32,7 +33,7 @@ fn tag_array_decl() {
 
     assert_eq!(d.stmts.len(), 1);
 
-    d.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
+    d.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     if let Statement::Decl(decl) = d.stmts.first().unwrap() {
@@ -46,7 +47,7 @@ fn tag_array_decl() {
 fn tag_lambda_decl() {
     let mut d: Program = parse("let f x y z = num;").expect("parsing failed");
 
-    d.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
+    d.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     assert_eq!(d.stmts.len(), 1);
@@ -77,7 +78,7 @@ fn tag_lambda_decl() {
 fn tag_not_in_scope() {
     let mut d: Program = parse("let a = f {};").expect("parsing failed");
 
-    let r = d.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type);
+    let r = d.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type);
 
     if let Err(e) = r {
         assert!(matches!(e.kind, Kind::NotInScope));
@@ -94,7 +95,7 @@ fn constraint_var() {
     "#;
     let mut d: Program = parse(code).expect("parsing failed");
 
-    d.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
+    d.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut InferenceSet::new();
@@ -109,7 +110,7 @@ fn constraint_var() {
 fn constraint_lambda() {
     let mut d: Program = parse("let f x y z = num;").expect("parsing failed");
 
-    d.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
+    d.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut InferenceSet::new();
@@ -158,7 +159,7 @@ fn unify_lambda() {
     "#;
     let mut prg: Program = parse(code).expect("parsing failed");
 
-    prg.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)
+    prg.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)
         .expect("tagging failed");
 
     let cnt = &mut InferenceSet::new();

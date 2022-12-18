@@ -11,7 +11,6 @@ pub mod rewrite;
 mod scan;
 mod scope;
 pub mod spec;
-mod tag;
 mod transform;
 mod typecheck;
 

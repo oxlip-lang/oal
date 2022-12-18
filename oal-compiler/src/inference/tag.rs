@@ -1,3 +1,5 @@
+use crate::locator::Locator;
+
 #[derive(PartialEq, Clone, Debug)]
 pub struct FuncTag {
     pub bindings: Vec<Tag>,
@@ -48,4 +50,19 @@ pub trait Tagged {
     fn set_tag(&mut self, t: Tag);
     fn unwrap_tag(&self) -> Tag;
     fn with_tag(self, t: Tag) -> Self;
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Seq(Option<Locator>, usize);
+
+impl Seq {
+    pub fn new(m: Locator) -> Self {
+        Seq(Some(m), 0)
+    }
+
+    pub fn next(&mut self) -> usize {
+        let n = self.1;
+        self.1 += 1;
+        n
+    }
 }

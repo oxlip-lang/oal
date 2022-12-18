@@ -1,5 +1,7 @@
 use crate::errors;
-use crate::inference::{constrain, substitute, tag_type, InferenceSet, TagSeq};
+use crate::inference::tag::Seq;
+use crate::inference::unify::InferenceSet;
+use crate::inference::{constrain, substitute, tag_type};
 use crate::reduction::reduce;
 use crate::scan::Scan;
 use crate::scope::Env;
@@ -11,7 +13,7 @@ use oal_syntax::parse;
 fn eval(code: &str) -> anyhow::Result<()> {
     let mut prg: Program = parse(code)?;
 
-    prg.transform(&mut TagSeq::default(), &mut Env::new(None), &mut tag_type)?;
+    prg.transform(&mut Seq::default(), &mut Env::new(None), &mut tag_type)?;
 
     let cnt = &mut InferenceSet::new();
 
