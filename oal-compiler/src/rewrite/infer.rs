@@ -46,15 +46,10 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                 lex::Operator::DoubleColon => Tag::Content,
                 _ => panic!("unexpected operator {:?}", op.operator()),
             })
-        } else if syn::Declaration::cast(node).is_some() {
+        } else if syn::Declaration::cast(node).is_some() || syn::Binding::cast(node).is_some() {
             Some(Tag::Var(seq.next()))
-        } else if syn::Binding::cast(node).is_some() {
-            Some(Tag::Var(seq.next()))
-        } else if syn::Variable::cast(node).is_some() {
-            let definition = definition(mods, node).expect("variable is not defined");
-            Some(definition.syntax().core_ref().unwrap_tag())
-        } else if syn::Application::cast(node).is_some() {
-            let definition = definition(mods, node).expect("function is not defined");
+        } else if syn::Variable::cast(node).is_some() || syn::Application::cast(node).is_some() {
+            let definition = definition(mods, node).expect("identifier is not defined");
             Some(definition.syntax().core_ref().unwrap_tag())
         } else {
             None

@@ -490,14 +490,13 @@ impl<'a, T: Core> Variable<'a, T> {
     }
 }
 
-fn variadic_op<'a, P, E, T>(
+fn variadic_op<'a, P, E>(
     op: lex::Operator,
     p: P,
-) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = E> + Clone + 'a
+) -> impl Parser<TokenAlias<Token>, ParseNode<Gram>, Error = E> + Clone + 'a
 where
-    P: Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = E> + Clone + 'a,
+    P: Parser<TokenAlias<Token>, ParseNode<Gram>, Error = E> + Clone + 'a,
     E: chumsky::Error<TokenAlias<Token>> + 'a,
-    T: Core + 'a,
 {
     tree_skip(
         p.clone().chain(
@@ -510,8 +509,8 @@ where
     )
 }
 
-pub fn parser<'a, T: Core + 'a>(
-) -> impl Parser<TokenAlias<Token>, ParseNode<T, Gram>, Error = ParserError<Token>> + 'a {
+pub fn parser<'a>(
+) -> impl Parser<TokenAlias<Token>, ParseNode<Gram>, Error = ParserError<Token>> + 'a {
     let identifier = match_token! { TokenKind::Identifier(_) };
 
     let literal = match_token! { TokenKind::Literal(_) };

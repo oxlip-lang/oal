@@ -45,26 +45,25 @@ impl<C: Default + Clone + Debug> Core for C {}
 ///
 /// Note: once Chumsky supports stateful combinators, it should be possible to build a
 /// generational index tree in one pass, and get rid of this type.
-// TODO: get rid of the Core element as it's always set to a default value.
 #[derive(Clone, Debug)]
-pub struct ParseNode<T: Core, G: Grammar>(SyntaxTrunk<G>, Option<Vec<ParseNode<T, G>>>, T);
+pub struct ParseNode<G: Grammar>(SyntaxTrunk<G>, Option<Vec<ParseNode<G>>>);
 
-impl<T: Core, G: Grammar> ParseNode<T, G> {
+impl<G: Grammar> ParseNode<G> {
     pub fn from_leaf(token: TokenAlias<G::Lex>) -> Self {
-        ParseNode(SyntaxTrunk::Leaf(token), None, T::default())
+        ParseNode(SyntaxTrunk::Leaf(token), None)
     }
 
-    pub fn from_tree(kind: G::Kind, children: Vec<ParseNode<T, G>>) -> Self {
-        ParseNode(SyntaxTrunk::Tree(kind), Some(children), T::default())
+    pub fn from_tree(kind: G::Kind, children: Vec<ParseNode<G>>) -> Self {
+        ParseNode(SyntaxTrunk::Tree(kind), Some(children))
     }
 
     pub fn from_error() -> Self {
-        ParseNode(SyntaxTrunk::Error, None, T::default())
+        ParseNode(SyntaxTrunk::Error, None)
     }
 
-    pub fn to_tree(self, tree: &mut SyntaxTree<T, G>, parent: Option<NodeIdx>) -> NodeIdx {
-        let ParseNode(trunk, children, core) = self;
-        let node = tree.new_node(SyntaxNode::new(trunk, core));
+    pub fn to_tree<T: Core>(self, tree: &mut SyntaxTree<T, G>, parent: Option<NodeIdx>) -> NodeIdx {
+        let ParseNode(trunk, children) = self;
+        let node = tree.new_node(SyntaxNode::new(trunk, T::default()));
         if let Some(parent) = parent {
             tree.append(parent, node);
         }
@@ -135,7 +134,7 @@ impl<T: Core, G: Grammar> Debug for SyntaxTree<T, G> {
 }
 
 impl<T: Core, G: Grammar> SyntaxTree<T, G> {
-    pub fn import(tokens: TokenList<G::Lex>, parse: ParseNode<T, G>) -> Self {
+    pub fn import(tokens: TokenList<G::Lex>, parse: ParseNode<G>) -> Self {
         let mut tree = SyntaxTree::default();
         let root = parse.to_tree(&mut tree, None);
         tree.tokens = tokens;
@@ -431,13 +430,12 @@ macro_rules! terminal_node {
     };
 }
 
-pub fn tree_one<'a, P, T, G>(
+pub fn tree_one<'a, P, G>(
     p: P,
     k: G::Kind,
-) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = P::Error> + Clone + 'a
 where
-    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>> + Clone + 'a,
-    T: Core + 'a,
+    P: Parser<TokenAlias<G::Lex>, ParseNode<G>> + Clone + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -445,13 +443,12 @@ where
     p.map(move |n| ParseNode::from_tree(k, vec![n])).boxed()
 }
 
-pub fn tree_maybe<'a, P, T, G>(
+pub fn tree_maybe<'a, P, G>(
     p: P,
     k: G::Kind,
-) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = P::Error> + Clone + 'a
 where
-    P: Parser<TokenAlias<G::Lex>, Option<ParseNode<T, G>>> + Clone + 'a,
-    T: Core + 'a,
+    P: Parser<TokenAlias<G::Lex>, Option<ParseNode<G>>> + Clone + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -460,13 +457,12 @@ where
         .boxed()
 }
 
-pub fn tree_many<'a, P, T, G>(
+pub fn tree_many<'a, P, G>(
     p: P,
     k: G::Kind,
-) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = P::Error> + Clone + 'a
 where
-    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + Clone + 'a,
-    T: Core + 'a,
+    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<G>>> + Clone + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -474,13 +470,12 @@ where
     p.map(move |v| ParseNode::from_tree(k, v)).boxed()
 }
 
-pub fn tree_skip<'a, P, T, G>(
+pub fn tree_skip<'a, P, G>(
     p: P,
     k: G::Kind,
-) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = P::Error> + Clone + 'a
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = P::Error> + Clone + 'a
 where
-    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<T, G>>> + Clone + 'a,
-    T: Core + 'a,
+    P: Parser<TokenAlias<G::Lex>, Vec<ParseNode<G>>> + Clone + 'a,
     G: Grammar + 'a,
 {
     // The returned parser is boxed otherwise the Rust compiler
@@ -495,12 +490,11 @@ where
     .boxed()
 }
 
-pub fn just_token<E, T, G>(
+pub fn just_token<E, G>(
     kind: <<G as Grammar>::Lex as Lexeme>::Kind,
-) -> impl Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = E> + Clone
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = E> + Clone
 where
     E: chumsky::Error<TokenAlias<G::Lex>>,
-    T: Core,
     G: Grammar,
 {
     filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() == kind).map(ParseNode::from_leaf)
@@ -530,7 +524,7 @@ pub fn analyze<G, P, T>(
 ) -> Result<SyntaxTree<T, G>, <G as Grammar>::Lex>
 where
     G: Grammar,
-    P: Parser<TokenAlias<G::Lex>, ParseNode<T, G>, Error = ParserError<<G as Grammar>::Lex>>,
+    P: Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = ParserError<<G as Grammar>::Lex>>,
     T: Core,
 {
     let (root, mut errs) = parser.parse_recovery(tokens.stream());
