@@ -303,18 +303,18 @@ fn parse_decl_application() {
         let app = Application::cast(decl.rhs()).expect("expected an application");
         assert_eq!(app.ident(), "f");
 
-        let bindings = &mut app.bindings();
+        let arguments = &mut app.arguments();
         assert_prim(
-            bindings.next().expect("expected a binding").inner(),
+            arguments.next().expect("expected an argument").inner(),
             lex::Primitive::Num,
         );
-        Object::cast(bindings.next().expect("expected a binding").inner())
+        Object::cast(arguments.next().expect("expected an argument").inner())
             .expect("expected an object");
         assert_prim(
-            bindings.next().expect("expected a binding").inner(),
+            arguments.next().expect("expected an argument").inner(),
             lex::Primitive::Uri,
         );
-        assert!(bindings.next().is_none(), "expected no more binding");
+        assert!(arguments.next().is_none(), "expected no more argument");
     })
 }
 

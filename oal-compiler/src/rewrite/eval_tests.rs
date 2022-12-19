@@ -1,4 +1,6 @@
-use super::{resolve::resolve, tests::mods_from};
+use super::infer::tag;
+use super::resolve::resolve;
+use super::tests::mods_from;
 use crate::errors;
 use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
 use oal_syntax::atom::{HttpStatus, Method, Operator};
@@ -6,8 +8,7 @@ use oal_syntax::atom::{HttpStatus, Method, Operator};
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
     resolve(&mods, mods.base())?;
-    // TODO: tag and infer types
-    // tag(&mods, mods.base())?;
+    tag(&mods, mods.base())?;
 
     // Uncomment for debugging purpose:
     // println!("{:#?}", mods.main().tree().root());

@@ -46,7 +46,10 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                 lex::Operator::DoubleColon => Tag::Content,
                 _ => panic!("unexpected operator {:?}", op.operator()),
             })
-        // TODO: tag declarations and bindings
+        } else if syn::Declaration::cast(node).is_some() {
+            Some(Tag::Var(seq.next()))
+        } else if syn::Binding::cast(node).is_some() {
+            Some(Tag::Var(seq.next()))
         } else if syn::Variable::cast(node).is_some() {
             let definition = definition(mods, node).expect("variable is not defined");
             Some(definition.syntax().core_ref().unwrap_tag())

@@ -119,6 +119,7 @@ syntax_nodes!(
     Array,
     Annotations,
     Bindings,
+    Binding,
     Declaration,
     UriVariable,
     UriPath,
@@ -167,9 +168,11 @@ impl<'a, T: Core> Annotations<'a, T> {
     }
 }
 
-impl<'a, T: Core> Bindings<'a, T> {
-    pub fn items(&self) -> impl Iterator<Item = Identifier<'a, T>> {
-        self.node().children().filter_map(Identifier::cast)
+impl<'a, T: Core> Binding<'a, T> {
+    pub fn ident(&self) -> atom::Ident {
+        Identifier::cast(self.node().first())
+            .expect("expected identifier")
+            .ident()
     }
 }
 
@@ -191,10 +194,11 @@ impl<'a, T: Core> Declaration<'a, T> {
             .ident()
     }
 
-    pub fn bindings(&self) -> impl Iterator<Item = Identifier<'a, T>> {
-        Bindings::cast(self.node().nth(Self::BINDINGS_POS))
-            .expect("expected bindings")
-            .items()
+    pub fn bindings(&self) -> impl Iterator<Item = Binding<'a, T>> {
+        self.node()
+            .nth(Self::BINDINGS_POS)
+            .children()
+            .filter_map(Binding::cast)
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
@@ -450,7 +454,7 @@ impl<'a, T: Core> Application<'a, T> {
             .ident()
     }
 
-    pub fn bindings(&self) -> impl Iterator<Item = Terminal<'a, T>> {
+    pub fn arguments(&self) -> impl Iterator<Item = Terminal<'a, T>> {
         self.node().children().skip(1).filter_map(Terminal::cast)
     }
 }
@@ -704,10 +708,12 @@ pub fn parser<'a, T: Core + 'a>(
 
     let annotations = tree_many(line_ann.repeated(), SyntaxKind::Annotations);
 
-    let bindings = tree_many(
-        just_token(TokenKind::Identifier(lex::Identifier::Value)).repeated(),
-        SyntaxKind::Bindings,
+    let binding = tree_one(
+        just_token(TokenKind::Identifier(lex::Identifier::Value)),
+        SyntaxKind::Binding,
     );
+
+    let bindings = tree_many(binding.repeated(), SyntaxKind::Bindings);
 
     let declaration = tree_many(
         annotations

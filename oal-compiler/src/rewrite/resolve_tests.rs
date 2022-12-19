@@ -3,7 +3,7 @@ use super::tests::mods_from;
 use super::tree::definition;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser::{
-    Application, Declaration, Identifier, Primitive, Program, Terminal, Variable,
+    Application, Declaration, Primitive, Program, Terminal, Variable, Binding,
 };
 
 #[test]
@@ -82,7 +82,7 @@ fn resolve_application() -> anyhow::Result<()> {
 
     let defn = definition(&mods, var.node()).expect("expected a definition");
 
-    let binding = Identifier::cast(defn).expect("expected an identifier");
+    let binding = Binding::cast(defn).expect("expected a binding");
 
     assert_eq!(binding.ident(), "x");
 

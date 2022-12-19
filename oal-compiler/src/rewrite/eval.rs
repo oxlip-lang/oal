@@ -303,12 +303,15 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
         } else {
             Ok(expr)
         }
-    } else if let Some(binding) = syn::Identifier::cast(definition) {
+    } else if let Some(binding) = syn::Binding::cast(definition) {
         let scope = ctx.scopes.last().expect("scope is missing");
         let expr = scope.get(&binding.ident()).expect("binding is undefined");
         Ok(expr.clone())
     } else {
-        panic!("expected variable definition to be either a declaration or a binding")
+        panic!(
+            "expected variable definition to be either a declaration or a binding: {:?}",
+            definition
+        )
     }
 }
 
@@ -483,9 +486,9 @@ fn eval_application(ctx: &mut Context, app: syn::Application<Core>) -> Result<Ex
             ctx.annotate(other)
         }
         let mut scope = HashMap::new();
-        for (identifier, terminal) in decl.bindings().zip(app.bindings()) {
-            let binding = eval_terminal(ctx, terminal)?;
-            scope.insert(identifier.ident(), binding);
+        for (binding, argument) in decl.bindings().zip(app.arguments()) {
+            let arg = eval_terminal(ctx, argument)?;
+            scope.insert(binding.ident(), arg);
         }
         ctx.scopes.push(scope);
         let expr = eval_any(ctx, decl.rhs())?;
