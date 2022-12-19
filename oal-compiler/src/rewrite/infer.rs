@@ -1,7 +1,8 @@
 use super::module::ModuleSet;
 use super::tree::definition;
-use crate::errors::Result;
+use crate::errors::{Error, Kind, Result};
 use crate::inference::tag::{Seq, Tag};
+use crate::inference::unify::InferenceSet;
 use crate::locator::Locator;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
@@ -49,7 +50,8 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         } else if syn::Declaration::cast(node).is_some() || syn::Binding::cast(node).is_some() {
             Some(Tag::Var(seq.next()))
         } else if syn::Variable::cast(node).is_some() || syn::Application::cast(node).is_some() {
-            let definition = definition(mods, node).expect("identifier is not defined");
+            let definition = definition(mods, node)
+                .ok_or_else(|| Error::new(Kind::NotInScope, "identifier is not defined").with(&node))?;
             Some(definition.syntax().core_ref().unwrap_tag())
         } else {
             None
@@ -59,4 +61,8 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn constrain(_mods: &ModuleSet, _loc: &Locator) -> InferenceSet {
+    todo!()
 }
