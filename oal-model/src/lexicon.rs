@@ -117,7 +117,7 @@ where
                 if token.is_trivia() {
                     None
                 } else {
-                    Some((TokenAlias::new(token.kind(), index), span.clone()))
+                    Some((TokenAlias::new(token.kind(), index), *span))
                 }
             });
         Stream::from_iter(Span::from(len..len + 1), iter)

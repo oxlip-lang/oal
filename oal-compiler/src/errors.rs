@@ -1,4 +1,4 @@
-use oal_model::span::Span;
+use oal_model::rewrite::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
 #[allow(dead_code)]

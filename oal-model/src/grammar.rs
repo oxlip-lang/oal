@@ -167,7 +167,7 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
 
                             let new_token = <<G as Grammar>::Lex as Lexeme>::new(kind, new_value);
 
-                            let new_index = tree.push((new_token, span.clone()));
+                            let new_index = tree.push((new_token, *span));
 
                             SyntaxTrunk::Leaf(TokenAlias::new(kind, new_index))
                         }

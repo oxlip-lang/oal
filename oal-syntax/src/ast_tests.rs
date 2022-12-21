@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::atom::{HttpStatus, HttpStatusRange, Method, Primitive};
 use crate::parse;
 use enum_map::enum_map;
-use oal_model::span::Span;
 
 #[derive(Clone, Debug, PartialEq)]
 struct TestExpr(NodeExpr<TestExpr>);
@@ -310,25 +309,15 @@ fn parse_annotation() {
 
     if let Statement::Ann(ann) = d.stmts.get(0).unwrap() {
         assert_eq!(ann.text, r#" description: "some identifier""#);
-        assert_eq!(
-            ann.span,
-            Some(Span {
-                start: (2, 9),
-                end: (2, 41)
-            })
-        )
+        let s = ann.span.unwrap();
+        assert_eq!(s.range(), 9..41);
     } else {
         panic!("expected annotation");
     }
     if let Statement::Ann(ann) = d.stmts.get(2).unwrap() {
         assert_eq!(ann.text, r#" description: "some record""#);
-        assert_eq!(
-            ann.span,
-            Some(Span {
-                start: (4, 9),
-                end: (4, 37)
-            })
-        )
+        let s = ann.span.unwrap();
+        assert_eq!(s.range(), 72..100);
     } else {
         panic!("expected annotation");
     }

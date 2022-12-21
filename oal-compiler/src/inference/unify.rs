@@ -1,7 +1,7 @@
-use super::disjoint;
+use super::disjoin;
 use super::tag::{FuncTag, Tag};
 use crate::errors::{Error, Kind, Result};
-use oal_model::span::Span;
+use oal_model::rewrite::span::Span;
 
 fn occurs(a: &Tag, b: &Tag) -> bool {
     assert!(a.is_variable());
@@ -14,7 +14,7 @@ fn occurs(a: &Tag, b: &Tag) -> bool {
     }
 }
 
-fn unify(s: &mut disjoint::Set, left: &Tag, right: &Tag) -> Result<()> {
+fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
     let left = s.substitute(left);
     let right = s.substitute(right);
 
@@ -69,7 +69,7 @@ struct TypeEquation {
 }
 
 impl TypeEquation {
-    fn unify(&self, s: &mut disjoint::Set) -> Result<()> {
+    fn unify(&self, s: &mut disjoin::Set) -> Result<()> {
         unify(s, &self.left, &self.right)
     }
 }
@@ -86,8 +86,8 @@ impl InferenceSet {
         self.0.push(TypeEquation { left, right, span });
     }
 
-    pub fn unify(&self) -> Result<disjoint::Set> {
-        let mut s = disjoint::Set::new();
+    pub fn unify(&self) -> Result<disjoin::Set> {
+        let mut s = disjoin::Set::new();
         self.0
             .iter()
             .try_for_each(|eq| eq.unify(&mut s).map_err(|err| err.at(eq.span)))?;

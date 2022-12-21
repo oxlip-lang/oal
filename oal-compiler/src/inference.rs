@@ -1,4 +1,4 @@
-mod disjoint;
+mod disjoin;
 pub mod tag;
 pub mod unify;
 
@@ -100,7 +100,7 @@ where
 }
 
 pub fn substitute<T: Tagged>(
-    subst: &mut disjoint::Set,
+    subst: &mut disjoin::Set,
     _env: &mut Env<T>,
     node: NodeMut<T>,
 ) -> Result<()> {

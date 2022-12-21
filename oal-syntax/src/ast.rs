@@ -1,17 +1,14 @@
 use crate::atom::{HttpStatus, HttpStatusRange, Ident, Method, Primitive, Text};
 use crate::{Pair, Rule};
 use enum_map::EnumMap;
-use oal_model::span::Span;
+use oal_model::rewrite::span::Span;
 use std::fmt::Debug;
 use std::iter::{once, Flatten, Once};
 use std::slice::{Iter, IterMut};
 
 fn pair_span(p: &Pair) -> Span {
     let s = p.as_span();
-    Span {
-        start: s.start_pos().line_col(),
-        end: s.end_pos().line_col(),
-    }
+    Span::new(s.start()..s.end())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
