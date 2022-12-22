@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
+/// The parsing span type.
+// TODO: track parsing context
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Span(usize, usize);
 

@@ -389,6 +389,7 @@ impl<'a, T: Core> Transfer<'a, T> {
 impl<'a, T: Core> VariadicOp<'a, T> {
     const OPERATOR_POS: usize = 1;
 
+    // TODO: map to a smaller set of operators
     pub fn operator(&self) -> lex::Operator {
         Operator::cast(self.node().nth(Self::OPERATOR_POS))
             .expect("expected an operator")
@@ -487,6 +488,14 @@ impl<'a, T: Core> Variable<'a, T> {
         Identifier::cast(self.node().nth(Self::INNER_POS))
             .expect("expected an identifier")
             .ident()
+    }
+}
+
+impl<'a, T: Core> SubExpression<'a, T> {
+    const INNER_POS: usize = 1;
+
+    pub fn inner(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::INNER_POS)
     }
 }
 

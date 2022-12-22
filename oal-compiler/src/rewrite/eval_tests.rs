@@ -350,3 +350,32 @@ fn eval_application() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn eval_subexpr() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let s = {} & ( {} | {} );
+        res / ( get -> s );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let r = s.rels.values().next().unwrap();
+    let x = r.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
+    let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
+
+    assert_eq!(op.op, Operator::Join);
+    assert_eq!(op.schemas.len(), 2);
+
+    let s = op.schemas.get(0).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Object(_)));
+
+    let s = op.schemas.get(1).expect("expected a schema");
+    assert!(matches!(s.expr, SchemaExpr::Op(_)));
+
+    Ok(())
+}

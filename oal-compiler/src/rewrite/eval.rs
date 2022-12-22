@@ -499,6 +499,10 @@ fn eval_application(ctx: &mut Context, app: syn::Application<Core>) -> Result<Ex
     }
 }
 
+fn eval_subexpression(ctx: &mut Context, expr: syn::SubExpression<Core>) -> Result<Expr> {
+    eval_any(ctx, expr.inner())
+}
+
 fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
     if let Some(program) = syn::Program::cast(node) {
         eval_program(ctx, program)
@@ -526,6 +530,8 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
         eval_array(ctx, array)
     } else if let Some(app) = syn::Application::cast(node) {
         eval_application(ctx, app)
+    } else if let Some(expr) = syn::SubExpression::cast(node) {
+        eval_subexpression(ctx, expr)
     } else {
         panic!("unexpected node: {:#?}", node)
     }

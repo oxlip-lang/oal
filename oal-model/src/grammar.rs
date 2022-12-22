@@ -207,6 +207,10 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
         id.children(&self.tree)
     }
 
+    fn reverse_children(&self, id: NodeIdx) -> impl Iterator<Item = NodeIdx> + '_ {
+        id.reverse_children(&self.tree)
+    }
+
     fn descendants(&self, id: NodeIdx) -> impl Iterator<Item = NodeIdx> + '_ {
         id.descendants(&self.tree)
     }
@@ -239,17 +243,20 @@ impl<'a, G: Grammar> TokenRef<'a, G> {
         TokenRef { tokens, idx }
     }
 
-    fn inner(&self) -> &'a <G as Grammar>::Lex {
-        let (token, _) = self.tokens.get(self.idx);
-        token
+    fn token(&self) -> &'a <G as Grammar>::Lex {
+        &self.tokens.get(self.idx).0
+    }
+
+    pub fn span(&self) -> Span {
+        self.tokens.get(self.idx).1
     }
 
     pub fn value(&self) -> &'a <<G as Grammar>::Lex as Lexeme>::Value {
-        self.inner().value()
+        self.token().value()
     }
 
     pub fn kind(&self) -> <<G as Grammar>::Lex as Lexeme>::Kind {
-        self.inner().kind()
+        self.token().kind()
     }
 }
 
@@ -314,6 +321,12 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
             .map(|id| NodeRef::from(self.tree, id))
     }
 
+    pub fn reverse_children(&self) -> impl Iterator<Item = NodeRef<'a, T, G>> + 'a {
+        self.tree
+            .reverse_children(self.idx)
+            .map(|id| NodeRef::from(self.tree, id))
+    }
+
     pub fn first(&self) -> NodeRef<'a, T, G> {
         self.nth(0)
     }
@@ -336,17 +349,28 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
         })
     }
 
-    pub fn begin(&self) -> TokenIdx {
-        match self.syntax().trunk() {
-            SyntaxTrunk::Leaf(t) => t.index(),
-            _ => self.children().next().unwrap().begin(),
+    /// Returns the span of text from first to last token, if any.
+    pub fn span(&self) -> Option<Span> {
+        if let (Some(start), Some(end)) = (self.start(), self.end()) {
+            Some(Span::new(start.span().start()..end.span().end()))
+        } else {
+            None
         }
     }
 
-    pub fn end(&self) -> TokenIdx {
+    /// Returns the index of the first token, if any.
+    pub fn start(&self) -> Option<TokenRef<'a, G>> {
         match self.syntax().trunk() {
-            SyntaxTrunk::Leaf(t) => t.index(),
-            _ => self.children().last().unwrap().end(),
+            SyntaxTrunk::Leaf(t) => Some(TokenRef::from(&self.tree.tokens, t.index())),
+            _ => self.children().find_map(|c| c.start()),
+        }
+    }
+
+    /// Returns the index of the last token, if any.
+    pub fn end(&self) -> Option<TokenRef<'a, G>> {
+        match self.syntax().trunk() {
+            SyntaxTrunk::Leaf(t) => Some(TokenRef::from(&self.tree.tokens, t.index())),
+            _ => self.reverse_children().find_map(|c| c.end()),
         }
     }
 

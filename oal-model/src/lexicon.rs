@@ -109,7 +109,7 @@ where
         &'a self,
     ) -> Stream<TokenAlias<L>, Span, impl Iterator<Item = (TokenAlias<L>, Span)> + 'a> {
         let len = self.len();
-        // Prepare the parser iterator by ignoring trivia tokens and replacing values by indices.
+        // Prepare the parser iterator by ignoring trivia tokens and replacing values with indices.
         let iter = self
             .list
             .iter_with_tokens()
