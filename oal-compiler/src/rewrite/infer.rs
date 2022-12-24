@@ -25,6 +25,7 @@ fn set_tag(n: NRef, t: Tag) {
     n.syntax().core_mut().set_tag(t)
 }
 
+/// Assigns type tags to all expressions in the given module.
 pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
     let mut seq = Seq::new(loc.clone());
@@ -68,9 +69,11 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
             set_tag(node, Tag::Var(seq.next()));
         }
     }
+
     Ok(())
 }
 
+/// Returns the set of type inference equations for the given module.
 pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
     let module = mods.get(loc).expect("module not found");
     let mut set = InferenceSet::new();
@@ -183,6 +186,7 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
     Ok(set)
 }
 
+/// Substitutes tags in each class of equivalence with the representative tag.
 pub fn substitute(mods: &ModuleSet, loc: &Locator, set: &disjoin::Set) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
@@ -196,12 +200,15 @@ pub fn substitute(mods: &ModuleSet, loc: &Locator, set: &disjoin::Set) -> Result
     Ok(())
 }
 
-pub fn check_tags(mods: &ModuleSet, loc: &Locator) -> Result<()> {
+/// Returns an error if there is at least one remaining tag variable.
+pub fn check_complete(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
+
     for node in module.tree().root().descendants() {
         if matches!(node.syntax().core_ref().tag(), Some(Tag::Var(_))) {
             return Err(Error::new(Kind::InvalidTypes, "unsolved tag variable").with(&node));
         }
     }
+
     Ok(())
 }

@@ -1,9 +1,10 @@
 use super::resolve::resolve;
 use super::tests::mods_from;
 use super::tree::definition;
+use crate::errors::Kind;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser::{
-    Application, Declaration, Primitive, Program, Terminal, Variable, Binding,
+    Application, Binding, Declaration, Primitive, Program, Terminal, Variable,
 };
 
 #[test]
@@ -85,6 +86,19 @@ fn resolve_application() -> anyhow::Result<()> {
     let binding = Binding::cast(defn).expect("expected a binding");
 
     assert_eq!(binding.ident(), "x");
+
+    Ok(())
+}
+
+#[test]
+fn resolve_not_in_scope() -> anyhow::Result<()> {
+    let mods = mods_from("let a = f {};")?;
+
+    if let Err(e) = resolve(&mods, mods.base()) {
+        assert!(matches!(e.kind, Kind::NotInScope));
+    } else {
+        panic!("expected an error");
+    }
 
     Ok(())
 }
