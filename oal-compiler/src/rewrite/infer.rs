@@ -32,8 +32,6 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
             set_tag(node, Tag::Relation);
         } else if syn::UriTemplate::cast(node).is_some() {
             set_tag(node, Tag::Uri);
-        } else if syn::Property::cast(node).is_some() {
-            set_tag(node, Tag::Property);
         } else if syn::Object::cast(node).is_some() {
             set_tag(node, Tag::Object);
         } else if syn::Content::cast(node).is_some() {
@@ -57,6 +55,7 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
             || syn::Terminal::cast(node).is_some()
             || syn::SubExpression::cast(node).is_some()
             || syn::Declaration::cast(node).is_some()
+            || syn::Property::cast(node).is_some()
         {
             set_tag(node, Tag::Var(seq.next()));
         }
@@ -71,37 +70,24 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
     let mut set = InferenceSet::new();
 
     for node in module.tree().root().descendants() {
-        if syn::Literal::cast(node).is_some() {
-            set.push(
-                get_tag(node),
-                literal_tag(node.token().value()),
-                node.span(),
-            );
-        } else if syn::Primitive::cast(node).is_some() {
-            set.push(get_tag(node), Tag::Primitive, node.span());
-        } else if let Some(rel) = syn::Relation::cast(node) {
+        if let Some(rel) = syn::Relation::cast(node) {
             set.push(get_tag(rel.uri().node()), Tag::Uri, rel.uri().node().span());
             for xfer in rel.transfers() {
                 set.push(get_tag(xfer), Tag::Transfer, xfer.span());
             }
-            set.push(get_tag(node), Tag::Relation, node.span());
         } else if let Some(uri) = syn::UriTemplate::cast(node) {
             for seg in uri.segments() {
                 if let syn::UriSegment::Variable(var) = seg {
-                    set.push(get_tag(var.inner()), Tag::Property, var.inner().span())
+                    let tag = Tag::Property(Box::new(Tag::Primitive));
+                    set.push(get_tag(var.inner()), tag, var.inner().span())
                 }
             }
             if let Some(params) = uri.params() {
                 set.push(get_tag(params.node()), Tag::Object, params.node().span());
             }
-            set.push(get_tag(node), Tag::Uri, node.span());
-        } else if syn::Property::cast(node).is_some() {
-            set.push(get_tag(node), Tag::Property, node.span());
-        } else if let Some(obj) = syn::Object::cast(node) {
-            for prop in obj.properties() {
-                set.push(get_tag(prop), Tag::Property, prop.span());
-            }
-            set.push(get_tag(node), Tag::Object, node.span());
+        } else if let Some(prop) = syn::Property::cast(node) {
+            let rhs = get_tag(prop.rhs()).into();
+            set.push(get_tag(node), Tag::Property(rhs), node.span());
         } else if let Some(cnt) = syn::Content::cast(node) {
             for meta in cnt.meta() {
                 if let Some(t) = match meta.tag() {
@@ -112,32 +98,19 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
                     set.push(get_tag(meta.rhs()), t, meta.rhs().span());
                 }
             }
-            set.push(get_tag(node), Tag::Content, node.span());
         } else if let Some(xfer) = syn::Transfer::cast(node) {
             if let Some(params) = xfer.params() {
                 set.push(get_tag(params.node()), Tag::Object, params.node().span());
             }
-            set.push(get_tag(node), Tag::Transfer, node.span());
-        } else if syn::Array::cast(node).is_some() {
-            set.push(get_tag(node), Tag::Array, node.span());
         } else if let Some(op) = syn::VariadicOp::cast(node) {
-            let operator = op.operator();
             for operand in op.operands() {
-                if let Some(t) = match operator {
+                if let Some(t) = match op.operator() {
                     atom::Operator::Range | atom::Operator::Any => None,
                     atom::Operator::Join => Some(Tag::Object),
                     atom::Operator::Sum => Some(get_tag(node)),
                 } {
                     set.push(get_tag(operand), t, operand.span());
                 }
-            }
-            if let Some(t) = match operator {
-                atom::Operator::Range => Some(Tag::Content),
-                atom::Operator::Any => Some(Tag::Any),
-                atom::Operator::Join => Some(Tag::Object),
-                atom::Operator::Sum => None,
-            } {
-                set.push(get_tag(node), t, node.span());
             }
         } else if let Some(decl) = syn::Declaration::cast(node) {
             let bindings: Vec<_> = decl.bindings().map(|b| get_tag(b.node())).collect();
@@ -190,13 +163,24 @@ pub fn substitute(mods: &ModuleSet, loc: &Locator, set: &disjoin::Set) -> Result
     Ok(())
 }
 
+fn has_variable(tag: &Tag) -> bool {
+    match tag {
+        Tag::Var(_) => true,
+        Tag::Property(t) => has_variable(t),
+        Tag::Func(f) => has_variable(f.range.as_ref()) || f.bindings.iter().any(has_variable),
+        _ => false,
+    }
+}
+
 /// Returns an error if there is at least one remaining tag variable.
 pub fn check_complete(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
     for node in module.tree().root().descendants() {
-        if matches!(node.syntax().core_ref().tag(), Some(Tag::Var(_))) {
-            return Err(Error::new(Kind::InvalidTypes, "unsolved tag variable").with(&node));
+        if let Some(tag) = node.syntax().core_ref().tag() {
+            if has_variable(tag) {
+                return Err(Error::new(Kind::InvalidTypes, "unsolved tag variable").with(&node));
+            }
         }
     }
 

@@ -2,6 +2,7 @@ use super::eval::eval;
 use super::infer::{check_complete, constrain, substitute, tag};
 use super::module::ModuleSet;
 use super::resolve::resolve;
+use super::typecheck::type_check;
 use crate::errors::Result;
 use crate::spec::Spec;
 use crate::Locator;
@@ -17,9 +18,10 @@ pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
     let set = eqs.unify()?;
     // Substitute tags in each class of equivalence with the representative tag.
     substitute(mods, loc, &set)?;
-    // Check for remaining tag variables.
+    // Check for remaining type tag variables.
     check_complete(mods, loc)?;
-    // TODO: type check
+    // Check type tags against expectations.
+    type_check(mods, loc)?;
     let spec = eval(mods, loc)?;
     Ok(spec)
 }

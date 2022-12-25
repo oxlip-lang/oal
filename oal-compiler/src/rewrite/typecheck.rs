@@ -81,7 +81,9 @@ fn check_relation(relation: syn::Relation<Core>) -> Result<()> {
 fn check_uri(uri: syn::UriTemplate<Core>) -> Result<()> {
     if !uri.segments().all(|s| match s {
         syn::UriSegment::Element(_) => true,
-        syn::UriSegment::Variable(_v) => true, // FIXME: extend tags for parametric properties
+        syn::UriSegment::Variable(v) => {
+            matches!(get_tag(v.inner()), Tag::Property(t) if *t == Tag::Primitive)
+        }
     }) {
         return Err(Error::new(Kind::InvalidTypes, "ill-formed uri").with(&uri));
     }
@@ -103,7 +105,10 @@ fn check_property(prop: syn::Property<Core>) -> Result<()> {
 }
 
 fn check_object(object: syn::Object<Core>) -> Result<()> {
-    if !object.properties().all(|p| get_tag(p) == Tag::Property) {
+    if !object
+        .properties()
+        .all(|p| matches!(get_tag(p), Tag::Property(_)))
+    {
         return Err(Error::new(Kind::InvalidTypes, "ill-formed object").with(&object));
     }
     Ok(())

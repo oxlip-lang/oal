@@ -45,8 +45,7 @@ fn typecheck_error() {
         "let a = <> ~ {};",
         "let a = / ( num );",
         "let a = / ( get -> ( get -> str ) );",
-        // FIXME: extend tags for parametric properties
-        // "let a = /wrong/{ 'n [num] };",
+        "let a = /wrong/{ 'n [num] };",
         r#"let a = <status=num, {}>;"#,
         r#"let a = <media=str, {}>;"#,
         r#"let a = <headers=str, {}>;"#,

@@ -56,6 +56,8 @@ fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
                     .try_for_each(|(l, r)| unify(s, l, r))
             })
         }
+    } else if let (Tag::Property(left_prop), Tag::Property(right_prop)) = (&left, &right) {
+        unify(s, left_prop, right_prop)
     } else {
         Err(Error::new(Kind::InvalidTypes, "type mismatch").with(&(left, right)))
     }

@@ -30,6 +30,7 @@ impl Set {
                 let range = self.substitute(range).into();
                 Tag::Func(FuncTag { bindings, range })
             }
+            Tag::Property(t) => Tag::Property(self.substitute(t.as_ref()).into()),
             _ => tag.clone(),
         }
     }

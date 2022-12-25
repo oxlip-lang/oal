@@ -61,8 +61,6 @@ fn typecheck_error() {
         r#"let a = <media=str, {}>;"#,
         r#"let a = <headers=str, {}>;"#,
         "let @a = 404;",
-        // FIXME: unexpected typecheck on unspecified uri primitive
-        // "let a = uri ( get -> str );"
     ];
 
     for c in cases {

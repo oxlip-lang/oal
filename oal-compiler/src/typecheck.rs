@@ -146,7 +146,11 @@ impl<T: AsExpr + Tagged> TypeChecked for Property<T> {
 
 impl<T: AsExpr + Tagged> TypeChecked for Object<T> {
     fn type_check(&self) -> Result<()> {
-        if self.props.iter().all(|p| p.unwrap_tag() == Tag::Property) {
+        if self
+            .props
+            .iter()
+            .all(|p| p.unwrap_tag() == Tag::PropertyAny)
+        {
             Ok(())
         } else {
             Err(Error::new(Kind::InvalidTypes, "ill-formed object").with(self))

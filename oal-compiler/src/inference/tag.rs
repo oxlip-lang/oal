@@ -13,7 +13,8 @@ pub enum Tag {
     Status,
     Primitive,
     Relation,
-    Property,
+    PropertyAny, // TODO: obsolete
+    Property(Box<Tag>),
     Object,
     Content,
     Transfer,

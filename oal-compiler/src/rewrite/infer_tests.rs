@@ -68,8 +68,8 @@ fn infer_tag() -> anyhow::Result<()> {
 fn infer_unify() -> anyhow::Result<()> {
     let mods = compile(
         r#"
-        let f x = x;
-        let g y = f y;
+        let f x = 'n x;
+        let g y = f [y];
         let a = g num;
         let b = a;
     "#,
@@ -77,7 +77,7 @@ fn infer_unify() -> anyhow::Result<()> {
 
     let eqs = constrain(&mods, mods.base())?;
 
-    assert_eq!(eqs.len(), 14);
+    assert_eq!(eqs.len(), 16);
 
     let set = eqs.unify()?;
     substitute(&mods, mods.base(), &set)?;
@@ -85,7 +85,8 @@ fn infer_unify() -> anyhow::Result<()> {
 
     let prog = Program::cast(mods.main().tree().root()).expect("expected a program");
     let decl = prog.declarations().last().expect("expected a declaration");
-    assert_eq!(decl.node().syntax().core_ref().unwrap_tag(), Tag::Primitive);
+    let tag = decl.node().syntax().core_ref().unwrap_tag();
+    assert_eq!(tag, Tag::Property(Tag::Array.into()));
 
     Ok(())
 }
