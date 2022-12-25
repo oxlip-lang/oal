@@ -354,7 +354,7 @@ fn parse_decl_relation() {
 
         let xfers = &mut rel.transfers();
 
-        let xfer = xfers.next().expect("expected a transfer");
+        let xfer = Transfer::cast(xfers.next().expect("expected a transfer")).unwrap();
         let methods: Vec<_> = xfer.methods().collect();
         assert_eq!(methods, vec![atom::Method::Put]);
 
@@ -379,17 +379,23 @@ let a = /p (
 
             let xfers = &mut rel.transfers();
 
-            let xfer = xfers.next().expect("expected a transfer");
+            let xfer = Transfer::cast(xfers.next().expect("expected a transfer")).unwrap();
             let methods: Vec<_> = xfer.methods().collect();
             assert_eq!(methods, vec![atom::Method::Patch, atom::Method::Put]);
 
-            let xfer = xfers.next().expect("expected a transfer");
+            let xfer = Transfer::cast(xfers.next().expect("expected a transfer")).unwrap();
             let methods: Vec<_> = xfer.methods().collect();
             assert_eq!(methods, vec![atom::Method::Get]);
 
             assert!(xfers.next().is_none(), "expected no more transfer");
         },
-    )
+    );
+    parse("let a = /p ( i, j );", |p: Prog| {
+        let decl = assert_decl(p, "a");
+        let rel = Relation::cast(decl.rhs()).expect("expected a relation");
+        let xfers = &mut rel.transfers();
+        assert_eq!(xfers.count(), 2);
+    });
 }
 
 #[test]
@@ -432,7 +438,7 @@ let r = {};
 fn parse_resource() {
     parse("res / (get -> <>);", |p: Prog| {
         let res = p.resources().next().expect("expected a resource");
-        let rel = res.relation();
+        let rel = Relation::cast(res.relation()).expect("expected a relation");
         UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
         rel.transfers().next().expect("expected a transfer");
     })

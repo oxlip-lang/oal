@@ -163,8 +163,8 @@ impl<'a, T: Core> Program<'a, T> {
 impl<'a, T: Core> Resource<'a, T> {
     const RELATION_POS: usize = 1;
 
-    pub fn relation(&self) -> Relation<'a, T> {
-        Relation::cast(self.node().nth(Self::RELATION_POS)).expect("expected a relation")
+    pub fn relation(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::RELATION_POS)
     }
 }
 
@@ -466,8 +466,8 @@ impl<'a, T: Core> Application<'a, T> {
 }
 
 impl<'a, T: Core> XferList<'a, T> {
-    pub fn items(&self) -> impl Iterator<Item = Transfer<'a, T>> {
-        self.node().children().step_by(2).filter_map(Transfer::cast)
+    pub fn items(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
+        self.node().children().step_by(2)
     }
 }
 
@@ -479,7 +479,7 @@ impl<'a, T: Core> Relation<'a, T> {
         Terminal::cast(self.node().nth(Self::URI_POS)).expect("expected a terminal")
     }
 
-    pub fn transfers(&self) -> impl Iterator<Item = Transfer<'a, T>> {
+    pub fn transfers(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
         XferList::cast(self.node().nth(Self::XFERS_POS))
             .expect("expected a transfer list")
             .items()

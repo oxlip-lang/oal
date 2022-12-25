@@ -1,13 +1,13 @@
 use super::module::ModuleSet;
-use super::tree::{definition, NRef};
+use super::tree::{definition, get_tag, set_tag};
 use crate::errors::{Error, Kind, Result};
 use crate::inference::disjoin;
 use crate::inference::tag::{FuncTag, Seq, Tag};
 use crate::inference::unify::InferenceSet;
 use crate::locator::Locator;
+use oal_syntax::atom;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
-use oal_syntax::atom;
 
 fn literal_tag(t: &lex::TokenValue) -> Tag {
     match t {
@@ -16,14 +16,6 @@ fn literal_tag(t: &lex::TokenValue) -> Tag {
         lex::TokenValue::Symbol(_) => Tag::Text,
         _ => panic!("unexpected token for literal {:?}", t),
     }
-}
-
-fn get_tag(n: NRef) -> Tag {
-    n.syntax().core_ref().unwrap_tag()
-}
-
-fn set_tag(n: NRef, t: Tag) {
-    n.syntax().core_mut().set_tag(t)
 }
 
 /// Assigns type tags to all expressions in the given module.
@@ -90,13 +82,13 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
         } else if let Some(rel) = syn::Relation::cast(node) {
             set.push(get_tag(rel.uri().node()), Tag::Uri, rel.uri().node().span());
             for xfer in rel.transfers() {
-                set.push(get_tag(xfer.node()), Tag::Transfer, xfer.node().span());
+                set.push(get_tag(xfer), Tag::Transfer, xfer.span());
             }
             set.push(get_tag(node), Tag::Relation, node.span());
         } else if let Some(uri) = syn::UriTemplate::cast(node) {
             for seg in uri.segments() {
                 if let syn::UriSegment::Variable(var) = seg {
-                    set.push(get_tag(var.node()), Tag::Property, var.node().span())
+                    set.push(get_tag(var.inner()), Tag::Property, var.inner().span())
                 }
             }
             if let Some(params) = uri.params() {

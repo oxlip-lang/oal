@@ -5,6 +5,7 @@ pub mod infer;
 pub mod module;
 pub mod resolve;
 pub mod tree;
+pub mod typecheck;
 
 #[cfg(test)]
 mod eval_tests;
@@ -14,3 +15,5 @@ mod infer_tests;
 mod resolve_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod typecheck_tests;

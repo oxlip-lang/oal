@@ -498,6 +498,15 @@ pub struct Relation {
     pub xfers: Transfers,
 }
 
+impl From<Uri> for Relation {
+    fn from(uri: Uri) -> Self {
+        Relation {
+            uri,
+            xfers: Transfers::default(),
+        }
+    }
+}
+
 impl Relation {
     fn try_from<T: AsSpec>(e: &T) -> Result<Self> {
         if let ast::Expr::Rel(rel) = e.as_node().as_expr() {

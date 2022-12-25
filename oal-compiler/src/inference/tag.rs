@@ -43,6 +43,10 @@ impl Tag {
     pub fn is_status_like(&self) -> bool {
         matches!(self, Tag::Status | Tag::Number)
     }
+
+    pub fn is_relation_like(&self) -> bool {
+        matches!(self, Tag::Relation | Tag::Uri)
+    }
 }
 
 pub trait Tagged {

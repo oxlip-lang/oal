@@ -163,6 +163,28 @@ fn cast_object(from: Expr) -> Object {
     }
 }
 
+fn cast_transfer(from: Expr) -> Transfer {
+    match from {
+        Expr::Transfer(x) => *x,
+        _ => panic!("not a transfer: {:?}", from),
+    }
+}
+
+fn cast_relation(from: Expr) -> Relation {
+    match from {
+        Expr::Relation(r) => *r,
+        _ => Relation::from(cast_uri(from)),
+    }
+}
+
+fn cast_uri(from: Expr) -> Uri {
+    match from {
+        Expr::Uri(u) => *u,
+        Expr::Relation(r) => r.uri,
+        _ => panic!("not a uri: {:?}", from),
+    }
+}
+
 fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
     if let Some(other) = compose_annotations(terminal.annotation().into_iter())? {
         ctx.annotate(other)
@@ -216,22 +238,19 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Exp
 }
 
 fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Expr> {
-    let Expr::Uri(uri) = eval_terminal(ctx, relation.uri())?
-        else { panic!("expected a URI") };
+    let uri = cast_uri(eval_terminal(ctx, relation.uri())?);
 
     let mut xfers = Transfers::default();
-
     for x in relation.transfers() {
-        let Expr::Transfer(xfer) = eval_transfer(ctx, x)?
-            else { panic!("expected a transfer") };
+        let xfer = cast_transfer(eval_any(ctx, x)?);
         for (m, b) in xfer.methods {
             if b {
-                xfers[m] = Some(xfer.as_ref().clone());
+                xfers[m] = Some(xfer.clone());
             }
         }
     }
 
-    let rel = Relation { uri: *uri, xfers };
+    let rel = Relation { uri, xfers };
 
     Ok(Expr::Relation(Box::new(rel)))
 }
@@ -239,9 +258,8 @@ fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Exp
 fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> {
     let mut rels = IndexMap::new();
     for res in program.resources() {
-        let Expr::Relation(rel) = eval_relation(ctx, res.relation())?
-            else { panic!("expected a relation") };
-        rels.insert(rel.uri.pattern(), *rel);
+        let rel = cast_relation(eval_any(ctx, res.relation())?);
+        rels.insert(rel.uri.pattern(), rel);
     }
 
     let spec = Spec {
@@ -527,6 +545,8 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
         eval_application(ctx, app)
     } else if let Some(expr) = syn::SubExpression::cast(node) {
         eval_subexpression(ctx, expr)
+    } else if let Some(xfer) = syn::Transfer::cast(node) {
+        eval_transfer(ctx, xfer)
     } else {
         panic!("unexpected node: {:#?}", node)
     }
