@@ -114,4 +114,5 @@ pub enum Operator {
     Join,
     Any,
     Sum,
+    Range,
 }

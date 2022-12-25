@@ -363,7 +363,8 @@ fn eval_object(ctx: &mut Context, object: syn::Object<Core>) -> Result<Expr> {
 }
 
 fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result<Expr> {
-    if operation.operator() == lex::Operator::DoubleColon {
+    let op = operation.operator();
+    if op == atom::Operator::Range {
         let mut ranges = Ranges::new();
         for operand in operation.operands() {
             let o = eval_any(ctx, operand)?;
@@ -372,12 +373,6 @@ fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result
         }
         Ok(Expr::Ranges(Box::new(ranges)))
     } else {
-        let op = match operation.operator() {
-            lex::Operator::Ampersand => atom::Operator::Join,
-            lex::Operator::Tilde => atom::Operator::Any,
-            lex::Operator::VerticalBar => atom::Operator::Sum,
-            _ => panic!("unexpected operator {:?}", operation.operator()),
-        };
         let mut schemas = Vec::new();
         for operand in operation.operands() {
             let o = eval_any(ctx, operand)?;

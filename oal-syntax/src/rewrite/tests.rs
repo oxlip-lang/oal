@@ -152,7 +152,7 @@ fn parse_decl_transfer() {
     parse("let a = get -> <{}> :: <{}>;", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
         let op = VariadicOp::cast(xfer.range()).expect("expected an operation");
-        assert_eq!(op.operator(), lex::Operator::DoubleColon);
+        assert_eq!(op.operator(), atom::Operator::Range);
 
         let opds = &mut op.operands();
         Content::cast(assert_term(opds.next().expect("expected operand")))
@@ -324,7 +324,7 @@ fn parse_decl_variadic_op() {
         let decl = assert_decl(p, "a");
 
         let op = VariadicOp::cast(decl.rhs()).expect("expected variadic operator");
-        assert_eq!(op.operator(), lex::Operator::Tilde);
+        assert_eq!(op.operator(), atom::Operator::Any);
 
         let opds = &mut op.operands();
         Object::cast(assert_term(opds.next().expect("expected operand"))).expect("expected object");

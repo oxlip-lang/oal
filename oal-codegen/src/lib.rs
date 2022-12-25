@@ -261,6 +261,7 @@ impl Builder {
                     atom::Operator::Join => self.join_schema(&operation.schemas),
                     atom::Operator::Sum => self.sum_schema(&operation.schemas),
                     atom::Operator::Any => self.any_schema(&operation.schemas),
+                    atom::Operator::Range => unreachable!(),
                 },
                 spec::SchemaExpr::Ref(_) => unreachable!(),
             };

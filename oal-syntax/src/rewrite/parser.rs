@@ -99,9 +99,15 @@ impl<'a, T: Core> ContentTag<'a, T> {
 terminal_node!(Gram, Operator, TokenKind::Operator(_));
 
 impl<'a, T: Core> Operator<'a, T> {
-    pub fn operator(&self) -> lex::Operator {
+    pub fn operator(&self) -> atom::Operator {
         let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
-        op
+        match op {
+            lex::Operator::DoubleColon => atom::Operator::Range,
+            lex::Operator::Ampersand => atom::Operator::Join,
+            lex::Operator::Tilde => atom::Operator::Any,
+            lex::Operator::VerticalBar => atom::Operator::Sum,
+            _ => unreachable!("not a variadic operator {:?}", op),
+        }
     }
 }
 
@@ -389,8 +395,7 @@ impl<'a, T: Core> Transfer<'a, T> {
 impl<'a, T: Core> VariadicOp<'a, T> {
     const OPERATOR_POS: usize = 1;
 
-    // TODO: map to a smaller set of operators
-    pub fn operator(&self) -> lex::Operator {
+    pub fn operator(&self) -> atom::Operator {
         Operator::cast(self.node().nth(Self::OPERATOR_POS))
             .expect("expected an operator")
             .operator()

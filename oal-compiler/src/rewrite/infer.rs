@@ -7,6 +7,7 @@ use crate::inference::unify::InferenceSet;
 use crate::locator::Locator;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
+use oal_syntax::atom;
 
 fn literal_tag(t: &lex::TokenValue) -> Tag {
     match t {
@@ -52,11 +53,10 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         } else if let Some(op) = syn::VariadicOp::cast(node) {
             let operator = op.operator();
             let tag = match operator {
-                lex::Operator::Ampersand => Tag::Object,
-                lex::Operator::Tilde => Tag::Any,
-                lex::Operator::VerticalBar => Tag::Var(seq.next()),
-                lex::Operator::DoubleColon => Tag::Content,
-                _ => unreachable!("not a variadic operator {:?}", operator),
+                atom::Operator::Join => Tag::Object,
+                atom::Operator::Any => Tag::Any,
+                atom::Operator::Sum => Tag::Var(seq.next()),
+                atom::Operator::Range => Tag::Content,
             };
             set_tag(node, tag);
         } else if syn::Application::cast(node).is_some()
@@ -132,20 +132,18 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
             let operator = op.operator();
             for operand in op.operands() {
                 if let Some(t) = match operator {
-                    lex::Operator::DoubleColon | lex::Operator::Tilde => None,
-                    lex::Operator::Ampersand => Some(Tag::Object),
-                    lex::Operator::VerticalBar => Some(get_tag(node)),
-                    _ => unreachable!("not a variadic operator {:?}", operator),
+                    atom::Operator::Range | atom::Operator::Any => None,
+                    atom::Operator::Join => Some(Tag::Object),
+                    atom::Operator::Sum => Some(get_tag(node)),
                 } {
                     set.push(get_tag(operand), t, operand.span());
                 }
             }
             if let Some(t) = match operator {
-                lex::Operator::DoubleColon => Some(Tag::Content),
-                lex::Operator::Tilde => Some(Tag::Any),
-                lex::Operator::Ampersand => Some(Tag::Object),
-                lex::Operator::VerticalBar => None,
-                _ => unreachable!("not a variadic operator {:?}", operator),
+                atom::Operator::Range => Some(Tag::Content),
+                atom::Operator::Any => Some(Tag::Any),
+                atom::Operator::Join => Some(Tag::Object),
+                atom::Operator::Sum => None,
             } {
                 set.push(get_tag(node), t, node.span());
             }
