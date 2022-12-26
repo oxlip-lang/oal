@@ -6,16 +6,16 @@ use crate::inference::tag::Tag;
 use crate::rewrite::infer::{check_complete, substitute};
 use oal_syntax::rewrite::parser::{Application, Program, Terminal, Variable};
 
-fn compile(code: &str) -> anyhow::Result<ModuleSet> {
+fn compile(code: &str) -> anyhow::Result<(ModuleSet, usize)> {
     let mods = mods_from(code)?;
     resolve(&mods, mods.base())?;
-    tag(&mods, mods.base())?;
-    Ok(mods)
+    let nvars = tag(&mods, mods.base())?;
+    Ok((mods, nvars))
 }
 
 #[test]
 fn infer_tag() -> anyhow::Result<()> {
-    let mods = compile(
+    let (mods, _) = compile(
         r#"
         let f x = x;
         let b = f num;
@@ -66,7 +66,7 @@ fn infer_tag() -> anyhow::Result<()> {
 
 #[test]
 fn infer_unify() -> anyhow::Result<()> {
-    let mods = compile(
+    let (mods, _nvars) = compile(
         r#"
         let f x = 'n x;
         let g y = f [y];

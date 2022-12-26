@@ -11,7 +11,7 @@ pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
     // Resolve variable and function references.
     resolve(mods, loc)?;
     // Tag expressions with concrete and variable types.
-    tag(mods, loc)?;
+    let _nvars = tag(mods, loc)?;
     // Collect the set of type inference equations.
     let eqs = constrain(mods, loc)?;
     // Unify the inference set.

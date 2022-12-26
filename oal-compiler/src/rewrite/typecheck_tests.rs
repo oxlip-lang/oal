@@ -8,7 +8,7 @@ use crate::errors;
 fn compile(code: &str) -> anyhow::Result<ModuleSet> {
     let mods = mods_from(code)?;
     resolve(&mods, mods.base())?;
-    tag(&mods, mods.base())?;
+    let _nvars = tag(&mods, mods.base())?;
     let eqs = constrain(&mods, mods.base())?;
     let set = eqs.unify()?;
     substitute(&mods, mods.base(), &set)?;

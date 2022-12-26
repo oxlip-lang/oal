@@ -19,7 +19,8 @@ fn literal_tag(t: &lex::TokenValue) -> Tag {
 }
 
 /// Assigns type tags to all expressions in the given module.
-pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
+/// Returns the number of tag variables allocated.
+pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
     let module = mods.get(loc).expect("module not found");
     let mut seq = Seq::new(loc.clone());
 
@@ -61,7 +62,7 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(seq.len())
 }
 
 /// Returns the set of type inference equations for the given module.

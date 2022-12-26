@@ -61,13 +61,20 @@ pub trait Tagged {
 pub struct Seq(Option<Locator>, usize);
 
 impl Seq {
+    /// Create a new sequence of tag variables for the given module.
     pub fn new(m: Locator) -> Self {
         Seq(Some(m), 0)
     }
 
+    /// Allocate a new tag variable sequence number.
     pub fn next(&mut self) -> usize {
         let n = self.1;
         self.1 += 1;
         n
+    }
+
+    /// Returns the number of tag variables allocated.
+    pub fn len(&self) -> usize {
+        self.1
     }
 }

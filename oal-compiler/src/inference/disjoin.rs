@@ -4,6 +4,7 @@ use std::collections::HashMap;
 /// A naive implementation of a union-find/disjoint-set data structure
 /// for storing equivalences between Tag values
 /// and substituting a representative Tag from each equivalence class.
+// TODO: replace with petgraph::UnionFind
 #[derive(Debug, Default)]
 pub struct Set(HashMap<usize, Tag>);
 
