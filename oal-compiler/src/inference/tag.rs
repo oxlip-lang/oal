@@ -1,5 +1,12 @@
 use crate::locator::Locator;
 
+// TODO: remove default trait
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TagId {
+    loc: Option<Locator>,
+    n: usize,
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub struct FuncTag {
     pub bindings: Vec<Tag>,
@@ -22,7 +29,7 @@ pub enum Tag {
     Uri,
     Any,
     Func(FuncTag),
-    Var(usize),
+    Var(TagId),
 }
 
 impl Tag {
@@ -57,24 +64,28 @@ pub trait Tagged {
     fn with_tag(self, t: Tag) -> Self;
 }
 
+// TODO: remove default trait
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct Seq(Option<Locator>, usize);
+pub struct Seq(TagId);
 
 impl Seq {
     /// Create a new sequence of tag variables for the given module.
-    pub fn new(m: Locator) -> Self {
-        Seq(Some(m), 0)
+    pub fn new(loc: Locator) -> Self {
+        Seq(TagId {
+            loc: Some(loc),
+            n: 0,
+        })
     }
 
     /// Allocate a new tag variable sequence number.
-    pub fn next(&mut self) -> usize {
-        let n = self.1;
-        self.1 += 1;
-        n
+    pub fn next(&mut self) -> TagId {
+        let n = self.0.n;
+        self.0.n += 1;
+        TagId { loc: self.0.loc.clone(), n }
     }
 
     /// Returns the number of tag variables allocated.
     pub fn len(&self) -> usize {
-        self.1
+        self.0.n
     }
 }

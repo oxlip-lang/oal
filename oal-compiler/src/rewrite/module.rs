@@ -1,6 +1,10 @@
+use crate::errors::{Error, Kind};
+use crate::locator::Locator;
 use crate::rewrite::tree::{NRef, Tree};
-use crate::Locator;
 use oal_model::grammar::NodeIdx;
+use oal_syntax::rewrite::parser::Program;
+use petgraph::algo::toposort;
+use petgraph::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -30,10 +34,10 @@ pub struct ModuleSet {
 }
 
 impl ModuleSet {
-    pub fn new(base: Module) -> Self {
+    pub fn new(main: Module) -> Self {
         ModuleSet {
-            base: base.locator().clone(),
-            mods: HashMap::from([(base.locator().clone(), base)]),
+            base: main.locator().clone(),
+            mods: HashMap::from([(main.locator().clone(), main)]),
         }
     }
 
@@ -96,4 +100,85 @@ impl std::fmt::Debug for External {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         <Self as std::fmt::Display>::fmt(self, f)
     }
+}
+
+pub trait Loader<E>: Fn(&Locator) -> std::result::Result<Tree, E>
+where
+    E: From<Error>,
+{
+}
+
+impl<E, F> Loader<E> for F
+where
+    E: From<Error>,
+    F: Fn(&Locator) -> std::result::Result<Tree, E>,
+{
+}
+
+pub trait Compiler<E>: Fn(&ModuleSet, &Locator) -> std::result::Result<(), E>
+where
+    E: From<Error>,
+{
+}
+
+impl<E, F> Compiler<E> for F
+where
+    E: From<Error>,
+    F: Fn(&ModuleSet, &Locator) -> std::result::Result<(), E>,
+{
+}
+
+pub fn load<E, L, C>(base: &Locator, loader: L, compiler: C) -> std::result::Result<ModuleSet, E>
+where
+    E: From<Error>,
+    L: Loader<E>,
+    C: Compiler<E>,
+{
+    let mut deps = HashMap::new();
+    let mut graph = Graph::new();
+    let mut queue = Vec::new();
+
+    let tree = loader(base)?;
+    let main = Module::new(base.clone(), tree);
+    let mut mods = ModuleSet::new(main);
+
+    let root = graph.add_node(base.clone());
+    deps.insert(base.clone(), root);
+    queue.push(root);
+
+    while let Some(n) = queue.pop() {
+        let loc = graph.node_weight(n).unwrap();
+        let module = mods.get(loc).unwrap();
+
+        let mut imports = Vec::new();
+        let prog = Program::cast(module.tree().root()).expect("expected a program");
+        for import in prog.imports() {
+            imports.push(base.join(import.module())?);
+        }
+
+        for import in imports {
+            if let Some(m) = deps.get(&import) {
+                graph.add_edge(n, *m, ());
+            } else {
+                let tree = loader(&import)?;
+                let module = Module::new(import.clone(), tree);
+                mods.insert(module);
+
+                let node = graph.add_node(import.clone());
+                deps.insert(import, node);
+                queue.push(node);
+            }
+        }
+    }
+
+    let topo = toposort(&graph, None).map_err(|err| {
+        let loc = graph.node_weight(err.node_id()).unwrap();
+        Error::new(Kind::CycleDetected, "loading module").with(loc)
+    })?;
+    for node in topo {
+        let loc = graph.node_weight(node).unwrap();
+        compiler(&mods, loc)?;
+    }
+
+    Ok(mods)
 }

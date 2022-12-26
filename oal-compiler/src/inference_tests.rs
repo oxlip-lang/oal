@@ -7,7 +7,7 @@ use crate::node::NodeRef;
 use crate::scan::Scan;
 use crate::scope::Env;
 use crate::transform::Transform;
-use crate::Program;
+use crate::{Locator, Program};
 use oal_syntax::ast::{AsRefNode, Expr, Lambda, Statement};
 use oal_syntax::parse;
 
@@ -56,16 +56,18 @@ fn tag_lambda_decl() {
 
     if let Statement::Decl(decl) = s {
         assert_eq!(decl.name.as_ref(), "f");
-        assert_eq!(decl.expr.unwrap_tag(), Tag::Var(3));
+        assert!(matches!(decl.expr.unwrap_tag(), Tag::Var(_)));
         if let Expr::Lambda(Lambda { bindings, .. }) = decl.expr.as_node().as_expr() {
-            let tags: Vec<_> = bindings
+            let mut tags: Vec<_> = bindings
                 .iter()
                 .filter_map(|a| match a.tag() {
-                    Some(Tag::Var(n)) => Some(*n),
+                    Some(Tag::Var(n)) => Some(n),
                     _ => None,
                 })
                 .collect();
-            assert_eq!(tags, vec![0, 1, 2]);
+            tags.sort();
+            tags.dedup();
+            assert_eq!(tags.len(), 3);
         } else {
             panic!("expected lambda expression");
         }
@@ -124,14 +126,18 @@ fn constraint_lambda() {
 #[test]
 fn unify_simple() {
     let mut c = InferenceSet::new();
+    let mut seq = Seq::new(Locator::try_from("file:///base").unwrap());
+    let t0 = seq.next();
+    let t1 = seq.next();
+    let t2 = seq.next();
 
-    c.push(Tag::Var(0), Tag::Primitive, None);
-    c.push(Tag::Var(2), Tag::Var(1), None);
-    c.push(Tag::Var(1), Tag::Var(0), None);
+    c.push(Tag::Var(t0.clone()), Tag::Primitive, None);
+    c.push(Tag::Var(t2.clone()), Tag::Var(t1.clone()), None);
+    c.push(Tag::Var(t1), Tag::Var(t0), None);
 
     let u = c.unify().expect("unification failed");
 
-    let t = u.substitute(&Tag::Var(2));
+    let t = u.substitute(&Tag::Var(t2));
 
     assert_eq!(t, Tag::Primitive);
 }

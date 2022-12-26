@@ -1,6 +1,8 @@
 use anyhow::anyhow;
 use clap::Parser as ClapParser;
-use oal_compiler::{Locator, ModuleSet, Program};
+use oal_compiler::rewrite::module::ModuleSet;
+use oal_compiler::rewrite::tree::Tree;
+use oal_compiler::Locator;
 
 /// Compiles a program into an OpenAPI description in YAML.
 #[derive(ClapParser, Debug)]
@@ -18,35 +20,35 @@ struct Args {
     base: Option<std::path::PathBuf>,
 }
 
-/// Loads and parses a source file into a program.
-fn loader(l: &Locator) -> anyhow::Result<Program> {
+/// Loads and parses a source file into a concrete syntax tree.
+fn loader(l: &Locator) -> anyhow::Result<Tree> {
     eprintln!("Loading module {}", l);
     let path = l
         .url
         .to_file_path()
         .map_err(|_| anyhow!("not a file path: {}", l))?;
     let input = std::fs::read_to_string(path)?;
-    let program = oal_syntax::parse(input)?;
-    Ok(program)
+    let tree = oal_syntax::rewrite::parse(input)?;
+    Ok(tree)
 }
 
 /// Compiles a program.
-fn compiler(mods: &ModuleSet, l: &Locator, p: Program) -> anyhow::Result<Program> {
+fn compiler(mods: &ModuleSet, l: &Locator) -> anyhow::Result<()> {
     eprintln!("Compiling module {}", l);
-    let program = oal_compiler::compile(mods, l, p)?;
-    Ok(program)
+    oal_compiler::rewrite::compile::compile(mods, l)?;
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
     let args: Args = Args::parse();
 
-    let main_mod = Locator::try_from(args.input.as_path())?;
+    let base = Locator::try_from(args.input.as_path())?;
 
-    let mods = oal_compiler::load(&main_mod, loader, compiler)?;
+    let mods = oal_compiler::rewrite::module::load(&base, loader, compiler)?;
 
     eprintln!("Generating API definition");
 
-    let spec = oal_compiler::spec::Spec::try_from(&mods)?;
+    let spec = oal_compiler::rewrite::eval::eval(&mods, mods.base())?;
 
     let mut builder = oal_codegen::Builder::new().with_spec(spec);
 

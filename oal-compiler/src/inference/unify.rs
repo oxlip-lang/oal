@@ -20,18 +20,18 @@ fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
 
     if left == right {
         Ok(())
-    } else if let Tag::Var(v) = left {
+    } else if let Tag::Var(ref v) = left {
         if occurs(&left, &right) {
             Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(left, right)))
         } else {
-            s.extend(v, right);
+            s.extend(v.clone(), right);
             Ok(())
         }
-    } else if let Tag::Var(v) = right {
+    } else if let Tag::Var(ref v) = right {
         if occurs(&right, &left) {
             Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(right, left)))
         } else {
-            s.extend(v, left);
+            s.extend(v.clone(), left);
             Ok(())
         }
     } else if let (

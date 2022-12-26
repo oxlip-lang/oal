@@ -347,7 +347,11 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
         None => None,
     };
 
-    let mut status = None;
+    let mut status = if schema.is_none() {
+        Some(atom::HttpStatus::try_from(204).unwrap())
+    } else {
+        None
+    };
     let mut media = None;
     let mut headers = None;
     for meta in content.meta() {

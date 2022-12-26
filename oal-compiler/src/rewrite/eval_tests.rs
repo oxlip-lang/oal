@@ -56,6 +56,24 @@ fn eval_annotation() -> anyhow::Result<()> {
 }
 
 #[test]
+fn eval_composed_annotation() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let a = num `title: "num"`;
+        let b = 'prop a `required: true`;
+        res / ( get -> { b } );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    // println!("{:#?}", s);
+    // TODO: test composition of annotations
+
+    Ok(())
+}
+
+#[test]
 fn eval_content() -> anyhow::Result<()> {
     let s = eval(
         r#"

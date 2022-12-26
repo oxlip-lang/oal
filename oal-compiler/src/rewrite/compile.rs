@@ -1,13 +1,11 @@
-use super::eval::eval;
 use super::infer::{check_complete, constrain, substitute, tag};
 use super::module::ModuleSet;
 use super::resolve::resolve;
 use super::typecheck::type_check;
 use crate::errors::Result;
-use crate::spec::Spec;
 use crate::Locator;
 
-pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
+pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     // Resolve variable and function references.
     resolve(mods, loc)?;
     // Tag expressions with concrete and variable types.
@@ -22,6 +20,5 @@ pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
     check_complete(mods, loc)?;
     // Check type tags against expectations.
     type_check(mods, loc)?;
-    let spec = eval(mods, loc)?;
-    Ok(spec)
+    Ok(())
 }

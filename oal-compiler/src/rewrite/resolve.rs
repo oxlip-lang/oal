@@ -18,6 +18,7 @@ fn define(env: &mut Env, ident: Ident, node: NRef) -> Result<()> {
 
 pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let env = &mut Env::new();
+    let current = mods.get(loc).unwrap();
 
     for cursor in mods.get(loc).unwrap().tree().root().traverse() {
         match cursor {
@@ -35,7 +36,7 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                 } else if let Some(decl) = Declaration::cast(node) {
                     env.open();
                     for binding in decl.bindings() {
-                        let ext = External::new(mods.main(), binding.node());
+                        let ext = External::new(current, binding.node());
                         env.declare(binding.ident(), ext);
                     }
                 } else if let Some(var) = Variable::cast(node) {
@@ -47,7 +48,7 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
             NodeCursor::End(node) => {
                 if let Some(decl) = Declaration::cast(node) {
                     env.close();
-                    let ext = External::new(mods.main(), node);
+                    let ext = External::new(current, node);
                     env.declare(decl.ident(), ext);
                 }
             }

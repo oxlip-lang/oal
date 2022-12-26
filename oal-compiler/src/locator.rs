@@ -4,7 +4,7 @@ use std::path::Path;
 use std::rc::Rc;
 use url::Url;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Locator {
     pub url: Rc<Url>,
 }

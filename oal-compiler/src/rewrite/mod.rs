@@ -8,6 +8,8 @@ pub mod tree;
 pub mod typecheck;
 
 #[cfg(test)]
+mod compile_tests;
+#[cfg(test)]
 mod eval_tests;
 #[cfg(test)]
 mod infer_tests;

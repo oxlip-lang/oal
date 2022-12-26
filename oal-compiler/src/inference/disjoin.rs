@@ -1,4 +1,4 @@
-use super::tag::{FuncTag, Tag};
+use super::tag::{FuncTag, Tag, TagId};
 use std::collections::HashMap;
 
 /// A naive implementation of a union-find/disjoint-set data structure
@@ -6,14 +6,14 @@ use std::collections::HashMap;
 /// and substituting a representative Tag from each equivalence class.
 // TODO: replace with petgraph::UnionFind
 #[derive(Debug, Default)]
-pub struct Set(HashMap<usize, Tag>);
+pub struct Set(HashMap<TagId, Tag>);
 
 impl Set {
     pub fn new() -> Self {
         Default::default()
     }
 
-    pub fn extend(&mut self, v: usize, t: Tag) {
+    pub fn extend(&mut self, v: TagId, t: Tag) {
         self.0.insert(v, t);
     }
 
