@@ -14,6 +14,8 @@ mod eval_tests;
 #[cfg(test)]
 mod infer_tests;
 #[cfg(test)]
+mod module_tests;
+#[cfg(test)]
 mod resolve_tests;
 #[cfg(test)]
 mod tests;

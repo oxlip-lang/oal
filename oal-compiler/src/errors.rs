@@ -1,7 +1,6 @@
 use oal_model::rewrite::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
-#[allow(dead_code)]
 #[derive(thiserror::Error, Debug, Default)]
 pub enum Kind {
     #[error("invalid YAML content")]

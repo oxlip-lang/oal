@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use clap::Parser as ClapParser;
 use oal_compiler::rewrite::module::ModuleSet;
 use oal_compiler::rewrite::tree::Tree;
-use oal_compiler::Locator;
+use oal_compiler::locator::Locator;
 
 /// Compiles a program into an OpenAPI description in YAML.
 #[derive(ClapParser, Debug)]

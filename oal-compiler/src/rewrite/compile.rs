@@ -3,7 +3,7 @@ use super::module::ModuleSet;
 use super::resolve::resolve;
 use super::typecheck::type_check;
 use crate::errors::Result;
-use crate::Locator;
+use crate::locator::Locator;
 
 pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     // Resolve variable and function references.

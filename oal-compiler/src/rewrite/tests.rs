@@ -1,5 +1,5 @@
 use super::module::{Module, ModuleSet};
-use crate::Locator;
+use crate::locator::Locator;
 
 pub fn mods_from(code: &str) -> anyhow::Result<ModuleSet> {
     let tree = oal_syntax::rewrite::parse(code)?;
