@@ -1,8 +1,8 @@
-use super::infer::tag;
-use super::resolve::resolve;
-use super::tests::mods_from;
 use crate::errors;
+use crate::inference::tag;
+use crate::resolve::resolve;
 use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
+use crate::tests::mods_from;
 use oal_syntax::atom::{HttpStatus, Method, Operator};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
@@ -13,7 +13,7 @@ fn eval(code: &str) -> anyhow::Result<Spec> {
     // Uncomment for debugging purpose:
     // println!("{:#?}", mods.main().tree().root());
 
-    let spec = super::eval::eval(&mods, mods.base())?;
+    let spec = crate::eval::eval(&mods, mods.base())?;
     Ok(spec)
 }
 

@@ -1,9 +1,9 @@
-use super::infer::{check_complete, constrain, substitute, tag};
-use super::module::ModuleSet;
-use super::resolve::resolve;
-use super::tests::mods_from;
-use super::typecheck::type_check;
 use crate::errors;
+use crate::inference::{check_complete, constrain, substitute, tag};
+use crate::module::ModuleSet;
+use crate::resolve::resolve;
+use crate::tests::mods_from;
+use crate::typecheck::type_check;
 
 fn compile(code: &str) -> anyhow::Result<ModuleSet> {
     let mods = mods_from(code)?;

@@ -2,7 +2,7 @@ use crate::errors::Result;
 use crate::lexicon::{
     Intern, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList, TokenSpan,
 };
-use crate::rewrite::span::Span;
+use crate::span::Span;
 use chumsky::prelude::*;
 use generational_indextree::NodeEdge;
 use std::cell::{Ref, RefCell, RefMut};

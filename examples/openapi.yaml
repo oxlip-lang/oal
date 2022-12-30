@@ -7,27 +7,27 @@ info:
     url: https://www.apache.org/licenses/LICENSE-2.0.html
   version: 1.0.0
 servers:
-  - url: /
+- url: /
 paths:
   /some/path/{id}/template:
     get:
       tags:
-        - blah
+      - blah
       summary: does something else
       operationId: get-some-path-id-template
       parameters:
-        - in: query
-          name: q
-          schema:
-            type: string
-          style: form
+      - in: query
+        name: q
+        schema:
+          type: string
+        style: form
       responses:
         default:
           description: some content
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/obj1"
+                $ref: '#/components/schemas/obj1'
               examples:
                 default:
                   externalValue: examples/stuff.json
@@ -35,20 +35,20 @@ paths:
       summary: does something
       operationId: put-some-path-id-template
       parameters:
-        - in: query
-          name: n
-          schema:
-            example: 42.0
-            type: number
-            minimum: 0.0
-            maximum: 99.99
-          style: form
+      - in: query
+        name: n
+        schema:
+          example: 42.0
+          type: number
+          minimum: 0.0
+          maximum: 99.99
+        style: form
       requestBody:
         description: some content
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/obj1"
+              $ref: '#/components/schemas/obj1'
             examples:
               default:
                 externalValue: examples/stuff.json
@@ -58,7 +58,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/obj1"
+                $ref: '#/components/schemas/obj1'
               examples:
                 default:
                   externalValue: examples/stuff.json
@@ -66,20 +66,20 @@ paths:
       summary: does something
       operationId: patch-some-path-id-template
       parameters:
-        - in: query
-          name: n
-          schema:
-            example: 42.0
-            type: number
-            minimum: 0.0
-            maximum: 99.99
-          style: form
+      - in: query
+        name: n
+        schema:
+          example: 42.0
+          type: number
+          minimum: 0.0
+          maximum: 99.99
+        style: form
       requestBody:
         description: some content
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/obj1"
+              $ref: '#/components/schemas/obj1'
             examples:
               default:
                 externalValue: examples/stuff.json
@@ -89,32 +89,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/obj1"
+                $ref: '#/components/schemas/obj1'
               examples:
                 default:
                   externalValue: examples/stuff.json
     parameters:
-      - in: path
-        name: id
-        description: some parameter
-        required: true
-        schema:
-          title: some identifier
-          type: number
-        style: simple
+    - in: path
+      name: id
+      description: some parameter
+      required: true
+      schema:
+        title: some identifier
+        type: number
+      style: simple
   /something:
     get:
       summary: get-something
       operationId: get-something
       parameters:
-        - in: header
-          name: If-None-Match
-          description: makes the request conditional
-          schema:
-            type: string
-          style: simple
+      - in: header
+        name: If-None-Match
+        description: makes the request conditional
+        schema:
+          type: string
+        style: simple
       responses:
-        "200":
+        '200':
           description: all good
           headers:
             ETag:
@@ -127,7 +127,7 @@ paths:
           content:
             application/vnd.blah+json:
               schema:
-                $ref: "#/components/schemas/obj3"
+                $ref: '#/components/schemas/obj3'
               examples:
                 default:
                   externalValue: examples/other_stuff.json
@@ -143,14 +143,14 @@ paths:
             application/problem+json:
               schema:
                 type: object
-        "204":
+        '204':
           description: no content
     parameters:
-      - in: query
-        name: q
-        schema:
-          type: string
-        style: form
+    - in: query
+      name: q
+      schema:
+        type: string
+      style: form
 components:
   securitySchemes:
     default:
@@ -179,35 +179,35 @@ components:
             type: string
             pattern: ^[a-z]+$
       required:
-        - firstName
-        - lastName
+      - firstName
+      - lastName
     obj2:
       allOf:
-        - $ref: "#/components/schemas/obj1"
-        - type: object
-          properties:
-            age:
-              type: integer
-              minimum: 0
-              maximum: 999
+      - $ref: '#/components/schemas/obj1'
+      - type: object
+        properties:
+          age:
+            type: integer
+            minimum: 0
+            maximum: 999
     obj3:
       description: some other stuff
       allOf:
-        - $ref: "#/components/schemas/obj2"
-        - oneOf:
-            - type: object
-              properties:
-                height:
+      - $ref: '#/components/schemas/obj2'
+      - oneOf:
+        - type: object
+          properties:
+            height:
+              type: number
+        - type: object
+          properties:
+            stuff:
+              anyOf:
+              - oneOf:
+                - title: some identifier
                   type: number
-            - type: object
-              properties:
-                stuff:
-                  anyOf:
-                    - oneOf:
-                        - title: some identifier
-                          type: number
-                        - type: string
-                    - $ref: "#/components/schemas/obj2"
-                    - example: /some/path/_id_number_/template
-                      type: string
-                      format: uri-reference
+                - type: string
+              - $ref: '#/components/schemas/obj2'
+              - example: /some/path/_id_number_/template
+                type: string
+                format: uri-reference

@@ -1,4 +1,4 @@
-use crate::rewrite::module::External;
+use crate::module::External;
 use oal_syntax::atom::Ident;
 use std::collections::HashMap;
 
@@ -18,10 +18,6 @@ impl Env {
         Env(vec![Scope::new()])
     }
 
-    pub fn head(&self) -> &Scope {
-        self.0.last().unwrap()
-    }
-
     pub fn declare(&mut self, n: Ident, e: External) {
         self.0.last_mut().unwrap().insert(n, e);
     }
@@ -34,10 +30,6 @@ impl Env {
             .skip_while(Option::is_none)
             .map(|s| s.unwrap())
             .next()
-    }
-
-    pub fn exists(&self, n: &Ident) -> bool {
-        self.0.last().unwrap().contains_key(n)
     }
 
     pub fn open(&mut self) {

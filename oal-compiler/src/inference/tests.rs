@@ -1,10 +1,9 @@
-use super::infer::{constrain, tag};
-use super::module::ModuleSet;
-use super::resolve::resolve;
-use super::tests::mods_from;
+use super::{check_complete, substitute, constrain, tag};
 use crate::inference::tag::Tag;
-use crate::rewrite::infer::{check_complete, substitute};
-use oal_syntax::rewrite::parser::{Application, Program, Terminal, Variable};
+use crate::module::ModuleSet;
+use crate::resolve::resolve;
+use crate::tests::mods_from;
+use oal_syntax::parser::{Application, Program, Terminal, Variable};
 
 fn compile(code: &str) -> anyhow::Result<(ModuleSet, usize)> {
     let mods = mods_from(code)?;

@@ -1,8 +1,8 @@
 use crate::errors::{Error, Kind};
 use crate::locator::Locator;
-use crate::rewrite::tree::{NRef, Tree};
+use crate::tree::{NRef, Tree};
 use oal_model::grammar::NodeIdx;
-use oal_syntax::rewrite::parser::Program;
+use oal_syntax::parser::Program;
 use petgraph::algo::toposort;
 use petgraph::prelude::*;
 use std::collections::HashMap;

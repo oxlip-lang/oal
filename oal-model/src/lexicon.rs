@@ -1,5 +1,5 @@
 use crate::errors::Result;
-use crate::rewrite::span::Span;
+use crate::span::Span;
 use chumsky::{prelude::*, Stream};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;

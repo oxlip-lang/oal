@@ -10,7 +10,7 @@ type Prog<'a> = Program<'a, ()>;
 type NRef<'a> = NodeRef<'a, (), Gram>;
 
 fn parse<F: Fn(Prog)>(i: &str, f: F) {
-    let tree = crate::rewrite::parse(i).expect("parsing failed");
+    let tree = crate::parse(i).expect("parsing failed");
     let prog = Program::cast(tree.root()).expect("expected a program");
     f(prog)
 }
@@ -461,7 +461,7 @@ fn parse_resource() {
 
 #[test]
 fn parse_grammar_error() {
-    let Err(err) = crate::rewrite::parse::<_, ()>("res / ( get -> );")
+    let Err(err) = crate::parse::<_, ()>("res / ( get -> );")
         else { panic!("expected an error") };
     let crate::errors::Error::Parser(err) = err
         else { panic!("expected a parser error") };
@@ -473,7 +473,7 @@ fn parse_grammar_error() {
 
 #[test]
 fn parse_lexicon_error() {
-    let Err(err) = crate::rewrite::parse::<_, ()>("!!! / ( get -> );")
+    let Err(err) = crate::parse::<_, ()>("!!! / ( get -> );")
         else { panic!("expected an error") };
     let crate::errors::Error::Parser(err) = err
         else { panic!("expected a parser error") };

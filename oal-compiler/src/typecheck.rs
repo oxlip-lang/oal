@@ -1,11 +1,11 @@
-use super::module::ModuleSet;
-use super::tree::{get_tag, Core};
 use crate::errors::{Error, Kind, Result};
 use crate::inference::tag::Tag;
 use crate::locator::Locator;
+use crate::module::ModuleSet;
+use crate::tree::{get_tag, Core};
 use oal_syntax::atom;
-use oal_syntax::rewrite::lexer as lex;
-use oal_syntax::rewrite::parser as syn;
+use oal_syntax::lexer as lex;
+use oal_syntax::parser as syn;
 
 fn check_operation(op: syn::VariadicOp<Core>) -> Result<()> {
     match op.operator() {

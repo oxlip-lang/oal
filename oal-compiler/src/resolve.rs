@@ -1,11 +1,11 @@
-use super::env::Env;
-use super::module::{External, ModuleSet};
-use super::tree::NRef;
+use crate::env::Env;
 use crate::errors::{Error, Kind, Result};
 use crate::locator::Locator;
+use crate::module::{External, ModuleSet};
+use crate::tree::NRef;
 use oal_model::grammar::NodeCursor;
 use oal_syntax::atom::Ident;
-use oal_syntax::rewrite::parser::{Application, Declaration, Import, Program, Variable};
+use oal_syntax::parser::{Application, Declaration, Import, Program, Variable};
 
 fn define(env: &mut Env, ident: Ident, node: NRef) -> Result<()> {
     if let Some(ext) = env.lookup(&ident) {

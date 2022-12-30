@@ -1,9 +1,9 @@
-use super::resolve::resolve;
-use super::tests::mods_from;
-use super::tree::definition;
 use crate::errors::Kind;
-use oal_syntax::rewrite::lexer as lex;
-use oal_syntax::rewrite::parser::{
+use crate::resolve::resolve;
+use crate::tests::mods_from;
+use crate::tree::definition;
+use oal_syntax::lexer as lex;
+use oal_syntax::parser::{
     Application, Binding, Declaration, Primitive, Program, Terminal, Variable,
 };
 

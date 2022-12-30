@@ -1,4 +1,4 @@
-use crate::rewrite::lexer::Token;
+use crate::lexer::Token;
 
 /// The syntax analysis error type.
 #[derive(thiserror::Error, Debug)]

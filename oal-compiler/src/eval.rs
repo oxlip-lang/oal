@@ -1,18 +1,18 @@
-use super::module::ModuleSet;
-use super::tree::{definition, Core, NRef};
 use crate::annotation::Annotation;
 use crate::errors::Result;
 use crate::locator::Locator;
+use crate::module::ModuleSet;
 use crate::spec::{
     Array, Content, Object, PrimBoolean, PrimInteger, PrimNumber, PrimString, Property, Ranges,
     Reference, References, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri,
     UriSegment, VariadicOp,
 };
+use crate::tree::{definition, Core, NRef};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_syntax::atom;
-use oal_syntax::rewrite::lexer as lex;
-use oal_syntax::rewrite::parser as syn;
+use oal_syntax::lexer as lex;
+use oal_syntax::parser as syn;
 use std::collections::HashMap;
 use std::rc::Rc;
 

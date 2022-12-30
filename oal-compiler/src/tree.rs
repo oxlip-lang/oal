@@ -1,7 +1,7 @@
-use super::module::{External, ModuleSet};
 use crate::inference::tag::Tag;
+use crate::module::{External, ModuleSet};
 use oal_model::grammar::{NodeRef, SyntaxTree};
-use oal_syntax::rewrite::parser::Gram;
+use oal_syntax::parser::Gram;
 
 /// The internally mutable `Core` type for the syntax tree.
 #[derive(Clone, Default, Debug)]

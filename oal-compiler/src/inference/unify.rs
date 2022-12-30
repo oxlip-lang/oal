@@ -1,7 +1,7 @@
 use super::disjoin;
 use super::tag::{FuncTag, Tag};
 use crate::errors::{Error, Kind, Result};
-use oal_model::rewrite::span::Span;
+use oal_model::span::Span;
 
 fn occurs(a: &Tag, b: &Tag) -> bool {
     assert!(a.is_variable());

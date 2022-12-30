@@ -1,9 +1,9 @@
-use super::infer::{check_complete, constrain, substitute, tag};
-use super::module::ModuleSet;
-use super::resolve::resolve;
-use super::typecheck::type_check;
 use crate::errors::Result;
+use crate::inference::{check_complete, constrain, substitute, tag};
 use crate::locator::Locator;
+use crate::module::ModuleSet;
+use crate::resolve::resolve;
+use crate::typecheck::type_check;
 
 pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     // Resolve variable and function references.

@@ -1,13 +1,19 @@
-use super::module::ModuleSet;
-use super::tree::{definition, get_tag, set_tag};
+pub mod disjoin;
+pub mod tag;
+pub mod unify;
+
+#[cfg(test)]
+mod tests;
+
 use crate::errors::{Error, Kind, Result};
-use crate::inference::disjoin;
-use crate::inference::tag::{FuncTag, Seq, Tag};
-use crate::inference::unify::InferenceSet;
 use crate::locator::Locator;
+use crate::module::ModuleSet;
+use crate::tree::{definition, get_tag, set_tag};
 use oal_syntax::atom;
-use oal_syntax::rewrite::lexer as lex;
-use oal_syntax::rewrite::parser as syn;
+use oal_syntax::lexer as lex;
+use oal_syntax::parser as syn;
+use tag::{FuncTag, Seq, Tag};
+use unify::InferenceSet;
 
 fn literal_tag(t: &lex::TokenValue) -> Tag {
     match t {

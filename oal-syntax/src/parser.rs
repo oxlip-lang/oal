@@ -1,6 +1,6 @@
 use crate::atom;
-use crate::rewrite::lexer as lex;
-use crate::rewrite::lexer::{Token, TokenKind, TokenValue};
+use crate::lexer as lex;
+use crate::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
 use oal_model::grammar::*;
 use oal_model::lexicon::TokenAlias;
