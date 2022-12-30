@@ -1,4 +1,4 @@
-![Build](https://img.shields.io/github/workflow/status/ebastien/openapi-lang/ci)
+![Build](https://img.shields.io/github/actions/workflow/status/ebastien/openapi-lang/workflows/ci.yml?branch=master)
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # OpenAPI Language
@@ -8,7 +8,7 @@ OpenAPI specifications.
 This is not a general purpose language.
 The motivation is to play with algebraic language abstractions on top of OpenAPI
 in a similar fashion as Sass/SCSS over CSS.
-The ambition of the author is to consider OpenAPI as the assembly language of API design. 
+The ambition of the author is to consider OpenAPI as the assembly language of API design.
 
 The language is statically typed with global type inference.
 Due to the experimental nature of this project, error handling is rudimentary.

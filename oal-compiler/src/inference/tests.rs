@@ -1,4 +1,4 @@
-use super::{check_complete, substitute, constrain, tag};
+use super::{check_complete, constrain, substitute, tag};
 use crate::inference::tag::Tag;
 use crate::module::ModuleSet;
 use crate::resolve::resolve;

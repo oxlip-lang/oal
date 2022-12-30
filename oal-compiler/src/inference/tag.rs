@@ -81,7 +81,10 @@ impl Seq {
     pub fn next(&mut self) -> TagId {
         let n = self.0.n;
         self.0.n += 1;
-        TagId { loc: self.0.loc.clone(), n }
+        TagId {
+            loc: self.0.loc.clone(),
+            n,
+        }
     }
 
     /// Returns the number of tag variables allocated.
