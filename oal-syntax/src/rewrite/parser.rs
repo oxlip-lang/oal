@@ -221,18 +221,30 @@ impl<'a, T: Core> Import<'a, T> {
 }
 
 impl<'a, T: Core> Terminal<'a, T> {
-    const INNER_POS: usize = 0;
-    const ANN_POS: usize = 1;
+    const PREFIX_ANN_POS: usize = 0;
+    const INNER_POS: usize = 1;
+    const SUFFIX_ANN_POS: usize = 2;
 
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
         self.node().nth(Self::INNER_POS)
     }
 
-    pub fn annotation(&self) -> Option<&'a str> {
+    pub fn prefix_annotations(&self) -> impl Iterator<Item = &'a str> {
+        Annotations::cast(self.node().nth(Self::PREFIX_ANN_POS))
+            .expect("expected annotations")
+            .items()
+    }
+
+    pub fn suffix_annotation(&self) -> Option<&'a str> {
         self.node()
             .children()
-            .nth(Self::ANN_POS)
+            .nth(Self::SUFFIX_ANN_POS)
             .map(|n| n.as_str())
+    }
+
+    pub fn annotations(&self) -> impl Iterator<Item = &'a str> {
+        self.prefix_annotations()
+            .chain(self.suffix_annotation().into_iter())
     }
 }
 
@@ -547,9 +559,14 @@ pub fn parser<'a>(
         SyntaxKind::XferMethods,
     );
 
-    let line_ann = just_token(TokenKind::Annotation(lex::Annotation::Line));
+    let inline_annotation = just_token(TokenKind::Annotation(lex::Annotation::Inline));
 
-    let inline_ann = just_token(TokenKind::Annotation(lex::Annotation::Inline));
+    let line_annotations = || {
+        tree_many(
+            just_token(TokenKind::Annotation(lex::Annotation::Line)).repeated(),
+            SyntaxKind::Annotations,
+        )
+    };
 
     let expr_kind = recursive(|expr| {
         let property_list = tree_many(
@@ -648,16 +665,19 @@ pub fn parser<'a>(
         let variable = tree_one(identifier, SyntaxKind::Variable);
 
         let term_kind = tree_many(
-            literal
-                .or(primitive)
-                .or(uri_kind)
-                .or(array)
-                .or(property)
-                .or(object.clone())
-                .or(content)
-                .or(subexpr)
-                .or(variable)
-                .chain(inline_ann.or_not()),
+            line_annotations()
+                .chain(
+                    literal
+                        .or(primitive)
+                        .or(uri_kind)
+                        .or(array)
+                        .or(property)
+                        .or(object.clone())
+                        .or(content)
+                        .or(subexpr)
+                        .or(variable),
+                )
+                .chain(inline_annotation.or_not()),
             SyntaxKind::Terminal,
         );
 
@@ -719,8 +739,6 @@ pub fn parser<'a>(
         relation.or(xfer_kind)
     });
 
-    let annotations = tree_many(line_ann.repeated(), SyntaxKind::Annotations);
-
     let binding = tree_one(
         just_token(TokenKind::Identifier(lex::Identifier::Value)),
         SyntaxKind::Binding,
@@ -729,7 +747,7 @@ pub fn parser<'a>(
     let bindings = tree_many(binding.repeated(), SyntaxKind::Bindings);
 
     let declaration = tree_many(
-        annotations
+        line_annotations()
             .chain(just_token(TokenKind::Keyword(lex::Keyword::Let)))
             .chain(identifier)
             .chain(bindings)

@@ -14,6 +14,9 @@ use oal_syntax::atom;
 use oal_syntax::rewrite::lexer as lex;
 use oal_syntax::rewrite::parser as syn;
 use std::collections::HashMap;
+use std::rc::Rc;
+
+type AnnRef = Rc<Annotation>;
 
 #[derive(Clone, Debug)]
 enum Expr {
@@ -39,59 +42,40 @@ enum Expr {
 
 struct Context<'a> {
     mods: &'a ModuleSet,
-    ann: Option<Annotation>,
     refs: Option<References>,
-    scopes: Vec<HashMap<atom::Ident, Expr>>,
+    scopes: Vec<HashMap<atom::Ident, (Expr, AnnRef)>>,
 }
 
 impl<'a> Context<'a> {
     fn new(mods: &'a ModuleSet) -> Self {
         Context {
             mods,
-            ann: None,
             refs: None,
             scopes: Vec::new(),
         }
     }
-
-    fn annotate(&mut self, other: Annotation) {
-        if let Some(a) = &mut self.ann {
-            a.extend(other)
-        } else {
-            self.ann = Some(other)
-        }
-    }
-
-    fn annotation(&mut self) -> Option<Annotation> {
-        self.ann.take()
-    }
 }
 
-fn compose_annotations<'a, I>(mut iter: I) -> Result<Option<Annotation>>
+fn compose_annotations<'a, I>(iter: I) -> Result<Annotation>
 where
     I: Iterator<Item = &'a str>,
 {
-    if let Some(text) = iter.next() {
-        let mut ann = Annotation::try_from(text)?;
-        for text in iter {
-            let other = Annotation::try_from(text)?;
-            ann.extend(other);
-        }
-        Ok(Some(ann))
-    } else {
-        Ok(None)
+    let mut ann = Annotation::default();
+    for text in iter {
+        let other = Annotation::try_from(text)?;
+        ann.extend(other);
     }
+    Ok(ann)
 }
 
-fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
-    let ann = ctx.annotation();
-    let ann = ann.as_ref();
-    let desc = ann.and_then(|a| a.get_string("description"));
-    let title = ann.and_then(|a| a.get_string("title"));
-    let required = ann.and_then(|a| a.get_bool("required"));
-    let examples = ann.and_then(|a| a.get_props("examples"));
+fn cast_schema(from: (Expr, AnnRef)) -> Schema {
+    let ann = from.1;
+    let desc = ann.get_string("description");
+    let title = ann.get_string("title");
+    let required = ann.get_bool("required");
+    let examples = ann.get_props("examples");
 
-    let expr = match from {
+    let expr = match from.0 {
         Expr::Object(o) => SchemaExpr::Object(*o),
         Expr::PrimInteger(i) => SchemaExpr::Int(*i),
         Expr::PrimNumber(p) => SchemaExpr::Num(*p),
@@ -102,7 +86,7 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
         Expr::VariadicOp(o) => SchemaExpr::Op(*o),
         Expr::Reference(r) => SchemaExpr::Ref(r),
         Expr::Relation(r) => SchemaExpr::Rel(r),
-        _ => panic!("not a schema expression: {:?}", from),
+        e => panic!("not a schema expression: {:?}", e),
     };
 
     Schema {
@@ -114,91 +98,97 @@ fn cast_schema(ctx: &mut Context, from: Expr) -> Schema {
     }
 }
 
-fn cast_content(ctx: &mut Context, from: Expr) -> Content {
-    match from {
+fn cast_content(from: (Expr, AnnRef)) -> Content {
+    match from.0 {
         Expr::Content(c) => *c,
-        _ => Content::from(cast_schema(ctx, from)),
+        _ => Content::from(cast_schema(from)),
     }
 }
 
-fn cast_ranges(ctx: &mut Context, from: Expr) -> Ranges {
-    match from {
+fn cast_ranges(from: (Expr, AnnRef)) -> Ranges {
+    match from.0 {
         Expr::Ranges(r) => *r,
         _ => {
-            let c = cast_content(ctx, from);
+            let c = cast_content(from);
             Ranges::from([((c.status, c.media.clone()), c)])
         }
     }
 }
 
-fn cast_string(from: Expr) -> String {
-    match from {
+fn cast_string(from: (Expr, AnnRef)) -> String {
+    match from.0 {
         Expr::String(s) => s,
-        _ => panic!("not a string: {:?}", from),
+        e => panic!("not a string: {:?}", e),
     }
 }
 
-fn cast_property(from: Expr) -> Property {
-    match from {
+fn cast_property(from: (Expr, AnnRef)) -> Property {
+    match from.0 {
         Expr::Property(p) => *p,
-        _ => panic!("not a property: {:?}", from),
+        e => panic!("not a property: {:?}", e),
     }
 }
 
-fn cast_http_status(from: Expr) -> Result<atom::HttpStatus> {
-    match from {
+fn cast_http_status(from: (Expr, AnnRef)) -> Result<atom::HttpStatus> {
+    match from.0 {
         Expr::HttpStatus(s) => Ok(s),
         Expr::Number(n) => {
             let s = atom::HttpStatus::try_from(n)?;
             Ok(s)
         }
-        _ => panic!("not an HTTP status: {:?}", from),
+        e => panic!("not an HTTP status: {:?}", e),
     }
 }
 
-fn cast_object(from: Expr) -> Object {
-    match from {
+fn cast_object(from: (Expr, AnnRef)) -> Object {
+    match from.0 {
         Expr::Object(o) => *o,
-        _ => panic!("not an object: {:?}", from),
+        e => panic!("not an object: {:?}", e),
     }
 }
 
-fn cast_transfer(from: Expr) -> Transfer {
-    match from {
+fn cast_transfer(from: (Expr, AnnRef)) -> Transfer {
+    match from.0 {
         Expr::Transfer(x) => *x,
-        _ => panic!("not a transfer: {:?}", from),
+        e => panic!("not a transfer: {:?}", e),
     }
 }
 
-fn cast_relation(from: Expr) -> Relation {
-    match from {
+fn cast_relation(from: (Expr, AnnRef)) -> Relation {
+    match from.0 {
         Expr::Relation(r) => *r,
         _ => Relation::from(cast_uri(from)),
     }
 }
 
-fn cast_uri(from: Expr) -> Uri {
-    match from {
+fn cast_uri(from: (Expr, AnnRef)) -> Uri {
+    match from.0 {
         Expr::Uri(u) => *u,
         Expr::Relation(r) => r.uri,
-        _ => panic!("not a uri: {:?}", from),
+        e => panic!("not a uri: {:?}", e),
     }
 }
 
-fn eval_terminal(ctx: &mut Context, terminal: syn::Terminal<Core>) -> Result<Expr> {
-    if let Some(other) = compose_annotations(terminal.annotation().into_iter())? {
-        ctx.annotate(other)
-    }
-    eval_any(ctx, terminal.inner())
+fn eval_terminal(
+    ctx: &mut Context,
+    terminal: syn::Terminal<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let mut next_ann = ann.as_ref().clone();
+    next_ann.extend(compose_annotations(terminal.annotations())?);
+    let next_ann = AnnRef::new(next_ann);
+    eval_any(ctx, terminal.inner(), next_ann)
 }
 
-fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Expr> {
-    let ann = ctx.annotation();
-    let ann = ann.as_ref();
-    let desc = ann.and_then(|a| a.get_string("description"));
-    let summary = ann.and_then(|a| a.get_string("summary"));
-    let tags = ann.and_then(|a| a.get_enum("tags")).unwrap_or_default();
-    let id = ann.and_then(|a| a.get_string("operationId"));
+fn eval_transfer(
+    ctx: &mut Context,
+    transfer: syn::Transfer<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let desc = ann.get_string("description");
+    let summary = ann.get_string("summary");
+    let tags = ann.get_enum("tags").unwrap_or_default();
+    let id = ann.get_string("operationId");
 
     let mut methods = EnumMap::default();
     for m in transfer.methods() {
@@ -206,20 +196,14 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Exp
     }
 
     let domain = match transfer.domain() {
-        Some(term) => {
-            let c = eval_terminal(ctx, term)?;
-            cast_content(ctx, c)
-        }
+        Some(term) => cast_content(eval_terminal(ctx, term, AnnRef::default())?),
         None => Content::default(),
     };
 
-    let ranges = {
-        let r = eval_any(ctx, transfer.range())?;
-        cast_ranges(ctx, r)
-    };
+    let ranges = cast_ranges(eval_any(ctx, transfer.range(), AnnRef::default())?);
 
     let params = match transfer.params() {
-        Some(object) => Some(cast_object(eval_object(ctx, object)?)),
+        Some(object) => Some(cast_object(eval_object(ctx, object, AnnRef::default())?)),
         None => None,
     };
 
@@ -234,15 +218,20 @@ fn eval_transfer(ctx: &mut Context, transfer: syn::Transfer<Core>) -> Result<Exp
         id,
     };
 
-    Ok(Expr::Transfer(Box::new(xfer)))
+    let expr = Expr::Transfer(Box::new(xfer));
+    Ok((expr, ann))
 }
 
-fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Expr> {
-    let uri = cast_uri(eval_terminal(ctx, relation.uri())?);
+fn eval_relation(
+    ctx: &mut Context,
+    relation: syn::Relation<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let uri = cast_uri(eval_terminal(ctx, relation.uri(), AnnRef::default())?);
 
     let mut xfers = Transfers::default();
     for x in relation.transfers() {
-        let xfer = cast_transfer(eval_any(ctx, x)?);
+        let xfer = cast_transfer(eval_any(ctx, x, AnnRef::default())?);
         for (m, b) in xfer.methods {
             if b {
                 xfers[m] = Some(xfer.clone());
@@ -251,14 +240,18 @@ fn eval_relation(ctx: &mut Context, relation: syn::Relation<Core>) -> Result<Exp
     }
 
     let rel = Relation { uri, xfers };
-
-    Ok(Expr::Relation(Box::new(rel)))
+    let expr = Expr::Relation(Box::new(rel));
+    Ok((expr, ann))
 }
 
-fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> {
+fn eval_program(
+    ctx: &mut Context,
+    program: syn::Program<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
     let mut rels = IndexMap::new();
     for res in program.resources() {
-        let rel = cast_relation(eval_any(ctx, res.relation())?);
+        let rel = cast_relation(eval_any(ctx, res.relation(), AnnRef::default())?);
         rels.insert(rel.uri.pattern(), rel);
     }
 
@@ -267,12 +260,16 @@ fn eval_program(ctx: &mut Context, program: syn::Program<Core>) -> Result<Expr> 
         refs: ctx.refs.take().unwrap_or_default(),
     };
 
-    Ok(Expr::Spec(Box::new(spec)))
+    let expr = Expr::Spec(Box::new(spec));
+    Ok((expr, ann))
 }
 
-fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Result<Expr> {
-    let ann = ctx.annotation();
-    let example = ann.as_ref().and_then(|a| a.get_string("example"));
+fn eval_uri_template(
+    ctx: &mut Context,
+    template: syn::UriTemplate<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let example = ann.get_string("example");
 
     let mut path = Vec::new();
     for seg in template.segments() {
@@ -282,15 +279,15 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Res
                 path.push(s);
             }
             syn::UriSegment::Variable(var) => {
-                let p = eval_any(ctx, var.inner())?;
-                let s = UriSegment::Variable(Box::new(cast_property(p)));
+                let p = cast_property(eval_any(ctx, var.inner(), AnnRef::default())?);
+                let s = UriSegment::Variable(Box::new(p));
                 path.push(s);
             }
         }
     }
 
     let params = match template.params() {
-        Some(p) => Some(cast_object(eval_object(ctx, p)?)),
+        Some(p) => Some(cast_object(eval_object(ctx, p, AnnRef::default())?)),
         None => None,
     };
 
@@ -300,31 +297,44 @@ fn eval_uri_template(ctx: &mut Context, template: syn::UriTemplate<Core>) -> Res
         params,
     };
 
-    Ok(Expr::Uri(Box::new(uri)))
+    let expr = Expr::Uri(Box::new(uri));
+    Ok((expr, ann))
 }
 
-fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Expr> {
+fn eval_variable(
+    ctx: &mut Context,
+    variable: syn::Variable<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
     let definition = definition(ctx.mods, variable.node()).expect("variable is not defined");
 
     if let Some(decl) = syn::Declaration::cast(definition) {
-        if let Some(other) = compose_annotations(decl.annotations())? {
-            ctx.annotate(other)
-        }
-        let expr = eval_any(ctx, decl.rhs())?;
+        let mut rhs_ann = compose_annotations(decl.annotations())?;
+        rhs_ann.extend(ann.as_ref().clone());
+        let rhs_ann = AnnRef::new(rhs_ann);
+        let (expr, next_ann) = eval_any(ctx, decl.rhs(), rhs_ann)?;
+
         let ident = variable.ident();
         if ident.is_reference() {
-            let reference = Reference::Schema(cast_schema(ctx, expr));
+            let reference = Reference::Schema(cast_schema((expr, next_ann.clone())));
             ctx.refs
                 .get_or_insert_with(Default::default)
                 .insert(ident.clone(), reference);
-            Ok(Expr::Reference(ident))
+            let expr = Expr::Reference(ident);
+            Ok((expr, next_ann))
         } else {
-            Ok(expr)
+            Ok((expr, next_ann))
         }
     } else if let Some(binding) = syn::Binding::cast(definition) {
         let scope = ctx.scopes.last().expect("scope is missing");
-        let expr = scope.get(&binding.ident()).expect("binding is undefined");
-        Ok(expr.clone())
+        let (expr, bind_ann) = scope
+            .get(&binding.ident())
+            .expect("binding is undefined")
+            .clone();
+        let mut next_ann = ann.as_ref().clone();
+        next_ann.extend(bind_ann.as_ref().clone());
+        let next_ann = AnnRef::new(next_ann);
+        Ok((expr, next_ann))
     } else {
         panic!(
             "expected variable definition to be either a declaration or a binding: {:?}",
@@ -333,17 +343,20 @@ fn eval_variable(ctx: &mut Context, variable: syn::Variable<Core>) -> Result<Exp
     }
 }
 
-fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> {
-    let ann = ctx.annotation();
-    let ann = ann.as_ref();
-    let desc = ann.and_then(|a| a.get_string("description"));
-    let examples = ann.and_then(|a| a.get_props("examples"));
+fn eval_content(
+    ctx: &mut Context,
+    content: syn::Content<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let desc = ann.get_string("description");
+    let examples = ann.get_props("examples");
 
     let schema = match content.body() {
-        Some(body) => {
-            let s = eval_any(ctx, body)?;
-            Some(Box::new(cast_schema(ctx, s)))
-        }
+        Some(body) => Some(Box::new(cast_schema(eval_any(
+            ctx,
+            body,
+            AnnRef::default(),
+        )?))),
         None => None,
     };
 
@@ -355,7 +368,7 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
     let mut media = None;
     let mut headers = None;
     for meta in content.meta() {
-        let rhs = eval_any(ctx, meta.rhs())?;
+        let rhs = eval_any(ctx, meta.rhs(), AnnRef::default())?;
         match meta.tag() {
             lex::Content::Media => media = Some(cast_string(rhs)),
             lex::Content::Headers => headers = Some(cast_object(rhs)),
@@ -372,67 +385,82 @@ fn eval_content(ctx: &mut Context, content: syn::Content<Core>) -> Result<Expr> 
         examples,
     };
 
-    Ok(Expr::Content(Box::new(cnt)))
+    let expr = Expr::Content(Box::new(cnt));
+    Ok((expr, ann))
 }
 
-fn eval_object(ctx: &mut Context, object: syn::Object<Core>) -> Result<Expr> {
+fn eval_object(
+    ctx: &mut Context,
+    object: syn::Object<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
     let mut props = Vec::new();
     for prop in object.properties() {
-        props.push(cast_property(eval_any(ctx, prop)?));
+        props.push(cast_property(eval_any(ctx, prop, AnnRef::default())?));
     }
     let obj = Object { props };
-    Ok(Expr::Object(Box::new(obj)))
+    let expr = Expr::Object(Box::new(obj));
+    Ok((expr, ann))
 }
 
-fn eval_operation(ctx: &mut Context, operation: syn::VariadicOp<Core>) -> Result<Expr> {
+fn eval_operation(
+    ctx: &mut Context,
+    operation: syn::VariadicOp<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
     let op = operation.operator();
-    if op == atom::Operator::Range {
+    let expr = if op == atom::Operator::Range {
         let mut ranges = Ranges::new();
         for operand in operation.operands() {
-            let o = eval_any(ctx, operand)?;
-            let c = cast_content(ctx, o);
+            let c = cast_content(eval_any(ctx, operand, AnnRef::default())?);
             ranges.insert((c.status, c.media.clone()), c);
         }
-        Ok(Expr::Ranges(Box::new(ranges)))
+        Expr::Ranges(Box::new(ranges))
     } else {
         let mut schemas = Vec::new();
         for operand in operation.operands() {
-            let o = eval_any(ctx, operand)?;
-            schemas.push(cast_schema(ctx, o));
+            schemas.push(cast_schema(eval_any(ctx, operand, AnnRef::default())?));
         }
         let var_op = VariadicOp { op, schemas };
-        Ok(Expr::VariadicOp(Box::new(var_op)))
-    }
+        Expr::VariadicOp(Box::new(var_op))
+    };
+    Ok((expr, ann))
 }
 
-fn eval_literal(_ctx: &mut Context, literal: syn::Literal<Core>) -> Result<Expr> {
-    match literal.kind() {
+fn eval_literal(
+    _ctx: &mut Context,
+    literal: syn::Literal<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let expr = match literal.kind() {
         lex::Literal::HttpStatus => {
             let lex::TokenValue::HttpStatus(status) = literal.value()
                 else { panic!("expected an HTTP status") };
-            Ok(Expr::HttpStatus(*status))
+            Expr::HttpStatus(*status)
         }
         lex::Literal::Number => {
             let lex::TokenValue::Number(number) = literal.value()
                 else { panic!("expected a number") };
-            Ok(Expr::Number(*number))
+            Expr::Number(*number)
         }
         lex::Literal::String => {
             let string = literal.as_str().to_owned();
-            Ok(Expr::String(string))
+            Expr::String(string)
         }
-    }
+    };
+    Ok((expr, ann))
 }
 
-fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Expr> {
-    let ann = ctx.annotation();
-    let ann = ann.as_ref();
-    let desc = ann.and_then(|a| a.get_string("description"));
-    let required = ann.and_then(|a| a.get_bool("required"));
+fn eval_property(
+    ctx: &mut Context,
+    property: syn::Property<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let desc = ann.get_string("description");
+    let required = ann.get_bool("required");
 
     let name = property.name();
-    let s = eval_any(ctx, property.rhs())?;
-    let schema = cast_schema(ctx, s);
+    let schema = cast_schema(eval_any(ctx, property.rhs(), AnnRef::default())?);
 
     let prop = Property {
         name,
@@ -441,37 +469,40 @@ fn eval_property(ctx: &mut Context, property: syn::Property<Core>) -> Result<Exp
         required,
     };
 
-    Ok(Expr::Property(Box::new(prop)))
+    let expr = Expr::Property(Box::new(prop));
+    Ok((expr, ann))
 }
 
-fn eval_primitive(ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result<Expr> {
-    let ann = ctx.annotation();
-    let ann = ann.as_ref();
-    let value = match primitive.primitive() {
+fn eval_primitive(
+    _ctx: &mut Context,
+    primitive: syn::Primitive<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    let expr = match primitive.primitive() {
         lex::Primitive::Bool => Expr::PrimBoolean(Box::new(PrimBoolean {})),
         lex::Primitive::Int => {
             let p = PrimInteger {
-                minimum: ann.and_then(|a| a.get_int("minimum")),
-                maximum: ann.and_then(|a| a.get_int("maximum")),
-                multiple_of: ann.and_then(|a| a.get_int("multipleOf")),
-                example: ann.and_then(|a| a.get_int("example")),
+                minimum: ann.get_int("minimum"),
+                maximum: ann.get_int("maximum"),
+                multiple_of: ann.get_int("multipleOf"),
+                example: ann.get_int("example"),
             };
             Expr::PrimInteger(Box::new(p))
         }
         lex::Primitive::Num => {
             let p = PrimNumber {
-                minimum: ann.and_then(|a| a.get_num("minimum")),
-                maximum: ann.and_then(|a| a.get_num("maximum")),
-                multiple_of: ann.and_then(|a| a.get_num("multipleOf")),
-                example: ann.and_then(|a| a.get_num("example")),
+                minimum: ann.get_num("minimum"),
+                maximum: ann.get_num("maximum"),
+                multiple_of: ann.get_num("multipleOf"),
+                example: ann.get_num("example"),
             };
             Expr::PrimNumber(Box::new(p))
         }
         lex::Primitive::Str => {
             let p = PrimString {
-                pattern: ann.and_then(|a| a.get_string("pattern")),
-                enumeration: ann.and_then(|a| a.get_enum("enum")).unwrap_or_default(),
-                example: ann.and_then(|a| a.get_string("example")),
+                pattern: ann.get_string("pattern"),
+                enumeration: ann.get_enum("enum").unwrap_or_default(),
+                example: ann.get_string("example"),
             };
             Expr::PrimString(Box::new(p))
         }
@@ -479,78 +510,89 @@ fn eval_primitive(ctx: &mut Context, primitive: syn::Primitive<Core>) -> Result<
             let p = Uri {
                 path: Vec::new(),
                 params: None,
-                example: ann.and_then(|a| a.get_string("example")),
+                example: ann.get_string("example"),
             };
             Expr::Uri(Box::new(p))
         }
     };
-    Ok(value)
+    Ok((expr, ann))
 }
 
-fn eval_array(ctx: &mut Context, array: syn::Array<Core>) -> Result<Expr> {
-    let item = eval_any(ctx, array.inner())?;
+fn eval_array(ctx: &mut Context, array: syn::Array<Core>, ann: AnnRef) -> Result<(Expr, AnnRef)> {
     let array = Array {
-        item: cast_schema(ctx, item),
+        item: cast_schema(eval_any(ctx, array.inner(), AnnRef::default())?),
     };
-    Ok(Expr::Array(Box::new(array)))
+    let expr = Expr::Array(Box::new(array));
+    Ok((expr, ann))
 }
 
-fn eval_application(ctx: &mut Context, app: syn::Application<Core>) -> Result<Expr> {
+fn eval_application(
+    ctx: &mut Context,
+    app: syn::Application<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
     let definition = definition(ctx.mods, app.node()).expect("function is not defined");
 
     if let Some(decl) = syn::Declaration::cast(definition) {
-        if let Some(other) = compose_annotations(decl.annotations())? {
-            ctx.annotate(other)
-        }
         let mut scope = HashMap::new();
         for (binding, argument) in decl.bindings().zip(app.arguments()) {
-            let arg = eval_terminal(ctx, argument)?;
+            let arg = eval_terminal(ctx, argument, AnnRef::default())?;
             scope.insert(binding.ident(), arg);
         }
+
+        let mut app_ann = compose_annotations(decl.annotations())?;
+        app_ann.extend(ann.as_ref().clone());
+        let app_ann = AnnRef::new(app_ann);
+
         ctx.scopes.push(scope);
-        let expr = eval_any(ctx, decl.rhs())?;
+        let (expr, next_ann) = eval_any(ctx, decl.rhs(), app_ann)?;
         ctx.scopes.pop();
-        Ok(expr)
+
+        Ok((expr, next_ann))
     } else {
         panic!("expected function definition to be a declaration")
     }
 }
 
-fn eval_subexpression(ctx: &mut Context, expr: syn::SubExpression<Core>) -> Result<Expr> {
-    eval_any(ctx, expr.inner())
+fn eval_subexpression(
+    ctx: &mut Context,
+    expr: syn::SubExpression<Core>,
+    ann: AnnRef,
+) -> Result<(Expr, AnnRef)> {
+    eval_any(ctx, expr.inner(), ann)
 }
 
-fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
+fn eval_any(ctx: &mut Context, node: NRef, ann: AnnRef) -> Result<(Expr, AnnRef)> {
     if let Some(program) = syn::Program::cast(node) {
-        eval_program(ctx, program)
+        eval_program(ctx, program, ann)
     } else if let Some(relation) = syn::Relation::cast(node) {
-        eval_relation(ctx, relation)
+        eval_relation(ctx, relation, ann)
     } else if let Some(template) = syn::UriTemplate::cast(node) {
-        eval_uri_template(ctx, template)
+        eval_uri_template(ctx, template, ann)
     } else if let Some(variable) = syn::Variable::cast(node) {
-        eval_variable(ctx, variable)
+        eval_variable(ctx, variable, ann)
     } else if let Some(term) = syn::Terminal::cast(node) {
-        eval_terminal(ctx, term)
+        eval_terminal(ctx, term, ann)
     } else if let Some(content) = syn::Content::cast(node) {
-        eval_content(ctx, content)
+        eval_content(ctx, content, ann)
     } else if let Some(object) = syn::Object::cast(node) {
-        eval_object(ctx, object)
+        eval_object(ctx, object, ann)
     } else if let Some(operation) = syn::VariadicOp::cast(node) {
-        eval_operation(ctx, operation)
+        eval_operation(ctx, operation, ann)
     } else if let Some(literal) = syn::Literal::cast(node) {
-        eval_literal(ctx, literal)
+        eval_literal(ctx, literal, ann)
     } else if let Some(property) = syn::Property::cast(node) {
-        eval_property(ctx, property)
+        eval_property(ctx, property, ann)
     } else if let Some(primitive) = syn::Primitive::cast(node) {
-        eval_primitive(ctx, primitive)
+        eval_primitive(ctx, primitive, ann)
     } else if let Some(array) = syn::Array::cast(node) {
-        eval_array(ctx, array)
+        eval_array(ctx, array, ann)
     } else if let Some(app) = syn::Application::cast(node) {
-        eval_application(ctx, app)
+        eval_application(ctx, app, ann)
     } else if let Some(expr) = syn::SubExpression::cast(node) {
-        eval_subexpression(ctx, expr)
+        eval_subexpression(ctx, expr, ann)
     } else if let Some(xfer) = syn::Transfer::cast(node) {
-        eval_transfer(ctx, xfer)
+        eval_transfer(ctx, xfer, ann)
     } else {
         panic!("unexpected node: {:#?}", node)
     }
@@ -558,7 +600,8 @@ fn eval_any(ctx: &mut Context, node: NRef) -> Result<Expr> {
 
 pub fn eval(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
     let ctx = &mut Context::new(mods);
-    let expr = eval_any(ctx, mods.get(loc).unwrap().tree().root())?;
+    let ann = AnnRef::default();
+    let (expr, _) = eval_any(ctx, mods.get(loc).unwrap().tree().root(), ann)?;
     let Expr::Spec(spec) = expr else { panic!("expected a specification") };
     Ok(*spec)
 }

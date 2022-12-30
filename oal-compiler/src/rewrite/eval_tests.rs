@@ -59,16 +59,37 @@ fn eval_annotation() -> anyhow::Result<()> {
 fn eval_composed_annotation() -> anyhow::Result<()> {
     let s = eval(
         r#"
-        let a = num `title: "num"`;
-        let b = 'prop a `required: true`;
-        res / ( get -> { b } );
+        # description: "a number"
+        # title: "a number"
+        let a = num `minimum: 0`;
+        res / ( get -> {
+            # description: "a property"
+            # required: true
+            'prop a `title: "a property type"`
+        } );
     "#,
     )?;
 
     assert_eq!(s.rels.len(), 1);
-
-    // println!("{:#?}", s);
-    // TODO: test composition of annotations
+    let (_, p) = s.rels.iter().next().unwrap();
+    let x = p.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    assert_eq!(x.ranges.len(), 1);
+    let c = x.ranges.values().next().unwrap();
+    let s = c.schema.as_ref().unwrap();
+    let SchemaExpr::Object(ref o) = s.expr else { panic!("expected an object") };
+    assert_eq!(o.props.len(), 1);
+    let p = o.props.first().unwrap();
+    assert_eq!(p.name, "prop");
+    assert_eq!(p.desc.as_ref().unwrap(), "a property");
+    assert!(p.required.unwrap());
+    let s = &p.schema;
+    assert_eq!(s.desc.as_ref().unwrap(), "a number");
+    assert_eq!(s.title.as_ref().unwrap(), "a property type");
+    assert!(s.required.is_none());
+    let SchemaExpr::Num(ref n) = s.expr else { panic!("expected a number") };
+    assert_eq!(n.minimum.unwrap(), 0f64);
 
     Ok(())
 }

@@ -218,18 +218,33 @@ fn parse_import() {
 }
 
 #[test]
-fn parse_decl_ann_inline() {
+fn parse_terminal_annotations() {
     parse(r#"let a = num `title: "number"`;"#, |p: Prog| {
         let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
         assert_eq!(
-            term.annotation().expect("expected an inline annotation"),
+            term.annotations().next().expect("expected an annotation"),
             r#"title: "number""#
         );
     });
     parse(r#"let a = num;"#, |p: Prog| {
         let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
-        assert!(term.annotation().is_none());
-    })
+        assert!(term.annotations().next().is_none());
+    });
+    parse(
+        r#"
+    let a =
+        # title: "number"
+        # required: true
+        num `minimum: 0`;
+    "#,
+        |p: Prog| {
+            let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
+            assert_eq!(
+                term.annotations().collect::<Vec<_>>(),
+                vec![" title: \"number\"\n", " required: true\n", "minimum: 0"]
+            );
+        },
+    )
 }
 
 #[test]
@@ -399,7 +414,7 @@ let a = /p (
 }
 
 #[test]
-fn parse_annotation() {
+fn parse_decl_annotations() {
     parse(
         r#"
 # description: "some identifier"

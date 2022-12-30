@@ -1,16 +1,15 @@
----
 openapi: 3.0.3
 info:
   title: Example
   description: Example
   license:
     name: Apache 2.0
-    url: "https://www.apache.org/licenses/LICENSE-2.0.html"
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
   version: 1.0.0
 servers:
   - url: /
 paths:
-  "/some/path/{id}/template":
+  /some/path/{id}/template:
     get:
       tags:
         - blah
@@ -166,19 +165,19 @@ components:
           example: sarah
           title: First name
           type: string
-          pattern: "^[a-z]+$"
+          pattern: ^[a-z]+$
         lastName:
           example: sarah
           title: Last name
           type: string
-          pattern: "^[a-z]+$"
+          pattern: ^[a-z]+$
         middleNames:
           title: Middle names
           type: array
           items:
             example: sarah
             type: string
-            pattern: "^[a-z]+$"
+            pattern: ^[a-z]+$
       required:
         - firstName
         - lastName
