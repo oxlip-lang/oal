@@ -771,7 +771,7 @@ pub fn parser<'a>(
         SyntaxKind::Import,
     );
 
-    // TODO: implement skip_until for composite input types.
+    // TODO: implement skip_until for composite input types or refactor TokenAlias into a scalar.
     let statement = declaration
         .or(resource)
         .or(import)

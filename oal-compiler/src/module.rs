@@ -164,9 +164,10 @@ where
                 let module = Module::new(import.clone(), tree);
                 mods.insert(module);
 
-                let node = graph.add_node(import.clone());
-                deps.insert(import, node);
-                queue.push(node);
+                let m = graph.add_node(import.clone());
+                graph.add_edge(n, m, ());
+                deps.insert(import, m);
+                queue.push(m);
             }
         }
     }

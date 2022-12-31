@@ -1,9 +1,8 @@
 use crate::locator::Locator;
 
-// TODO: remove default trait
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TagId {
-    loc: Option<Locator>,
+    loc: Locator,
     n: usize,
 }
 
@@ -20,14 +19,13 @@ pub enum Tag {
     Status,
     Primitive,
     Relation,
-    PropertyAny, // TODO: obsolete
-    Property(Box<Tag>),
     Object,
     Content,
     Transfer,
     Array,
     Uri,
     Any,
+    Property(Box<Tag>),
     Func(FuncTag),
     Var(TagId),
 }
@@ -64,17 +62,13 @@ pub trait Tagged {
     fn with_tag(self, t: Tag) -> Self;
 }
 
-// TODO: remove default trait
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Seq(TagId);
 
 impl Seq {
     /// Create a new sequence of tag variables for the given module.
     pub fn new(loc: Locator) -> Self {
-        Seq(TagId {
-            loc: Some(loc),
-            n: 0,
-        })
+        Seq(TagId { loc, n: 0 })
     }
 
     /// Allocate a new tag variable sequence number.
