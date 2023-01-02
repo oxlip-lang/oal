@@ -1,9 +1,9 @@
 use crate::env::Env;
 use crate::errors::{Error, Kind, Result};
-use crate::locator::Locator;
 use crate::module::{External, ModuleSet};
 use crate::tree::NRef;
 use oal_model::grammar::NodeCursor;
+use oal_model::locator::Locator;
 use oal_syntax::atom::Ident;
 use oal_syntax::parser::{Application, Declaration, Import, Program, Variable};
 

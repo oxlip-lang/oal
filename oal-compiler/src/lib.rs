@@ -4,7 +4,6 @@ mod env;
 mod errors;
 pub mod eval;
 mod inference;
-pub mod locator;
 pub mod module;
 mod resolve;
 pub mod spec;

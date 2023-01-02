@@ -6,9 +6,9 @@ pub mod unify;
 mod tests;
 
 use crate::errors::{Error, Kind, Result};
-use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::tree::{definition, get_tag, set_tag};
+use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;

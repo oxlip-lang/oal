@@ -3,14 +3,12 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[derive(thiserror::Error, Debug, Default)]
 pub enum Kind {
-    #[error("invalid YAML content")]
+    #[error("YAML")]
     Yaml(#[from] serde_yaml::Error),
-    #[error("input/output error")]
-    IO(#[from] std::io::Error),
-    #[error("invalid URL")]
-    Url(#[from] url::ParseError),
-    #[error("invalid syntax")]
+    #[error("syntax")]
     Syntax(#[from] oal_syntax::errors::Error),
+    #[error("model")]
+    Model(#[from] oal_model::errors::Error),
     #[error("not in scope")]
     NotInScope,
     #[error("not a function")]

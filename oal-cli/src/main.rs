@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use clap::Parser as ClapParser;
-use oal_compiler::locator::Locator;
+use oal_model::locator::Locator;
 use oal_compiler::module::ModuleSet;
 use oal_compiler::tree::Tree;
 

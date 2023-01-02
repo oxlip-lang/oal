@@ -1,28 +1,32 @@
 /// The parser error type.
 #[derive(thiserror::Error, Debug)]
-pub enum Error<L: crate::lexicon::Lexeme> {
+pub enum Error {
     #[error("syntax analysis failed")]
-    Grammar(#[from] Box<crate::grammar::ParserError<L>>),
+    Grammar(Box<dyn std::error::Error + Send + Sync>),
     #[error("tokenization failed")]
-    Lexicon(#[from] Box<crate::lexicon::ParserError>),
+    Lexicon(Box<crate::lexicon::ParserError>),
+    #[error("invalid URL")]
+    Url(#[from] url::ParseError),
+    #[error("invalid path")]
+    Path,
+    #[error("input/output error")]
+    IO(#[from] std::io::Error),
 }
 
-impl<L> From<crate::grammar::ParserError<L>> for Error<L>
+impl<L> From<crate::grammar::ParserError<L>> for Error
 where
     L: crate::lexicon::Lexeme,
 {
     fn from(e: crate::grammar::ParserError<L>) -> Self {
-        Error::from(Box::new(e))
+        Error::Grammar(Box::new(e))
     }
 }
 
-impl<L> From<crate::lexicon::ParserError> for Error<L>
-where
-    L: crate::lexicon::Lexeme,
+impl From<crate::lexicon::ParserError> for Error
 {
     fn from(e: crate::lexicon::ParserError) -> Self {
-        Error::from(Box::new(e))
+        Error::Lexicon(Box::new(e))
     }
 }
 
-pub type Result<T, L> = std::result::Result<T, Error<L>>;
+pub type Result<T> = std::result::Result<T, Error>;

@@ -1,7 +1,7 @@
 use crate::errors::{Error, Kind};
-use crate::locator::Locator;
 use crate::tree::{NRef, Tree};
 use oal_model::grammar::NodeIdx;
+use oal_model::locator::Locator;
 use oal_syntax::parser::Program;
 use petgraph::algo::toposort;
 use petgraph::prelude::*;
@@ -153,7 +153,8 @@ where
         let mut imports = Vec::new();
         let prog = Program::cast(module.tree().root()).expect("expected a program");
         for import in prog.imports() {
-            imports.push(base.join(import.module())?);
+            let i = base.join(import.module()).map_err(Error::from)?;
+            imports.push(i);
         }
 
         for import in imports {

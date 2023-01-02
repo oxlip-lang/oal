@@ -17,8 +17,8 @@ pub trait Intern {
     fn as_str<'a, I: Interner>(&'a self, from: &'a I) -> &'a str;
 }
 
-pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug {
-    type Kind: Copy + Clone + PartialEq + Eq + Hash + Debug;
+pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug + 'static {
+    type Kind: Copy + Clone + PartialEq + Eq + Hash + Debug + Send + Sync;
     type Value: Debug + Intern;
 
     fn new(kind: Self::Kind, value: Self::Value) -> Self;
@@ -120,7 +120,7 @@ where
                     Some((TokenAlias::new(token.kind(), index), *span))
                 }
             });
-        Stream::from_iter(Span::from(len..len + 1), iter)
+        Stream::from_iter(Span::new(len..len + 1), iter)
     }
 }
 
@@ -128,7 +128,7 @@ where
 pub type ParserError = Simple<char, Span>;
 
 /// Parse a string of characters, yielding a list of tokens.
-pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>, L>
+pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>>
 where
     L: Lexeme,
     I: AsRef<str>,
@@ -141,8 +141,8 @@ where
         .as_ref()
         .chars()
         .enumerate()
-        .map(|(i, c)| (c, Span::from(i..i + 1)));
-    let stream = Stream::from_iter(Span::from(len..len + 1), iter);
+        .map(|(i, c)| (c, Span::new(i..i + 1)));
+    let stream = Stream::from_iter(Span::new(len..len + 1), iter);
 
     let (tokens, mut errs) = lexer.parse_recovery(stream);
 

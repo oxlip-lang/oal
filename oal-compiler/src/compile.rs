@@ -1,9 +1,9 @@
 use crate::errors::Result;
 use crate::inference::{check_complete, constrain, substitute, tag};
-use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::resolve::resolve;
 use crate::typecheck::type_check;
+use oal_model::locator::Locator;
 
 pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     // Resolve variable and function references.

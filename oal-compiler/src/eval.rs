@@ -1,6 +1,5 @@
 use crate::annotation::Annotation;
 use crate::errors::Result;
-use crate::locator::Locator;
 use crate::module::ModuleSet;
 use crate::spec::{
     Array, Content, Object, PrimBoolean, PrimInteger, PrimNumber, PrimString, Property, Ranges,
@@ -10,6 +9,7 @@ use crate::spec::{
 use crate::tree::{definition, Core, NRef};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
+use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;

@@ -4,23 +4,29 @@ use std::ops::Range;
 /// The parsing span type.
 // TODO: track parsing context
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Span(usize, usize);
+pub struct Span {
+    start: usize,
+    end: usize,
+}
 
 impl Span {
     pub fn new(range: Range<usize>) -> Self {
-        Span(range.start, range.end)
+        Span {
+            start: range.start,
+            end: range.end,
+        }
     }
 
     pub fn range(&self) -> Range<usize> {
-        self.0..self.1
+        self.start..self.end
     }
 
     pub fn start(&self) -> usize {
-        self.0
+        self.start
     }
 
     pub fn end(&self) -> usize {
-        self.1
+        self.end
     }
 }
 
@@ -47,11 +53,5 @@ impl chumsky::Span for Span {
 impl Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}..{}", self.start(), self.end())
-    }
-}
-
-impl From<Range<usize>> for Span {
-    fn from(range: Range<usize>) -> Self {
-        Span::new(range)
     }
 }

@@ -42,7 +42,7 @@ impl TryFrom<&Path> for Locator {
         let path = p.canonicalize()?;
         let url = Url::from_file_path(path)
             .map(Rc::new)
-            .map_err(|_| crate::errors::Kind::Unknown)?;
+            .map_err(|_| crate::errors::Error::Path)?;
         Ok(Locator { url })
     }
 }

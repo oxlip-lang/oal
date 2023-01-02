@@ -12,6 +12,7 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
+oal-model = { path = "../oal-model" }
 oal-syntax = { path = "../oal-syntax" }
 oal-compiler = { path = "../oal-compiler" }
 oal-codegen = { path = "../oal-codegen" }

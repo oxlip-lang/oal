@@ -20,7 +20,6 @@ enum-map-derive = "0.10.0"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9.14"
 anyhow = "1.0.57"
-url = "2.2.2"
 backtrace = "0.3"
 thiserror = "1.0.37"
 petgraph = "0.6.2"

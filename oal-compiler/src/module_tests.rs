@@ -1,6 +1,6 @@
 use crate::errors;
-use crate::locator::Locator;
 use crate::module::{load, ModuleSet};
+use oal_model::locator::Locator;
 
 #[test]
 fn module_cycle() -> anyhow::Result<()> {

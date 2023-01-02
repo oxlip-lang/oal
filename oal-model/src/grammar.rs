@@ -545,7 +545,7 @@ pub type ParserError<L> = Simple<TokenAlias<L>, Span>;
 pub fn analyze<G, P, T>(
     tokens: TokenList<G::Lex>,
     parser: P,
-) -> Result<SyntaxTree<T, G>, <G as Grammar>::Lex>
+) -> Result<SyntaxTree<T, G>>
 where
     G: Grammar,
     P: Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = ParserError<<G as Grammar>::Lex>>,

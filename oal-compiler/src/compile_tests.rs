@@ -1,6 +1,6 @@
 use crate::compile::compile;
-use crate::locator::Locator;
 use crate::module::{Module, ModuleSet};
+use oal_model::locator::Locator;
 
 #[test]
 fn compile_modules() -> anyhow::Result<()> {
