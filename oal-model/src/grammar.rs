@@ -542,10 +542,7 @@ macro_rules! match_token {
 pub type ParserError<L> = Simple<TokenAlias<L>, Span>;
 
 /// Perform syntax analysis over a list of tokens, yielding a concrete syntax tree.
-pub fn analyze<G, P, T>(
-    tokens: TokenList<G::Lex>,
-    parser: P,
-) -> Result<SyntaxTree<T, G>>
+pub fn analyze<G, P, T>(tokens: TokenList<G::Lex>, parser: P) -> Result<SyntaxTree<T, G>>
 where
     G: Grammar,
     P: Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = ParserError<<G as Grammar>::Lex>>,

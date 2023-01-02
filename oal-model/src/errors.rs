@@ -22,8 +22,7 @@ where
     }
 }
 
-impl From<crate::lexicon::ParserError> for Error
-{
+impl From<crate::lexicon::ParserError> for Error {
     fn from(e: crate::lexicon::ParserError) -> Self {
         Error::Lexicon(Box::new(e))
     }
