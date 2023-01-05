@@ -1,34 +1,23 @@
 use oal_model::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(thiserror::Error, Debug, Default)]
+#[derive(thiserror::Error, Debug)]
 pub enum Kind {
-    #[error("YAML")]
+    #[error("invalid locator")]
+    Locator(#[from] oal_model::locator::Error),
+    #[error("invalid YAML")]
     Yaml(#[from] serde_yaml::Error),
-    #[error("syntax")]
+    #[error("invalid syntax")]
     Syntax(#[from] oal_syntax::errors::Error),
-    #[error("model")]
-    Model(#[from] oal_model::errors::Error),
     #[error("not in scope")]
     NotInScope,
-    #[error("not a function")]
-    NotAFunction,
     #[error("invalid types")]
     InvalidTypes,
-    #[error("conflict")]
-    Conflict,
-    #[error("unexpected expression")]
-    UnexpectedExpression,
     #[error("cycle detected")]
     CycleDetected,
-    #[error("invalid HTTP status")]
-    InvalidHttpStatus,
-    #[default]
-    #[error("unknown error")]
-    Unknown,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Error {
     msg: String,
     details: Vec<String>,
@@ -39,8 +28,10 @@ pub struct Error {
 impl<E: Into<Kind>> From<E> for Error {
     fn from(e: E) -> Self {
         Error {
+            msg: Default::default(),
+            details: Default::default(),
+            span: Default::default(),
             kind: e.into(),
-            ..Default::default()
         }
     }
 }

@@ -1,8 +1,18 @@
-use crate::errors::{Error, Result};
 use std::fmt::{Debug, Display, Formatter};
 use std::path::Path;
 use std::rc::Rc;
+use std::result::Result;
 use url::Url;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("invalid URL")]
+    InvalidUrl(#[from] url::ParseError),
+    #[error("invalid path")]
+    InvalidPath(std::ffi::OsString),
+    #[error("input/output error")]
+    IO(#[from] std::io::Error),
+}
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Locator {
@@ -14,7 +24,7 @@ impl Locator {
         self.url.as_ref()
     }
 
-    pub fn join(&self, path: &str) -> Result<Locator> {
+    pub fn join(&self, path: &str) -> Result<Self, Error> {
         let url = self.url.join(path).map(Rc::new)?;
         Ok(Locator { url })
     }
@@ -27,9 +37,9 @@ impl Debug for Locator {
 }
 
 impl TryFrom<&str> for Locator {
-    type Error = Error;
+    type Error = url::ParseError;
 
-    fn try_from(s: &str) -> Result<Locator> {
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         let url = Url::parse(s).map(Rc::new)?;
         Ok(Locator { url })
     }
@@ -38,11 +48,11 @@ impl TryFrom<&str> for Locator {
 impl TryFrom<&Path> for Locator {
     type Error = Error;
 
-    fn try_from(p: &Path) -> Result<Locator> {
+    fn try_from(p: &Path) -> Result<Self, Self::Error> {
         let path = p.canonicalize()?;
         let url = Url::from_file_path(path)
             .map(Rc::new)
-            .map_err(|_| crate::errors::Error::Path)?;
+            .map_err(|_| Error::InvalidPath(p.as_os_str().to_owned()))?;
         Ok(Locator { url })
     }
 }

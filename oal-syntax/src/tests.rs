@@ -463,10 +463,8 @@ fn parse_resource() {
 fn parse_grammar_error() {
     let Err(err) = crate::parse::<_, ()>("res / ( get -> );")
         else { panic!("expected an error") };
-    let crate::errors::Error::Parser(err) = err
-        else { panic!("expected a parser error") };
     assert!(
-        matches!(*err, oal_model::errors::Error::Grammar(_)),
+        matches!(err, crate::errors::Error::Grammar(_)),
         "expected a grammar error"
     );
 }
@@ -475,10 +473,8 @@ fn parse_grammar_error() {
 fn parse_lexicon_error() {
     let Err(err) = crate::parse::<_, ()>("!!! / ( get -> );")
         else { panic!("expected an error") };
-    let crate::errors::Error::Parser(err) = err
-        else { panic!("expected a parser error") };
     assert!(
-        matches!(*err, oal_model::errors::Error::Lexicon(_)),
+        matches!(err, crate::errors::Error::Lexicon(_)),
         "expected a lexicon error"
     );
 }

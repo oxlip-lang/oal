@@ -102,7 +102,7 @@ impl std::fmt::Debug for External {
     }
 }
 
-pub trait Loader<E>: Fn(&Locator) -> std::result::Result<Tree, E>
+pub trait Loader<E>: FnMut(&Locator) -> std::result::Result<Tree, E>
 where
     E: From<Error>,
 {
@@ -111,11 +111,11 @@ where
 impl<E, F> Loader<E> for F
 where
     E: From<Error>,
-    F: Fn(&Locator) -> std::result::Result<Tree, E>,
+    F: FnMut(&Locator) -> std::result::Result<Tree, E>,
 {
 }
 
-pub trait Compiler<E>: Fn(&ModuleSet, &Locator) -> std::result::Result<(), E>
+pub trait Compiler<E>: FnMut(&ModuleSet, &Locator) -> std::result::Result<(), E>
 where
     E: From<Error>,
 {
@@ -124,11 +124,15 @@ where
 impl<E, F> Compiler<E> for F
 where
     E: From<Error>,
-    F: Fn(&ModuleSet, &Locator) -> std::result::Result<(), E>,
+    F: FnMut(&ModuleSet, &Locator) -> std::result::Result<(), E>,
 {
 }
 
-pub fn load<E, L, C>(base: &Locator, loader: L, compiler: C) -> std::result::Result<ModuleSet, E>
+pub fn load<E, L, C>(
+    base: &Locator,
+    mut loader: L,
+    mut compiler: C,
+) -> std::result::Result<ModuleSet, E>
 where
     E: From<Error>,
     L: Loader<E>,
@@ -159,14 +163,14 @@ where
 
         for import in imports {
             if let Some(m) = deps.get(&import) {
-                graph.add_edge(n, *m, ());
+                graph.add_edge(*m, n, ());
             } else {
                 let tree = loader(&import)?;
                 let module = Module::new(import.clone(), tree);
                 mods.insert(module);
 
                 let m = graph.add_node(import.clone());
-                graph.add_edge(n, m, ());
+                graph.add_edge(m, n, ());
                 deps.insert(import, m);
                 queue.push(m);
             }

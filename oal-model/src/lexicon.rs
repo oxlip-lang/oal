@@ -1,4 +1,3 @@
-use crate::errors::Result;
 use crate::span::Span;
 use chumsky::{prelude::*, Stream};
 use std::fmt::{Debug, Display, Formatter};
@@ -128,7 +127,7 @@ where
 pub type ParserError = Simple<char, Span>;
 
 /// Parse a string of characters, yielding a list of tokens.
-pub fn tokenize<L, I, P>(input: I, lexer: P) -> Result<TokenList<L>>
+pub fn tokenize<L, I, P>(input: I, lexer: P) -> std::result::Result<TokenList<L>, Box<ParserError>>
 where
     L: Lexeme,
     I: AsRef<str>,
