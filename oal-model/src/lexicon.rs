@@ -16,8 +16,8 @@ pub trait Intern {
     fn as_str<'a, I: Interner>(&'a self, from: &'a I) -> &'a str;
 }
 
-pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug + 'static {
-    type Kind: Copy + Clone + PartialEq + Eq + Hash + Debug + Send + Sync;
+pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug {
+    type Kind: Copy + Clone + PartialEq + Eq + Hash + Debug;
     type Value: Debug + Intern;
 
     fn new(kind: Self::Kind, value: Self::Value) -> Self;

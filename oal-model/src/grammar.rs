@@ -409,7 +409,7 @@ macro_rules! syntax_nodes {
 
         $(
             #[allow(dead_code)]
-            #[derive(Debug)]
+            #[derive(Clone, Copy, Debug)]
             pub struct $node<'a, T: Core>(NodeRef<'a, T, $grammar>);
 
             #[allow(dead_code)]

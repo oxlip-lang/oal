@@ -1,14 +1,21 @@
 use crate::errors;
-use crate::inference::tag;
+use crate::inference::{check_complete, constrain, substitute, tag};
 use crate::resolve::resolve;
 use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
 use crate::tests::mods_from;
+use crate::typecheck::type_check;
 use oal_syntax::atom::{HttpStatus, Method, Operator};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
-    resolve(&mods, mods.base())?;
-    tag(&mods, mods.base())?;
+    let loc = mods.base();
+    resolve(&mods, loc)?;
+    let _nvars = tag(&mods, loc)?;
+    let eqs = constrain(&mods, loc)?;
+    let set = eqs.unify()?;
+    substitute(&mods, loc, &set)?;
+    check_complete(&mods, loc)?;
+    type_check(&mods, loc)?;
 
     // Uncomment for debugging purpose:
     // println!("{:#?}", mods.main().tree().root());
@@ -415,6 +422,25 @@ fn eval_subexpr() -> anyhow::Result<()> {
 
     let s = op.schemas.get(1).expect("expected a schema");
     assert!(matches!(s.expr, SchemaExpr::Op(_)));
+
+    Ok(())
+}
+
+#[test]
+#[ignore = "function as value not supported"]
+fn eval_lambda() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let f x = x;
+        let g = f;
+        res g /;
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let r = s.rels.values().next().unwrap();
+    assert_eq!(r.uri.path.len(), 1);
+    assert_eq!(*r.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
     Ok(())
 }

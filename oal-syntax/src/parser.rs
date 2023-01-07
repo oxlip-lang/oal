@@ -207,6 +207,10 @@ impl<'a, T: Core> Declaration<'a, T> {
             .filter_map(Binding::cast)
     }
 
+    pub fn has_bindings(&self) -> bool {
+        self.bindings().next().is_some()
+    }
+
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
         self.node().nth(Self::RHS_POS)
     }
