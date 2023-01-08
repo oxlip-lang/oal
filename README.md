@@ -140,7 +140,7 @@ let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "a
 res rel1;
 
 res /something?{ 'q str } (
-  get : <headers={ifnmatch},> -> with_err @obj3
+  get : <headers={ifnmatch}> -> with_err @obj3
 );
 ```
 ```
