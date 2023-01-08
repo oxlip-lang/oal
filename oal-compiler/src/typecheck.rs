@@ -29,7 +29,7 @@ fn check_operation(op: syn::VariadicOp<Core>) -> Result<()> {
 }
 
 fn check_content(content: syn::Content<Core>) -> Result<()> {
-    for meta in content.meta() {
+    for meta in content.meta().into_iter().flatten() {
         match meta.tag() {
             lex::Content::Media => {
                 if get_tag(meta.rhs()) != Tag::Text {

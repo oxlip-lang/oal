@@ -96,7 +96,7 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
             let rhs = get_tag(prop.rhs()).into();
             set.push(get_tag(node), Tag::Property(rhs), node.span());
         } else if let Some(cnt) = syn::Content::cast(node) {
-            for meta in cnt.meta() {
+            for meta in cnt.meta().into_iter().flatten() {
                 if let Some(t) = match meta.tag() {
                     lex::Content::Headers => Some(Tag::Object),
                     lex::Content::Media => Some(Tag::Text),

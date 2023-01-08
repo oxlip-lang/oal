@@ -371,7 +371,7 @@ fn eval_content<'a>(
     };
     let mut media = None;
     let mut headers = None;
-    for meta in content.meta() {
+    for meta in content.meta().into_iter().flatten() {
         let rhs = eval_any(ctx, meta.rhs(), AnnRef::default())?;
         match meta.tag() {
             lex::Content::Media => media = Some(cast_string(rhs)),

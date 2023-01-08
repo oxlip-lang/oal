@@ -444,28 +444,24 @@ impl<'a, T: Core> ContentMetaList<'a, T> {
 }
 
 impl<'a, T: Core> ContentBody<'a, T> {
-    const INNER_POS: usize = 0;
-
-    #[allow(clippy::iter_nth_zero)]
-    pub fn inner(&self) -> Option<NodeRef<'a, T, Gram>> {
-        self.node().children().nth(Self::INNER_POS)
+    pub fn inner(&self) -> NodeRef<'a, T, Gram> {
+        self.node().first()
     }
 }
 
 impl<'a, T: Core> Content<'a, T> {
-    const META_POS: usize = 1;
-    const BODY_POS: usize = 2;
-
-    pub fn meta(&self) -> impl Iterator<Item = ContentMeta<'a, T>> {
-        ContentMetaList::cast(self.node().nth(Self::META_POS))
-            .expect("expected content meta")
-            .items()
+    pub fn meta(&self) -> Option<impl Iterator<Item = ContentMeta<'a, T>>> {
+        self.node()
+            .children()
+            .find_map(ContentMetaList::cast)
+            .map(|m| m.items())
     }
 
     pub fn body(&self) -> Option<NodeRef<'a, T, Gram>> {
-        ContentBody::cast(self.node().nth(Self::BODY_POS))
-            .expect("expected content body")
-            .inner()
+        self.node()
+            .children()
+            .find_map(ContentBody::cast)
+            .map(|m| m.inner())
     }
 }
 
@@ -640,19 +636,29 @@ pub fn parser<'a>(
         );
 
         let content_meta_list = tree_many(
-            content_meta
-                .chain(just_token(TokenKind::Control(lex::Control::Comma)))
-                .repeated()
-                .flatten(),
+            content_meta.clone().chain(
+                just_token(TokenKind::Control(lex::Control::Comma))
+                    .chain(content_meta)
+                    .repeated()
+                    .flatten(),
+            ),
             SyntaxKind::ContentMetaList,
         );
 
-        let content_body = tree_maybe(expr.clone().or_not(), SyntaxKind::ContentBody);
+        let content_body = tree_one(expr.clone(), SyntaxKind::ContentBody);
 
         let content = tree_many(
             just_token(TokenKind::Control(lex::Control::ChevronLeft))
-                .chain(content_meta_list)
-                .chain(content_body)
+                .chain(
+                    content_meta_list
+                        .clone()
+                        .chain(just_token(TokenKind::Control(lex::Control::Comma)))
+                        .chain(content_body.clone())
+                        .or(content_meta_list.map(move |n| vec![n]))
+                        .or(content_body.map(move |n| vec![n]))
+                        .or_not()
+                        .flatten(),
+                )
                 .chain(just_token(TokenKind::Control(lex::Control::ChevronRight))),
             SyntaxKind::Content,
         );

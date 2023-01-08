@@ -258,7 +258,7 @@ fn parse_decl_content() {
             let body = cnt.body().expect("expected a content body");
             Object::cast(assert_term(body)).expect("expected an object");
 
-            let metas = &mut cnt.meta();
+            let metas = &mut cnt.meta().expect("expected meta list");
 
             let meta = metas.next().expect("expected meta");
             assert_eq!(meta.tag(), lex::Content::Media);
@@ -276,14 +276,13 @@ fn parse_decl_content() {
             assert!(metas.next().is_none());
         },
     );
-    parse(r#"let a = <status=204,>;"#, |p: Prog| {
+    parse(r#"let a = <status=204>;"#, |p: Prog| {
         let cnt =
             Content::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a content");
 
         assert!(cnt.body().is_none());
 
-        let metas = &mut cnt.meta();
-
+        let metas = &mut cnt.meta().expect("expected meta list");
         let meta = metas.next().expect("expected meta");
         assert_eq!(meta.tag(), lex::Content::Status);
         let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
@@ -291,12 +290,21 @@ fn parse_decl_content() {
 
         assert!(metas.next().is_none());
     });
+    parse(r#"let a = <{}>;"#, |p: Prog| {
+        let cnt =
+            Content::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a content");
+
+        let body = cnt.body().expect("expected a content body");
+        Object::cast(assert_term(body)).expect("expected an object");
+
+        assert!(cnt.meta().is_none());
+    });
     parse(r#"let a = <>;"#, |p: Prog| {
         let cnt =
             Content::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a content");
 
         assert!(cnt.body().is_none());
-        assert!(cnt.meta().next().is_none());
+        assert!(cnt.meta().is_none());
     })
 }
 
