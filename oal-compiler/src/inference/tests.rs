@@ -76,7 +76,7 @@ fn infer_unify() -> anyhow::Result<()> {
 
     let eqs = constrain(&mods, mods.base())?;
 
-    assert_eq!(eqs.len(), 16);
+    assert_eq!(eqs.len(), 18);
 
     let set = eqs.unify()?;
     substitute(&mods, mods.base(), &set)?;

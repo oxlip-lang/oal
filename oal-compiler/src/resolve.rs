@@ -5,7 +5,7 @@ use crate::tree::NRef;
 use oal_model::grammar::NodeCursor;
 use oal_model::locator::Locator;
 use oal_syntax::atom::Ident;
-use oal_syntax::parser::{Application, Declaration, Import, Program, Variable};
+use oal_syntax::parser::{Declaration, Import, Program, Variable};
 
 fn define(env: &mut Env, ident: Ident, node: NRef) -> Result<()> {
     if let Some(ext) = env.lookup(&ident) {
@@ -41,8 +41,6 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                     }
                 } else if let Some(var) = Variable::cast(node) {
                     define(env, var.ident(), var.node())?;
-                } else if let Some(app) = Application::cast(node) {
-                    define(env, app.ident(), app.node())?;
                 }
             }
             NodeCursor::End(node) => {

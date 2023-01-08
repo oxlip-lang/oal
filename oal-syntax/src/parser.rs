@@ -470,10 +470,8 @@ impl<'a, T: Core> Content<'a, T> {
 }
 
 impl<'a, T: Core> Application<'a, T> {
-    pub fn ident(&self) -> atom::Ident {
-        Identifier::cast(self.node().first())
-            .expect("expected an identifier")
-            .ident()
+    pub fn lambda(&self) -> Variable<'a, T> {
+        Variable::cast(self.node().first()).expect("expected a variable")
     }
 
     pub fn arguments(&self) -> impl Iterator<Item = Terminal<'a, T>> {
@@ -679,15 +677,14 @@ pub fn parser<'a>(
                         .or(object.clone())
                         .or(content)
                         .or(subexpr)
-                        .or(variable),
+                        .or(variable.clone()),
                 )
                 .chain(inline_annotation.or_not()),
             SyntaxKind::Terminal,
         );
 
         let application = tree_many(
-            just_token(TokenKind::Identifier(lex::Identifier::Value))
-                .chain(term_kind.clone().repeated().at_least(1)),
+            variable.chain(term_kind.clone().repeated().at_least(1)),
             SyntaxKind::Application,
         );
 

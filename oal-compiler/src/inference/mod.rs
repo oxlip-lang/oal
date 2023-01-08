@@ -131,16 +131,10 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
             };
             set.push(get_tag(node), tag, node.span());
         } else if let Some(app) = syn::Application::cast(node) {
-            let definition = definition(mods, node).ok_or_else(|| {
-                Error::new(Kind::NotInScope, "function is not defined").with(&node)
-            })?;
             let bindings = app.arguments().map(|a| get_tag(a.node())).collect();
             let range = get_tag(node).into();
-            set.push(
-                get_tag(definition),
-                Tag::Func(FuncTag { bindings, range }),
-                node.span(),
-            );
+            let lambda = get_tag(app.lambda().node());
+            set.push(lambda, Tag::Func(FuncTag { bindings, range }), node.span());
         } else if syn::Variable::cast(node).is_some() {
             let definition = definition(mods, node).ok_or_else(|| {
                 Error::new(Kind::NotInScope, "variable is not defined").with(&node)

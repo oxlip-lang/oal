@@ -427,13 +427,30 @@ fn eval_subexpr() -> anyhow::Result<()> {
 }
 
 #[test]
-#[ignore = "function as value not supported"]
-fn eval_lambda() -> anyhow::Result<()> {
+fn eval_lambda_variable() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let f x = x;
         let g = f;
         res g /;
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let r = s.rels.values().next().unwrap();
+    assert_eq!(r.uri.path.len(), 1);
+    assert_eq!(*r.uri.path.first().unwrap(), UriSegment::Literal("".into()));
+
+    Ok(())
+}
+
+#[test]
+fn eval_lambda_binding() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let f x = x;
+        let g y = y /;
+        res g f;
     "#,
     )?;
 

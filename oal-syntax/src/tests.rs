@@ -316,7 +316,7 @@ fn parse_decl_application() {
         let decl = assert_decl(p, "a");
 
         let app = Application::cast(decl.rhs()).expect("expected an application");
-        assert_eq!(app.ident(), "f");
+        assert_eq!(app.lambda().ident(), "f");
 
         let arguments = &mut app.arguments();
         assert_prim(

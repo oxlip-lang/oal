@@ -64,7 +64,7 @@ fn resolve_application() -> anyhow::Result<()> {
 
     let app = Application::cast(decl.rhs()).expect("expected an application");
 
-    let defn = definition(&mods, app.node()).expect("expected a definition");
+    let defn = definition(&mods, app.lambda().node()).expect("expected a definition");
 
     let decl = Declaration::cast(defn).expect("expected a declaration");
 
