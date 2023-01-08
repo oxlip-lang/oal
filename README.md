@@ -1,14 +1,13 @@
 ![Build](https://img.shields.io/github/actions/workflow/status/ebastien/openapi-lang/ci.yml?branch=master)
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# OpenAPI Language
-
-An experiment on a high-level functional programming language for designing
-OpenAPI specifications.
-This is not a general purpose language.
-The motivation is to play with algebraic language abstractions on top of OpenAPI
-in a similar fashion as Sass/SCSS over CSS.
-The ambition of the author is to consider OpenAPI as the assembly language of API design.
+# An OpenAPI Language
+OAL is a high-level functional programming language for designing
+OpenAPI definitions.
+It is not a general purpose language. It is not Turing Complete, by design.
+The motivation is to experiment with algebraic language abstractions over REST concepts,
+not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/).
+The ambition of the author is to consider OpenAPI as the assembly language of REST API design.
 
 The language is statically typed with global type inference.
 Due to the experimental nature of this project, error handling is rudimentary.
@@ -16,7 +15,6 @@ The CLI generates OpenAPI 3.0.3 definitions in YAML format from the resources de
 in the source program.
 
 ## Installation
-
 This step requires a [local Rust and Cargo installation](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
 ```
@@ -24,9 +22,19 @@ cargo install --path oal-cli
 ```
 
 ## Usage
-
 ```
-oal-cli -b examples/base.yaml -i examples/main.oal -o examples/openapi.yaml
+    oal-cli [OPTIONS] --input <INPUT> --output <OUTPUT>
+
+OPTIONS:
+    -b, --base <BASE>        The path to a base OpenAPI description
+    -h, --help               Print help information
+    -i, --input <INPUT>      The path to the source program
+    -o, --output <OUTPUT>    The path to the output OpenAPI description
+```
+
+### Compiling the example program
+```
+oal-cli --base examples/base.yaml --input examples/main.oal --output examples/openapi.yaml
 ```
 
 ## Examples of language constructs:
@@ -143,3 +151,15 @@ res /something?{ 'q str } (
 ```
 
 [OpenAPI definition generated from this program](examples/openapi.yaml)
+
+## Related work and comparison with OAL
+- [Cadl](https://github.com/microsoft/cadl)
+- [Smithy IDL](https://github.com/awslabs/smithy)
+
+Arguably, Cadl and Smithy provide an opinionated service interface abstraction
+that happens to compile down to an OpenAPI definition.
+As they take on a broader scope than REST APIs (e.g. GraphQL, gRPC), it is not their objective to behave as a preprocessor and to offer feature parity with OpenAPI.
+The language design philosophy for both Cald and Smithy looks similar and influenced by familiar object-oriented and general purpose languages.
+
+OAL takes a different approach by defining an algebra and a functional evaluation strategy to combine low-level REST concepts into modular OpenAPI descriptions.
+Cadl's support for parameterized data types (aka. templates) comes closer than Smithy in this regard.
