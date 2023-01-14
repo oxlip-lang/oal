@@ -346,7 +346,7 @@ fn eval_reference() -> anyhow::Result<()> {
         .expect("expected transfer on HTTP GET");
 
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Ref(i) = &r.expr else { panic!("expected an reference") };
+    let SchemaExpr::Ref(i) = &r.expr else { panic!("expected a reference") };
     assert_eq!(*i, "@a");
 
     assert_eq!(s.refs.len(), 1);
@@ -354,6 +354,50 @@ fn eval_reference() -> anyhow::Result<()> {
     let Reference::Schema(r) = s.refs.values().next().unwrap();
     let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
     assert!(o.props.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn eval_reference_fallback() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let @a = /;
+        res @a ( get -> <> );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let (i, p) = s.rels.iter().next().unwrap();
+    assert_eq!(i, "/");
+    assert_eq!(p.uri.path.len(), 1);
+    assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
+
+    assert_eq!(s.refs.len(), 1);
+    let Reference::Schema(r) = s.refs.values().next().unwrap();
+    let SchemaExpr::Uri(u) = &r.expr else { panic!("expected an URI") };
+    assert_eq!(u.path.len(), 1);
+    assert_eq!(*u.path.first().unwrap(), UriSegment::Literal("".into()));
+
+    Ok(())
+}
+
+#[test]
+fn eval_reference_lambda() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let @a x = x;
+        res (@a /) ( get -> <> );
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let (i, p) = s.rels.iter().next().unwrap();
+    assert_eq!(i, "/");
+    assert_eq!(p.uri.path.len(), 1);
+    assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
+
+    assert!(s.refs.is_empty());
 
     Ok(())
 }

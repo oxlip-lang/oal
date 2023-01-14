@@ -3,8 +3,8 @@ use crate::errors::Result;
 use crate::module::ModuleSet;
 use crate::spec::{
     Array, Content, Object, PrimBoolean, PrimInteger, PrimNumber, PrimString, Property, Ranges,
-    Reference, References, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri,
-    UriSegment, VariadicOp,
+    Reference, Relation, Schema, SchemaExpr, Spec, Transfer, Transfers, Uri, UriSegment,
+    VariadicOp,
 };
 use crate::tree::{definition, Core, NRef};
 use enum_map::EnumMap;
@@ -16,8 +16,13 @@ use oal_syntax::parser as syn;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+// AnnRef is the type of references to annotations.
 type AnnRef = Rc<Annotation>;
 
+// Value is the type of evaluation results.
+type Value<'a> = (Expr<'a>, AnnRef);
+
+// Expr is the type of evaluated expressions.
 #[derive(Clone, Debug)]
 enum Expr<'a> {
     Spec(Box<Spec>),
@@ -33,7 +38,7 @@ enum Expr<'a> {
     PrimString(Box<PrimString>),
     PrimBoolean(Box<PrimBoolean>),
     VariadicOp(Box<VariadicOp>),
-    Reference(atom::Ident),
+    Reference(atom::Ident, Box<Value<'a>>),
     Array(Box<Array>),
     String(String),
     Number(u64),
@@ -41,9 +46,31 @@ enum Expr<'a> {
     Lambda(syn::Declaration<'a, Core>),
 }
 
+impl<'a> Expr<'a> {
+    fn is_schema_like(&self) -> bool {
+        matches!(
+            self,
+            Expr::Object(_)
+                | Expr::PrimInteger(_)
+                | Expr::PrimNumber(_)
+                | Expr::PrimString(_)
+                | Expr::PrimBoolean(_)
+                | Expr::Array(_)
+                | Expr::Uri(_)
+                | Expr::VariadicOp(_)
+                | Expr::Reference(_, _)
+                | Expr::Relation(_)
+        )
+    }
+
+    fn is_content_like(&self) -> bool {
+        matches!(self, Expr::Content(_)) || self.is_schema_like()
+    }
+}
+
 struct Context<'a> {
     mods: &'a ModuleSet,
-    refs: Option<References>,
+    refs: IndexMap<atom::Ident, Value<'a>>,
     scopes: Vec<HashMap<atom::Ident, syn::Terminal<'a, Core>>>,
 }
 
@@ -51,7 +78,7 @@ impl<'a> Context<'a> {
     fn new(mods: &'a ModuleSet) -> Self {
         Context {
             mods,
-            refs: None,
+            refs: IndexMap::new(),
             scopes: Vec::new(),
         }
     }
@@ -85,9 +112,9 @@ fn cast_schema(from: (Expr, AnnRef)) -> Schema {
         Expr::Array(a) => SchemaExpr::Array(a),
         Expr::Uri(u) => SchemaExpr::Uri(*u),
         Expr::VariadicOp(o) => SchemaExpr::Op(*o),
-        Expr::Reference(r) => SchemaExpr::Ref(r),
+        Expr::Reference(r, _) => SchemaExpr::Ref(r),
         Expr::Relation(r) => SchemaExpr::Rel(r),
-        e => panic!("not a schema expression: {:?}", e),
+        e => panic!("not a schema: {:?}", e),
     };
 
     Schema {
@@ -100,25 +127,34 @@ fn cast_schema(from: (Expr, AnnRef)) -> Schema {
 }
 
 fn cast_content(from: (Expr, AnnRef)) -> Content {
-    match from.0 {
-        Expr::Content(c) => *c,
-        _ => Content::from(cast_schema(from)),
+    if let Expr::Content(c) = from.0 {
+        *c
+    } else if from.0.is_schema_like() {
+        Content::from(cast_schema(from))
+    } else if let Expr::Reference(_, v) = from.0 {
+        cast_content(*v)
+    } else {
+        panic!("not a content: {:?}", from.0)
     }
 }
 
 fn cast_ranges(from: (Expr, AnnRef)) -> Ranges {
-    match from.0 {
-        Expr::Ranges(r) => *r,
-        _ => {
-            let c = cast_content(from);
-            Ranges::from([((c.status, c.media.clone()), c)])
-        }
+    if let Expr::Ranges(r) = from.0 {
+        *r
+    } else if from.0.is_content_like() {
+        let c = cast_content(from);
+        Ranges::from([((c.status, c.media.clone()), c)])
+    } else if let Expr::Reference(_, v) = from.0 {
+        cast_ranges(*v)
+    } else {
+        panic!("not ranges: {:?}", from.0)
     }
 }
 
 fn cast_string(from: (Expr, AnnRef)) -> String {
     match from.0 {
         Expr::String(s) => s,
+        Expr::Reference(_, v) => cast_string(*v),
         e => panic!("not a string: {:?}", e),
     }
 }
@@ -126,6 +162,7 @@ fn cast_string(from: (Expr, AnnRef)) -> String {
 fn cast_property(from: (Expr, AnnRef)) -> Property {
     match from.0 {
         Expr::Property(p) => *p,
+        Expr::Reference(_, v) => cast_property(*v),
         e => panic!("not a property: {:?}", e),
     }
 }
@@ -137,6 +174,7 @@ fn cast_http_status(from: (Expr, AnnRef)) -> Result<atom::HttpStatus> {
             let s = atom::HttpStatus::try_from(n)?;
             Ok(s)
         }
+        Expr::Reference(_, v) => cast_http_status(*v),
         e => panic!("not an HTTP status: {:?}", e),
     }
 }
@@ -144,6 +182,7 @@ fn cast_http_status(from: (Expr, AnnRef)) -> Result<atom::HttpStatus> {
 fn cast_object(from: (Expr, AnnRef)) -> Object {
     match from.0 {
         Expr::Object(o) => *o,
+        Expr::Reference(_, v) => cast_object(*v),
         e => panic!("not an object: {:?}", e),
     }
 }
@@ -151,6 +190,7 @@ fn cast_object(from: (Expr, AnnRef)) -> Object {
 fn cast_transfer(from: (Expr, AnnRef)) -> Transfer {
     match from.0 {
         Expr::Transfer(x) => *x,
+        Expr::Reference(_, v) => cast_transfer(*v),
         e => panic!("not a transfer: {:?}", e),
     }
 }
@@ -158,6 +198,7 @@ fn cast_transfer(from: (Expr, AnnRef)) -> Transfer {
 fn cast_relation(from: (Expr, AnnRef)) -> Relation {
     match from.0 {
         Expr::Relation(r) => *r,
+        Expr::Reference(_, v) => cast_relation(*v),
         _ => Relation::from(cast_uri(from)),
     }
 }
@@ -166,7 +207,16 @@ fn cast_uri(from: (Expr, AnnRef)) -> Uri {
     match from.0 {
         Expr::Uri(u) => *u,
         Expr::Relation(r) => r.uri,
+        Expr::Reference(_, v) => cast_uri(*v),
         e => panic!("not a uri: {:?}", e),
+    }
+}
+
+fn cast_lambda(from: (Expr, AnnRef)) -> syn::Declaration<Core> {
+    match from.0 {
+        Expr::Lambda(d) => d,
+        Expr::Reference(_, v) => cast_lambda(*v),
+        e => panic!("not a lambda: {:?}", e),
     }
 }
 
@@ -256,10 +306,19 @@ fn eval_program<'a>(
         rels.insert(rel.uri.pattern(), rel);
     }
 
-    let spec = Spec {
-        rels,
-        refs: ctx.refs.take().unwrap_or_default(),
-    };
+    let refs = ctx
+        .refs
+        .drain(..)
+        .filter_map(|(ident, (expr, ann))| {
+            if expr.is_schema_like() {
+                Some((ident, Reference::Schema(cast_schema((expr, ann)))))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let spec = Spec { rels, refs };
 
     let expr = Expr::Spec(Box::new(spec));
     Ok((expr, ann))
@@ -321,12 +380,9 @@ fn eval_variable<'a>(
 
             let ident = variable.ident();
             if ident.is_reference() {
-                // FIXME: return an error if the variable is not a schema
-                let reference = Reference::Schema(cast_schema((expr, next_ann.clone())));
-                ctx.refs
-                    .get_or_insert_with(Default::default)
-                    .insert(ident.clone(), reference);
-                let expr = Expr::Reference(ident);
+                let value = (expr, next_ann.clone());
+                ctx.refs.insert(ident.clone(), value.clone());
+                let expr = Expr::Reference(ident, value.into());
                 Ok((expr, next_ann))
             } else {
                 Ok((expr, next_ann))
@@ -356,11 +412,10 @@ fn eval_content<'a>(
     let examples = ann.get_props("examples");
 
     let schema = match content.body() {
-        Some(body) => Some(Box::new(cast_schema(eval_any(
-            ctx,
-            body,
-            AnnRef::default(),
-        )?))),
+        Some(body) => {
+            let s = cast_schema(eval_any(ctx, body, AnnRef::default())?);
+            Some(Box::new(s))
+        }
         None => None,
     };
 
@@ -423,7 +478,8 @@ fn eval_operation<'a>(
     } else {
         let mut schemas = Vec::new();
         for operand in operation.operands() {
-            schemas.push(cast_schema(eval_any(ctx, operand, AnnRef::default())?));
+            let s = cast_schema(eval_any(ctx, operand, AnnRef::default())?);
+            schemas.push(s);
         }
         let var_op = VariadicOp { op, schemas };
         Expr::VariadicOp(Box::new(var_op))
@@ -527,9 +583,8 @@ fn eval_array<'a>(
     array: syn::Array<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let array = Array {
-        item: cast_schema(eval_any(ctx, array.inner(), AnnRef::default())?),
-    };
+    let schema = cast_schema(eval_any(ctx, array.inner(), AnnRef::default())?);
+    let array = Array { item: schema };
     let expr = Expr::Array(Box::new(array));
     Ok((expr, ann))
 }
@@ -539,8 +594,7 @@ fn eval_application<'a>(
     app: syn::Application<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let (Expr::Lambda(decl), _) = eval_variable(ctx, app.lambda(), AnnRef::default())?
-        else { panic!("expected application variable to be a function") };
+    let decl = cast_lambda(eval_variable(ctx, app.lambda(), AnnRef::default())?);
 
     let mut scope = HashMap::new();
     for (binding, argument) in decl.bindings().zip(app.arguments()) {
