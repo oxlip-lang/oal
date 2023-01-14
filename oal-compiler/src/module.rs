@@ -8,33 +8,13 @@ use petgraph::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct Module {
-    loc: Locator,
-    tree: Tree,
-}
-
-impl Module {
-    pub fn new(loc: Locator, tree: Tree) -> Self {
-        Module { loc, tree }
-    }
-
-    pub fn locator(&self) -> &Locator {
-        &self.loc
-    }
-
-    pub fn tree(&self) -> &Tree {
-        &self.tree
-    }
-}
-
-#[derive(Debug)]
 pub struct ModuleSet {
     base: Locator,
-    mods: HashMap<Locator, Module>,
+    mods: HashMap<Locator, Tree>,
 }
 
 impl ModuleSet {
-    pub fn new(main: Module) -> Self {
+    pub fn new(main: Tree) -> Self {
         ModuleSet {
             base: main.locator().clone(),
             mods: HashMap::from([(main.locator().clone(), main)]),
@@ -45,11 +25,11 @@ impl ModuleSet {
         &self.base
     }
 
-    pub fn main(&self) -> &Module {
+    pub fn main(&self) -> &Tree {
         self.mods.get(&self.base).unwrap()
     }
 
-    pub fn insert(&mut self, m: Module) {
+    pub fn insert(&mut self, m: Tree) {
         self.mods.insert(m.locator().clone(), m);
     }
 
@@ -61,7 +41,7 @@ impl ModuleSet {
         self.len() == 0
     }
 
-    pub fn get(&self, l: &Locator) -> Option<&Module> {
+    pub fn get(&self, l: &Locator) -> Option<&Tree> {
         self.mods.get(l)
     }
 }
@@ -73,7 +53,7 @@ pub struct External {
 }
 
 impl External {
-    pub fn new(module: &Module, node: NRef) -> Self {
+    pub fn new(module: &Tree, node: NRef) -> Self {
         External {
             loc: module.locator().clone(),
             index: node.index(),
@@ -82,7 +62,7 @@ impl External {
 
     pub fn node<'a>(&self, mods: &'a ModuleSet) -> NRef<'a> {
         if let Some(module) = mods.get(&self.loc) {
-            NRef::from(module.tree(), self.index)
+            NRef::from(module, self.index)
         } else {
             // All modules must be present in the module-set.
             panic!("unknown module: {}", self.loc)
@@ -102,7 +82,7 @@ impl std::fmt::Debug for External {
     }
 }
 
-pub trait Loader<E>: FnMut(&Locator) -> std::result::Result<Tree, E>
+pub trait Loader<E>: FnMut(Locator) -> std::result::Result<Tree, E>
 where
     E: From<Error>,
 {
@@ -111,7 +91,7 @@ where
 impl<E, F> Loader<E> for F
 where
     E: From<Error>,
-    F: FnMut(&Locator) -> std::result::Result<Tree, E>,
+    F: FnMut(Locator) -> std::result::Result<Tree, E>,
 {
 }
 
@@ -142,8 +122,7 @@ where
     let mut graph = Graph::new();
     let mut queue = Vec::new();
 
-    let tree = loader(base)?;
-    let main = Module::new(base.clone(), tree);
+    let main = loader(base.clone())?;
     let mut mods = ModuleSet::new(main);
 
     let root = graph.add_node(base.clone());
@@ -155,7 +134,7 @@ where
         let module = mods.get(loc).unwrap();
 
         let mut imports = Vec::new();
-        let prog = Program::cast(module.tree().root()).expect("expected a program");
+        let prog = Program::cast(module.root()).expect("expected a program");
         for import in prog.imports() {
             let i = base.join(import.module()).map_err(Error::from)?;
             imports.push(i);
@@ -165,8 +144,7 @@ where
             if let Some(m) = deps.get(&import) {
                 graph.add_edge(*m, n, ());
             } else {
-                let tree = loader(&import)?;
-                let module = Module::new(import.clone(), tree);
+                let module = loader(import.clone())?;
                 mods.insert(module);
 
                 let m = graph.add_node(import.clone());
@@ -179,7 +157,7 @@ where
 
     let topo = toposort(&graph, None).map_err(|err| {
         let loc = graph.node_weight(err.node_id()).unwrap();
-        Error::new(Kind::CycleDetected, "loading module").with(loc)
+        Error::new(Kind::CycleDetected, "cycle in module dependencies").with(loc)
     })?;
     for node in topo {
         let loc = graph.node_weight(node).unwrap();

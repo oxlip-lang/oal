@@ -9,7 +9,7 @@ pub enum Kind {
     Yaml(#[from] serde_yaml::Error),
     #[error("invalid syntax")]
     Syntax(#[from] oal_syntax::errors::Error),
-    #[error("not in scope")]
+    #[error("identifier not in scope")]
     NotInScope,
     #[error("invalid types")]
     InvalidTypes,
@@ -59,7 +59,8 @@ impl Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        writeln!(f, "{:?}: {}", self.kind, self.msg)?;
+        writeln!(f, "{}", self.kind)?;
+        writeln!(f, "Context: {}", self.msg)?;
         if let Some(span) = &self.span {
             writeln!(f, "Location: {}", span)?;
         }

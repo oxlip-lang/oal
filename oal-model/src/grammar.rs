@@ -1,6 +1,7 @@
 use crate::lexicon::{
     Intern, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList, TokenSpan,
 };
+use crate::locator::Locator;
 use crate::span::Span;
 use chumsky::prelude::*;
 use generational_indextree::NodeEdge;
@@ -102,16 +103,6 @@ pub struct SyntaxTree<T: Core, G: Grammar> {
     root: Option<NodeIdx>,
 }
 
-impl<T: Core, G: Grammar> Default for SyntaxTree<T, G> {
-    fn default() -> Self {
-        SyntaxTree {
-            tokens: TokenList::default(),
-            tree: TreeArena::default(),
-            root: Option::default(),
-        }
-    }
-}
-
 impl<T: Core, G: Grammar> Interner for SyntaxTree<T, G> {
     fn register<S: AsRef<str>>(&mut self, s: S) -> Symbol {
         self.tokens.register(s)
@@ -133,8 +124,20 @@ impl<T: Core, G: Grammar> Debug for SyntaxTree<T, G> {
 }
 
 impl<T: Core, G: Grammar> SyntaxTree<T, G> {
+    pub fn new(loc: Locator) -> Self {
+        SyntaxTree {
+            tokens: TokenList::new(loc),
+            tree: TreeArena::default(),
+            root: Option::default(),
+        }
+    }
+
+    pub fn locator(&self) -> &Locator {
+        self.tokens.locator()
+    }
+
     pub fn import(tokens: TokenList<G::Lex>, parse: ParseNode<G>) -> Self {
-        let mut tree = SyntaxTree::default();
+        let mut tree = SyntaxTree::new(tokens.locator().clone());
         let root = parse.to_tree(&mut tree, None);
         tree.tokens = tokens;
         tree.root = Some(root);
@@ -146,7 +149,7 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
     }
 
     pub fn detach(&self, id: NodeIdx) -> SyntaxTree<T, G> {
-        let mut tree = SyntaxTree::default();
+        let mut tree = SyntaxTree::new(self.tokens.locator().clone());
         let mut parents: Vec<NodeIdx> = Vec::new();
         let mut root: Option<NodeIdx> = None;
 
@@ -166,7 +169,7 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
 
                             let new_token = <<G as Grammar>::Lex as Lexeme>::new(kind, new_value);
 
-                            let new_index = tree.push((new_token, *span));
+                            let new_index = tree.push((new_token, span.clone()));
 
                             SyntaxTrunk::Leaf(TokenAlias::new(kind, new_index))
                         }
@@ -246,8 +249,8 @@ impl<'a, G: Grammar> TokenRef<'a, G> {
         &self.tokens.get(self.idx).0
     }
 
-    pub fn span(&self) -> Span {
-        self.tokens.get(self.idx).1
+    pub fn span(&self) -> &Span {
+        &self.tokens.get(self.idx).1
     }
 
     pub fn value(&self) -> &'a <<G as Grammar>::Lex as Lexeme>::Value {
@@ -351,7 +354,9 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     /// Returns the span of text from first to last token, if any.
     pub fn span(&self) -> Option<Span> {
         if let (Some(start), Some(end)) = (self.start(), self.end()) {
-            Some(Span::new(start.span().start()..end.span().end()))
+            let s = start.span();
+            let e = end.span();
+            Some(Span::new(s.locator().clone(), s.start()..e.end()))
         } else {
             None
         }

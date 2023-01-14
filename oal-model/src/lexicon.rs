@@ -1,3 +1,4 @@
+use crate::locator::Locator;
 use crate::span::Span;
 use chumsky::{prelude::*, Stream};
 use std::fmt::{Debug, Display, Formatter};
@@ -62,15 +63,7 @@ type ListArena<L> = generational_token_list::GenerationalTokenList<(L, Span)>;
 pub struct TokenList<L: Lexeme> {
     list: ListArena<L>,
     dict: StringInterner,
-}
-
-impl<L: Lexeme> Default for TokenList<L> {
-    fn default() -> Self {
-        TokenList {
-            list: ListArena::default(),
-            dict: StringInterner::default(),
-        }
-    }
+    loc: Locator,
 }
 
 impl<L: Lexeme> Interner for TokenList<L> {
@@ -87,6 +80,18 @@ impl<L> TokenList<L>
 where
     L: Lexeme,
 {
+    pub fn new(loc: Locator) -> Self {
+        TokenList {
+            list: ListArena::default(),
+            dict: StringInterner::default(),
+            loc,
+        }
+    }
+
+    pub fn locator(&self) -> &Locator {
+        &self.loc
+    }
+
     pub fn get(&self, id: TokenIdx) -> &TokenSpan<L> {
         self.list.get(id).unwrap()
     }
@@ -116,10 +121,10 @@ where
                 if token.is_trivia() {
                     None
                 } else {
-                    Some((TokenAlias::new(token.kind(), index), *span))
+                    Some((TokenAlias::new(token.kind(), index), span.clone()))
                 }
             });
-        Stream::from_iter(Span::new(len..len + 1), iter)
+        Stream::from_iter(Span::new(self.loc.clone(), len..len + 1), iter)
     }
 }
 
@@ -127,21 +132,25 @@ where
 pub type ParserError = Simple<char, Span>;
 
 /// Parse a string of characters, yielding a list of tokens.
-pub fn tokenize<L, I, P>(input: I, lexer: P) -> std::result::Result<TokenList<L>, Box<ParserError>>
+pub fn tokenize<L, I, P>(
+    loc: Locator,
+    input: I,
+    lexer: P,
+) -> std::result::Result<TokenList<L>, Box<ParserError>>
 where
     L: Lexeme,
     I: AsRef<str>,
     P: Parser<char, Vec<TokenSpan<L>>, Error = ParserError>,
 {
-    let mut token_list = TokenList::<L>::default();
+    let mut token_list = TokenList::<L>::new(loc.clone());
 
     let len = input.as_ref().len();
     let iter = input
         .as_ref()
         .chars()
         .enumerate()
-        .map(|(i, c)| (c, Span::new(i..i + 1)));
-    let stream = Stream::from_iter(Span::new(len..len + 1), iter);
+        .map(|(i, c)| (c, Span::new(loc.clone(), i..i + 1)));
+    let stream = Stream::from_iter(Span::new(loc.clone(), len..len + 1), iter);
 
     let (tokens, mut errs) = lexer.parse_recovery(stream);
 

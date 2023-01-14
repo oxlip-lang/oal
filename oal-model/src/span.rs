@@ -1,20 +1,26 @@
+use crate::locator::Locator;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
 /// The parsing span type.
-// TODO: track parsing context
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     start: usize,
     end: usize,
+    loc: Locator,
 }
 
 impl Span {
-    pub fn new(range: Range<usize>) -> Self {
+    pub fn new(loc: Locator, range: Range<usize>) -> Self {
         Span {
             start: range.start,
             end: range.end,
+            loc,
         }
+    }
+
+    pub fn locator(&self) -> &Locator {
+        &self.loc
     }
 
     pub fn range(&self) -> Range<usize> {
@@ -31,15 +37,17 @@ impl Span {
 }
 
 impl chumsky::Span for Span {
-    type Context = ();
+    type Context = Locator;
 
     type Offset = usize;
 
-    fn new(_: Self::Context, range: Range<Self::Offset>) -> Self {
-        Span::new(range)
+    fn new(loc: Locator, range: Range<Self::Offset>) -> Self {
+        Span::new(loc, range)
     }
 
-    fn context(&self) -> Self::Context {}
+    fn context(&self) -> Self::Context {
+        self.loc.clone()
+    }
 
     fn start(&self) -> Self::Offset {
         self.start()
@@ -52,6 +60,6 @@ impl chumsky::Span for Span {
 
 impl Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}..{}", self.start(), self.end())
+        write!(f, "{}#{}..{}", self.locator(), self.start(), self.end())
     }
 }

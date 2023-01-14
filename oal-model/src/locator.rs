@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::path::Path;
-use std::rc::Rc;
 use std::result::Result;
+use std::sync::Arc;
 use url::Url;
 
 #[derive(thiserror::Error, Debug)]
@@ -16,7 +16,7 @@ pub enum Error {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Locator {
-    pub url: Rc<Url>,
+    url: Arc<Url>,
 }
 
 impl Locator {
@@ -25,7 +25,7 @@ impl Locator {
     }
 
     pub fn join(&self, path: &str) -> Result<Self, Error> {
-        let url = self.url.join(path).map(Rc::new)?;
+        let url = self.url.join(path).map(Arc::new)?;
         Ok(Locator { url })
     }
 }
@@ -40,7 +40,7 @@ impl TryFrom<&str> for Locator {
     type Error = url::ParseError;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let url = Url::parse(s).map(Rc::new)?;
+        let url = Url::parse(s).map(Arc::new)?;
         Ok(Locator { url })
     }
 }
@@ -51,7 +51,7 @@ impl TryFrom<&Path> for Locator {
     fn try_from(p: &Path) -> Result<Self, Self::Error> {
         let path = p.canonicalize()?;
         let url = Url::from_file_path(path)
-            .map(Rc::new)
+            .map(Arc::new)
             .map_err(|_| Error::InvalidPath(p.as_os_str().to_owned()))?;
         Ok(Locator { url })
     }

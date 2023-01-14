@@ -1,20 +1,18 @@
 use crate::compile::compile;
-use crate::module::{Module, ModuleSet};
+use crate::module::ModuleSet;
 use oal_model::locator::Locator;
 
 #[test]
 fn compile_modules() -> anyhow::Result<()> {
-    let input = std::fs::read_to_string("../examples/main.oal")?;
-    let tree = oal_syntax::parse(input)?;
     let base = Locator::try_from("file:///main.oal")?;
-    let main = Module::new(base.clone(), tree);
+    let input = std::fs::read_to_string("../examples/main.oal")?;
+    let main = oal_syntax::parse(base.clone(), input)?;
 
     let mut mods = ModuleSet::new(main);
 
-    let input = std::fs::read_to_string("../examples/module.oal")?;
-    let tree = oal_syntax::parse(input)?;
     let loc = Locator::try_from("file:///module.oal")?;
-    let module = Module::new(loc.clone(), tree);
+    let input = std::fs::read_to_string("../examples/module.oal")?;
+    let module = oal_syntax::parse(loc.clone(), input)?;
     mods.insert(module);
 
     compile(&mods, &loc)?;

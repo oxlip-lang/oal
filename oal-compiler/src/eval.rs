@@ -66,6 +66,10 @@ impl<'a> Expr<'a> {
     fn is_content_like(&self) -> bool {
         matches!(self, Expr::Content(_)) || self.is_schema_like()
     }
+
+    fn is_uri_like(&self) -> bool {
+        matches!(self, Expr::Uri(_) | Expr::Relation(_))
+    }
 }
 
 struct Context<'a> {
@@ -196,10 +200,14 @@ fn cast_transfer(from: (Expr, AnnRef)) -> Transfer {
 }
 
 fn cast_relation(from: (Expr, AnnRef)) -> Relation {
-    match from.0 {
-        Expr::Relation(r) => *r,
-        Expr::Reference(_, v) => cast_relation(*v),
-        _ => Relation::from(cast_uri(from)),
+    if let Expr::Relation(r) = from.0 {
+        *r
+    } else if from.0.is_uri_like() {
+        Relation::from(cast_uri(from))
+    } else if let Expr::Reference(_, v) = from.0 {
+        cast_relation(*v)
+    } else {
+        panic!("not a relation: {:?}", from.0)
     }
 }
 
@@ -659,7 +667,7 @@ fn eval_any<'a>(ctx: &mut Context<'a>, node: NRef<'a>, ann: AnnRef) -> Result<(E
 pub fn eval(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
     let ctx = &mut Context::new(mods);
     let ann = AnnRef::default();
-    let (expr, _) = eval_any(ctx, mods.get(loc).unwrap().tree().root(), ann)?;
+    let (expr, _) = eval_any(ctx, mods.get(loc).unwrap().root(), ann)?;
     let Expr::Spec(spec) = expr else { panic!("expected a specification") };
     Ok(*spec)
 }

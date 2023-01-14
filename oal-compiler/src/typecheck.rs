@@ -132,28 +132,31 @@ fn check_resource(res: syn::Resource<Core>) -> Result<()> {
 pub fn type_check(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
-    for node in module.tree().root().descendants() {
+    for node in module.root().descendants() {
         if let Some(operation) = syn::VariadicOp::cast(node) {
-            check_operation(operation)?;
+            check_operation(operation)
         } else if let Some(content) = syn::Content::cast(node) {
-            check_content(content)?;
+            check_content(content)
         } else if let Some(xfer) = syn::Transfer::cast(node) {
-            check_transfer(xfer)?;
+            check_transfer(xfer)
         } else if let Some(relation) = syn::Relation::cast(node) {
-            check_relation(relation)?;
+            check_relation(relation)
         } else if let Some(uri) = syn::UriTemplate::cast(node) {
-            check_uri(uri)?;
+            check_uri(uri)
         } else if let Some(array) = syn::Array::cast(node) {
-            check_array(array)?;
+            check_array(array)
         } else if let Some(prop) = syn::Property::cast(node) {
-            check_property(prop)?;
+            check_property(prop)
         } else if let Some(object) = syn::Object::cast(node) {
-            check_object(object)?;
+            check_object(object)
         } else if let Some(decl) = syn::Declaration::cast(node) {
-            check_declaration(decl)?;
+            check_declaration(decl)
         } else if let Some(res) = syn::Resource::cast(node) {
-            check_resource(res)?;
+            check_resource(res)
+        } else {
+            Ok(())
         }
+        .map_err(|err| err.at(node.span()))?;
     }
 
     Ok(())

@@ -21,21 +21,21 @@ struct Args {
 }
 
 /// Loads and parses a source file into a concrete syntax tree.
-fn loader(l: &Locator) -> anyhow::Result<Tree> {
-    eprintln!("Loading module {}", l);
-    let path = l
-        .url
+fn loader(loc: Locator) -> anyhow::Result<Tree> {
+    eprintln!("Loading module {}", loc);
+    let path = loc
+        .url()
         .to_file_path()
-        .map_err(|_| anyhow!("not a file path: {}", l))?;
+        .map_err(|_| anyhow!("not a file path: {}", loc))?;
     let input = std::fs::read_to_string(path)?;
-    let tree = oal_syntax::parse(input)?;
+    let tree = oal_syntax::parse(loc, input)?;
     Ok(tree)
 }
 
 /// Compiles a program.
-fn compiler(mods: &ModuleSet, l: &Locator) -> anyhow::Result<()> {
-    eprintln!("Compiling module {}", l);
-    oal_compiler::compile::compile(mods, l)?;
+fn compiler(mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
+    eprintln!("Compiling module {}", loc);
+    oal_compiler::compile::compile(mods, loc)?;
     Ok(())
 }
 

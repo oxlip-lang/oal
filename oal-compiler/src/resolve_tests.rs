@@ -18,7 +18,7 @@ fn resolve_variable() -> anyhow::Result<()> {
 
     resolve(&mods, mods.base()).expect("expected resolution");
 
-    let prog = Program::cast(mods.main().tree().root()).expect("expected a program");
+    let prog = Program::cast(mods.main().root()).expect("expected a program");
 
     let decl = prog.declarations().nth(1).expect("expected a declaration");
 
@@ -58,7 +58,7 @@ fn resolve_application() -> anyhow::Result<()> {
 
     resolve(&mods, mods.base()).expect("expected resolution");
 
-    let prog = Program::cast(mods.main().tree().root()).expect("expected a program");
+    let prog = Program::cast(mods.main().root()).expect("expected a program");
 
     let decl = prog.declarations().nth(1).expect("expected a declaration");
 

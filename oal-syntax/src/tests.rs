@@ -5,12 +5,14 @@ use super::parser::{
 };
 use crate::atom;
 use oal_model::grammar::NodeRef;
+use oal_model::locator::Locator;
 
 type Prog<'a> = Program<'a, ()>;
 type NRef<'a> = NodeRef<'a, (), Gram>;
 
 fn parse<F: Fn(Prog)>(i: &str, f: F) {
-    let tree = crate::parse(i).expect("parsing failed");
+    let loc = Locator::try_from("file:///test.oal").unwrap();
+    let tree = crate::parse(loc, i).expect("parsing failed");
     let prog = Program::cast(tree.root()).expect("expected a program");
     f(prog)
 }
@@ -469,7 +471,8 @@ fn parse_resource() {
 
 #[test]
 fn parse_grammar_error() {
-    let Err(err) = crate::parse::<_, ()>("res / ( get -> );")
+    let loc = Locator::try_from("file:///test.oal").unwrap();
+    let Err(err) = crate::parse::<_, ()>(loc, "res / ( get -> );")
         else { panic!("expected an error") };
     assert!(
         matches!(err, crate::errors::Error::Grammar(_)),
@@ -479,7 +482,8 @@ fn parse_grammar_error() {
 
 #[test]
 fn parse_lexicon_error() {
-    let Err(err) = crate::parse::<_, ()>("!!! / ( get -> );")
+    let loc = Locator::try_from("file:///test.oal").unwrap();
+    let Err(err) = crate::parse::<_, ()>(loc, "!!! / ( get -> );")
         else { panic!("expected an error") };
     assert!(
         matches!(err, crate::errors::Error::Lexicon(_)),

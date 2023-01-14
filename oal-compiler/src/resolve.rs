@@ -12,7 +12,9 @@ fn define(env: &mut Env, ident: Ident, node: NRef) -> Result<()> {
         node.syntax().core_mut().define(ext.clone());
         Ok(())
     } else {
-        Err(Error::new(Kind::NotInScope, "resolve").with(&ident))
+        Err(Error::new(Kind::NotInScope, "variable is not defined")
+            .with(&ident)
+            .at(node.span()))
     }
 }
 
@@ -20,7 +22,7 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let env = &mut Env::new();
     let current = mods.get(loc).unwrap();
 
-    for cursor in mods.get(loc).unwrap().tree().root().traverse() {
+    for cursor in mods.get(loc).unwrap().root().traverse() {
         match cursor {
             NodeCursor::Start(node) => {
                 if let Some(import) = Import::cast(node) {
@@ -28,7 +30,7 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                     // All modules that are to be imported must be present in the module-set.
                     let Some(module) = mods.get(&loc) else { panic!("unknown module: {}", loc) };
                     let program =
-                        Program::cast(module.tree().root()).expect("module root must be a program");
+                        Program::cast(module.root()).expect("module root must be a program");
                     for decl in program.declarations() {
                         let ext = External::new(module, decl.node());
                         env.declare(decl.ident().clone(), ext);

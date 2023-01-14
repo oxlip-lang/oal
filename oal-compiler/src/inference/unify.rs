@@ -22,14 +22,14 @@ fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
         Ok(())
     } else if let Tag::Var(ref v) = left {
         if occurs(&left, &right) {
-            Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(left, right)))
+            Err(Error::new(Kind::InvalidTypes, "recursive type").with(&(left, right)))
         } else {
             s.extend(v.clone(), right);
             Ok(())
         }
     } else if let Tag::Var(ref v) = right {
         if occurs(&right, &left) {
-            Err(Error::new(Kind::InvalidTypes, "cycle detected").with(&(right, left)))
+            Err(Error::new(Kind::InvalidTypes, "recursive type").with(&(right, left)))
         } else {
             s.extend(v.clone(), left);
             Ok(())
@@ -46,7 +46,7 @@ fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
     ) = (&left, &right)
     {
         if left_bindings.len() != right_bindings.len() {
-            Err(Error::new(Kind::InvalidTypes, "wrong arity")
+            Err(Error::new(Kind::InvalidTypes, "function arity mismatch")
                 .with(&(left_bindings, right_bindings)))
         } else {
             unify(s, left_range, right_range).and_then(|_| {
@@ -90,9 +90,9 @@ impl InferenceSet {
 
     pub fn unify(&self) -> Result<disjoin::Set> {
         let mut s = disjoin::Set::new();
-        self.0
-            .iter()
-            .try_for_each(|eq| eq.unify(&mut s).map_err(|err| err.at(eq.span)))?;
+        for eq in self.0.iter() {
+            eq.unify(&mut s).map_err(|err| err.at(eq.span.clone()))?;
+        }
         Ok(s)
     }
 

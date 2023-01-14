@@ -21,7 +21,7 @@ fn infer_tag() -> anyhow::Result<()> {
     "#,
     )?;
 
-    let prog = Program::cast(mods.main().tree().root()).expect("expected a program");
+    let prog = Program::cast(mods.main().root()).expect("expected a program");
 
     let decl1 = prog.declarations().nth(0).expect("expected a declaration");
     let Tag::Var(t1) = decl1.node().syntax().core_ref().unwrap_tag()
@@ -82,7 +82,7 @@ fn infer_unify() -> anyhow::Result<()> {
     substitute(&mods, mods.base(), &set)?;
     check_complete(&mods, mods.base())?;
 
-    let prog = Program::cast(mods.main().tree().root()).expect("expected a program");
+    let prog = Program::cast(mods.main().root()).expect("expected a program");
     let decl = prog.declarations().last().expect("expected a declaration");
     let tag = decl.node().syntax().core_ref().unwrap_tag();
     assert_eq!(tag, Tag::Property(Tag::Array.into()));

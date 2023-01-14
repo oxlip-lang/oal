@@ -30,7 +30,7 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
     let module = mods.get(loc).expect("module not found");
     let mut seq = Seq::new(loc.clone());
 
-    for node in module.tree().root().descendants() {
+    for node in module.root().descendants() {
         if syn::Literal::cast(node).is_some() {
             set_tag(node, literal_tag(node.token().value()));
         } else if syn::Primitive::cast(node).is_some() {
@@ -76,7 +76,7 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
     let module = mods.get(loc).expect("module not found");
     let mut set = InferenceSet::new();
 
-    for node in module.tree().root().descendants() {
+    for node in module.root().descendants() {
         if let Some(rel) = syn::Relation::cast(node) {
             set.push(get_tag(rel.uri().node()), Tag::Uri, rel.uri().node().span());
             for xfer in rel.transfers() {
@@ -136,9 +136,7 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
             let lambda = get_tag(app.lambda().node());
             set.push(lambda, Tag::Func(FuncTag { bindings, range }), node.span());
         } else if syn::Variable::cast(node).is_some() {
-            let definition = definition(mods, node).ok_or_else(|| {
-                Error::new(Kind::NotInScope, "variable is not defined").with(&node)
-            })?;
+            let definition = definition(mods, node).expect("expected variable to be defined");
             set.push(get_tag(node), get_tag(definition), node.span());
         } else if let Some(term) = syn::Terminal::cast(node) {
             set.push(get_tag(node), get_tag(term.inner()), node.span());
@@ -154,7 +152,7 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
 pub fn substitute(mods: &ModuleSet, loc: &Locator, set: &disjoin::Set) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
-    for node in module.tree().root().descendants() {
+    for node in module.root().descendants() {
         let mut core = node.syntax().core_mut();
         if let Some(tag) = core.tag().map(|t| set.substitute(t)) {
             core.set_tag(tag);
@@ -177,10 +175,12 @@ fn has_variable(tag: &Tag) -> bool {
 pub fn check_complete(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
-    for node in module.tree().root().descendants() {
+    for node in module.root().descendants() {
         if let Some(tag) = node.syntax().core_ref().tag() {
             if has_variable(tag) {
-                return Err(Error::new(Kind::InvalidTypes, "unsolved tag variable").with(&node));
+                return Err(Error::new(Kind::InvalidTypes, "incomplete type inference")
+                    .with(&node)
+                    .at(node.span()));
             }
         }
     }
