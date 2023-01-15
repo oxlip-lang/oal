@@ -12,7 +12,7 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
-chumsky = "0.8.0"
+chumsky = { git = "https://github.com/ebastien/chumsky", branch = "master" }
 string-interner = "0.14.0"
 generational_token_list = "0.1.5"
 generational-indextree = "1.1.4"

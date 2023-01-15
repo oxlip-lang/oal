@@ -528,6 +528,16 @@ where
     filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() == kind).map(ParseNode::from_leaf)
 }
 
+pub fn but_token<E, G>(
+    kind: <<G as Grammar>::Lex as Lexeme>::Kind,
+) -> impl Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = E> + Clone
+where
+    E: chumsky::Error<TokenAlias<G::Lex>>,
+    G: Grammar,
+{
+    filter::<TokenAlias<G::Lex>, _, _>(move |t| t.kind() != kind).map(ParseNode::from_leaf)
+}
+
 #[macro_export]
 macro_rules! match_token {
     ($($p:pat $(if $guard:expr)?),+ $(,)?) => ({
@@ -557,6 +567,7 @@ where
 {
     let (root, mut errs) = parser.parse_recovery(tokens.stream());
 
+    // TODO: return potential errors and recovered parse tree
     if !errs.is_empty() {
         Err(errs.swap_remove(0).into())
     } else {

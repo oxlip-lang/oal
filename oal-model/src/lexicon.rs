@@ -154,6 +154,7 @@ where
 
     let (tokens, mut errs) = lexer.parse_recovery(stream);
 
+    // TODO: return potential errors and recovered tokens
     if !errs.is_empty() {
         Err(errs.swap_remove(0).into())
     } else {

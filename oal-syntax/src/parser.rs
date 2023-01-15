@@ -143,7 +143,8 @@ syntax_nodes!(
     Resource,
     XferList,
     Relation,
-    Program
+    Program,
+    Error
 );
 
 impl<'a, T: Core> Program<'a, T> {
@@ -778,11 +779,17 @@ pub fn parser<'a>(
         SyntaxKind::Import,
     );
 
-    // TODO: implement skip_until for composite input types or refactor TokenAlias into a scalar.
+    let error = tree_many(
+        but_token(TokenKind::Control(lex::Control::Semicolon))
+            .repeated()
+            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+        SyntaxKind::Error,
+    );
+
     let statement = declaration
         .or(resource)
         .or(import)
-        .recover_with(skip_until([], |_| ParseNode::from_error()));
+        .recover_with(skip_parser(error));
 
     tree_many(statement.repeated(), SyntaxKind::Program)
 }
