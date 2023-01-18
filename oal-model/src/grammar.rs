@@ -556,22 +556,17 @@ macro_rules! match_token {
 pub type ParserError<L> = Simple<TokenAlias<L>, Span>;
 
 /// Perform syntax analysis over a list of tokens, yielding a concrete syntax tree.
+#[allow(clippy::type_complexity)]
 pub fn analyze<G, P, T>(
     tokens: TokenList<G::Lex>,
     parser: P,
-) -> std::result::Result<SyntaxTree<T, G>, Box<ParserError<G::Lex>>>
+) -> (Option<SyntaxTree<T, G>>, Vec<ParserError<G::Lex>>)
 where
     G: Grammar,
     P: Parser<TokenAlias<G::Lex>, ParseNode<G>, Error = ParserError<<G as Grammar>::Lex>>,
     T: Core,
 {
-    let (root, mut errs) = parser.parse_recovery(tokens.stream());
-
-    // TODO: return potential errors and recovered parse tree
-    if !errs.is_empty() {
-        Err(errs.swap_remove(0).into())
-    } else {
-        let root = root.expect("a successful parsing must return a syntax tree");
-        Ok(SyntaxTree::import(tokens, root))
-    }
+    let (root, errs) = parser.parse_recovery(tokens.stream());
+    let tree = root.map(|r| SyntaxTree::import(tokens, r));
+    (tree, errs)
 }

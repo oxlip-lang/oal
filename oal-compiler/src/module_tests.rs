@@ -15,7 +15,10 @@ fn module_cycle() -> anyhow::Result<()> {
         } else {
             unreachable!()
         };
-        Ok(oal_syntax::parse(loc, code)?)
+        let (tree, errs) = oal_syntax::parse(loc, code);
+        assert!(errs.is_empty());
+        let tree = tree.expect("parsing failed");
+        Ok(tree)
     };
 
     let compiler = |_mods: &ModuleSet, _loc: &Locator| Ok(());
@@ -55,7 +58,10 @@ fn module_sort() -> anyhow::Result<()> {
         } else {
             unreachable!()
         };
-        Ok(oal_syntax::parse(loc, code)?)
+        let (tree, errs) = oal_syntax::parse(loc, code);
+        assert!(errs.is_empty());
+        let tree = tree.expect("parsing failed");
+        Ok(tree)
     };
 
     let mut order = Vec::new();

@@ -136,14 +136,12 @@ pub fn tokenize<L, I, P>(
     loc: Locator,
     input: I,
     lexer: P,
-) -> std::result::Result<TokenList<L>, Box<ParserError>>
+) -> (Option<TokenList<L>>, Vec<ParserError>)
 where
     L: Lexeme,
     I: AsRef<str>,
     P: Parser<char, Vec<TokenSpan<L>>, Error = ParserError>,
 {
-    let mut token_list = TokenList::<L>::new(loc.clone());
-
     let len = input.as_ref().len();
     let iter = input
         .as_ref()
@@ -152,21 +150,19 @@ where
         .map(|(i, c)| (c, Span::new(loc.clone(), i..i + 1)));
     let stream = Stream::from_iter(Span::new(loc.clone(), len..len + 1), iter);
 
-    let (tokens, mut errs) = lexer.parse_recovery(stream);
+    let (tokens, errs) = lexer.parse_recovery(stream);
 
-    // TODO: return potential errors and recovered tokens
-    if !errs.is_empty() {
-        Err(errs.swap_remove(0).into())
-    } else {
-        if let Some(tokens) = tokens {
-            // Note: Chumsky does not support stateful combinators at the moment.
-            // Therefore we need a second pass over the vector of tokens to
-            // internalize the strings and build the index list.
-            tokens.into_iter().for_each(|(token, span)| {
-                let new_token = token.internalize(&mut token_list);
-                token_list.push((new_token, span));
-            });
+    let token_list = tokens.map(|tokens| {
+        // Note: Chumsky does not support stateful combinators at the moment.
+        // Therefore we need a second pass over the vector of tokens to
+        // internalize the strings and build the index list.
+        let mut token_list = TokenList::<L>::new(loc.clone());
+        for (token, span) in tokens {
+            let intern_token = token.internalize(&mut token_list);
+            token_list.push((intern_token, span));
         }
-        Ok(token_list)
-    }
+        token_list
+    });
+
+    (token_list, errs)
 }

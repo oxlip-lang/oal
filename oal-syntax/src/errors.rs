@@ -1,5 +1,5 @@
-type GrammarError = Box<oal_model::grammar::ParserError<crate::lexer::Token>>;
-type LexiconError = Box<oal_model::lexicon::ParserError>;
+type GrammarError = oal_model::grammar::ParserError<crate::lexer::Token>;
+type LexiconError = oal_model::lexicon::ParserError;
 
 /// The syntax analysis error type.
 #[derive(thiserror::Error, Debug)]

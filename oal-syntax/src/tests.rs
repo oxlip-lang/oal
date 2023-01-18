@@ -12,7 +12,8 @@ type NRef<'a> = NodeRef<'a, (), Gram>;
 
 fn parse<F: Fn(Prog)>(i: &str, f: F) {
     let loc = Locator::try_from("file:///test.oal").unwrap();
-    let tree = crate::parse(loc, i).expect("parsing failed");
+    let (tree, _errs) = crate::parse(loc, i);
+    let tree = tree.expect("parsing failed");
     let prog = Program::cast(tree.root()).expect("expected a program");
     f(prog)
 }
@@ -472,10 +473,10 @@ fn parse_resource() {
 #[test]
 fn parse_grammar_error() {
     let loc = Locator::try_from("file:///test.oal").unwrap();
-    let Err(err) = crate::parse::<_, ()>(loc, "res / ( get -> );")
-        else { panic!("expected an error") };
+    let (_tree, mut errs) = crate::parse::<_, ()>(loc, "res / ( get -> );");
+    assert_eq!(errs.len(), 1, "expected an error");
     assert!(
-        matches!(err, crate::errors::Error::Grammar(_)),
+        matches!(errs.pop().unwrap(), crate::errors::Error::Grammar(_)),
         "expected a grammar error"
     );
 }
@@ -483,10 +484,14 @@ fn parse_grammar_error() {
 #[test]
 fn parse_lexicon_error() {
     let loc = Locator::try_from("file:///test.oal").unwrap();
-    let Err(err) = crate::parse::<_, ()>(loc, "!!! / ( get -> );")
-        else { panic!("expected an error") };
+    let (_tree, mut errs) = crate::parse::<_, ()>(loc, "!!! / ( get -> );");
+    assert_eq!(errs.len(), 2, "expected two errors");
     assert!(
-        matches!(err, crate::errors::Error::Lexicon(_)),
+        matches!(errs.pop().unwrap(), crate::errors::Error::Grammar(_)),
+        "expected a grammar error"
+    );
+    assert!(
+        matches!(errs.pop().unwrap(), crate::errors::Error::Lexicon(_)),
         "expected a lexicon error"
     );
 }

@@ -28,8 +28,15 @@ fn loader(loc: Locator) -> anyhow::Result<Tree> {
         .to_file_path()
         .map_err(|_| anyhow!("not a file path: {}", loc))?;
     let input = std::fs::read_to_string(path)?;
-    let tree = oal_syntax::parse(loc, input)?;
-    Ok(tree)
+    let (tree, mut errs) = oal_syntax::parse(loc, input);
+    if let Some(tree) = tree {
+        for err in errs {
+            eprintln!("Error: {}", err);
+        }
+        Ok(tree)
+    } else {
+        Err(errs.pop().unwrap().into())
+    }
 }
 
 /// Compiles a program.
