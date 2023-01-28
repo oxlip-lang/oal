@@ -3,6 +3,8 @@ pub mod tag;
 pub mod unify;
 
 #[cfg(test)]
+mod disjoin_tests;
+#[cfg(test)]
 mod tests;
 
 use crate::errors::{Error, Kind, Result};

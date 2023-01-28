@@ -6,13 +6,13 @@ pub struct TagId {
     n: usize,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct FuncTag {
     pub bindings: Vec<Tag>,
     pub range: Box<Tag>,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Tag {
     Text,
     Number,
