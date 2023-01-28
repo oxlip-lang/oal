@@ -114,7 +114,7 @@ impl TryFrom<&str> for Annotation {
     type Error = serde_yaml::Error;
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        let props = serde_yaml::from_str(format!("{{ {} }}", value).as_str())?;
+        let props = serde_yaml::from_str(format!("{{ {value} }}").as_str())?;
         Ok(Annotation { props })
     }
 }

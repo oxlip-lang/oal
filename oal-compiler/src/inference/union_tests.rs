@@ -1,10 +1,10 @@
-use super::disjoin::{reduce, TagUnionFind};
+use super::union::{reduce, UnionFind};
 use super::{Seq, Tag};
 use oal_model::locator::Locator;
 
 #[test]
-fn disjoin() {
-    let mut sets = TagUnionFind::new();
+fn union() {
+    let mut sets = UnionFind::new();
 
     let loc = Locator::try_from("file::///module.oal").unwrap();
     let mut seq = Seq::new(loc);

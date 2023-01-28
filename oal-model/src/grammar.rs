@@ -28,7 +28,7 @@ impl<G: Grammar> Debug for SyntaxTrunk<G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             SyntaxTrunk::Leaf(t) => write!(f, "Leaf[{:?}]", t.kind()),
-            SyntaxTrunk::Tree(k) => write!(f, "Tree[{:?}]", k),
+            SyntaxTrunk::Tree(k) => write!(f, "Tree[{k:?}]"),
             SyntaxTrunk::Error => write!(f, "Error"),
         }
     }
@@ -334,7 +334,7 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     }
 
     pub fn nth(&self, n: usize) -> NodeRef<'a, T, G> {
-        let Some(node) = self.children().nth(n) else { panic!("expected node at {}", n) };
+        let Some(node) = self.children().nth(n) else { panic!("expected node at {n}") };
         node
     }
 

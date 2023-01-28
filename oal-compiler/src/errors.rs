@@ -47,7 +47,7 @@ impl Error {
     }
 
     pub fn with<T: Debug>(mut self, e: &T) -> Self {
-        self.details.push(format!("{:?}", e));
+        self.details.push(format!("{e:?}"));
         self
     }
 
@@ -62,13 +62,13 @@ impl Display for Error {
         writeln!(f, "{}", self.kind)?;
         writeln!(f, "Context: {}", self.msg)?;
         if let Some(span) = &self.span {
-            writeln!(f, "Location: {}", span)?;
+            writeln!(f, "Location: {span}")?;
         }
         if !self.details.is_empty() {
             writeln!(f, "Details:")?;
             self.details
                 .iter()
-                .try_for_each(|d| writeln!(f, " {}", d))?;
+                .try_for_each(|d| writeln!(f, " {d}"))?;
         }
         Ok(())
     }

@@ -1,11 +1,11 @@
-pub mod disjoin;
 pub mod tag;
 pub mod unify;
+pub mod union;
 
 #[cfg(test)]
-mod disjoin_tests;
-#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod union_tests;
 
 use crate::errors::{Error, Kind, Result};
 use crate::module::ModuleSet;
@@ -22,7 +22,7 @@ fn literal_tag(t: &lex::TokenValue) -> Tag {
         lex::TokenValue::HttpStatus(_) => Tag::Status,
         lex::TokenValue::Number(_) => Tag::Number,
         lex::TokenValue::Symbol(_) => Tag::Text,
-        _ => panic!("unexpected token for literal {:?}", t),
+        _ => panic!("unexpected token for literal {t:?}"),
     }
 }
 
@@ -151,12 +151,12 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
 }
 
 /// Substitutes tags in each class of equivalence with the representative tag.
-pub fn substitute(mods: &ModuleSet, loc: &Locator, set: &disjoin::Set) -> Result<()> {
+pub fn substitute(mods: &ModuleSet, loc: &Locator, sets: &union::UnionFind) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
     for node in module.root().descendants() {
         let mut core = node.syntax().core_mut();
-        if let Some(tag) = core.tag().map(|t| set.substitute(t)) {
+        if let Some(tag) = core.tag().map(|t| union::reduce(sets, t)) {
             core.set_tag(tag);
         }
     }

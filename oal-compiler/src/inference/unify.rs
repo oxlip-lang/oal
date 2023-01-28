@@ -1,4 +1,4 @@
-use super::disjoin;
+use super::union;
 use super::tag::{FuncTag, Tag};
 use crate::errors::{Error, Kind, Result};
 use oal_model::span::Span;
@@ -14,24 +14,24 @@ fn occurs(a: &Tag, b: &Tag) -> bool {
     }
 }
 
-fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
-    let left = s.substitute(left);
-    let right = s.substitute(right);
+fn unify(sets: &mut union::UnionFind, left: &Tag, right: &Tag) -> Result<()> {
+    let left = union::reduce(sets, left);
+    let right = union::reduce(sets, right);
 
     if left == right {
         Ok(())
-    } else if let Tag::Var(ref v) = left {
+    } else if let Tag::Var(_) = left {
         if occurs(&left, &right) {
             Err(Error::new(Kind::InvalidTypes, "recursive type").with(&(left, right)))
         } else {
-            s.extend(v.clone(), right);
+            sets.union(left, right);
             Ok(())
         }
-    } else if let Tag::Var(ref v) = right {
+    } else if let Tag::Var(_) = right {
         if occurs(&right, &left) {
             Err(Error::new(Kind::InvalidTypes, "recursive type").with(&(right, left)))
         } else {
-            s.extend(v.clone(), left);
+            sets.union(right, left);
             Ok(())
         }
     } else if let (
@@ -49,15 +49,15 @@ fn unify(s: &mut disjoin::Set, left: &Tag, right: &Tag) -> Result<()> {
             Err(Error::new(Kind::InvalidTypes, "function arity mismatch")
                 .with(&(left_bindings, right_bindings)))
         } else {
-            unify(s, left_range, right_range).and_then(|_| {
+            unify(sets, left_range, right_range).and_then(|_| {
                 left_bindings
                     .iter()
                     .zip(right_bindings.iter())
-                    .try_for_each(|(l, r)| unify(s, l, r))
+                    .try_for_each(|(l, r)| unify(sets, l, r))
             })
         }
     } else if let (Tag::Property(left_prop), Tag::Property(right_prop)) = (&left, &right) {
-        unify(s, left_prop, right_prop)
+        unify(sets, left_prop, right_prop)
     } else {
         Err(Error::new(Kind::InvalidTypes, "type mismatch").with(&(left, right)))
     }
@@ -71,8 +71,8 @@ struct TypeEquation {
 }
 
 impl TypeEquation {
-    fn unify(&self, s: &mut disjoin::Set) -> Result<()> {
-        unify(s, &self.left, &self.right)
+    fn unify(&self, sets: &mut union::UnionFind) -> Result<()> {
+        unify(sets, &self.left, &self.right)
     }
 }
 
@@ -88,12 +88,12 @@ impl InferenceSet {
         self.0.push(TypeEquation { left, right, span });
     }
 
-    pub fn unify(&self) -> Result<disjoin::Set> {
-        let mut s = disjoin::Set::new();
+    pub fn unify(&self) -> Result<union::UnionFind> {
+        let mut sets = union::UnionFind::new();
         for eq in self.0.iter() {
-            eq.unify(&mut s).map_err(|err| err.at(eq.span.clone()))?;
+            eq.unify(&mut sets).map_err(|err| err.at(eq.span.clone()))?;
         }
-        Ok(s)
+        Ok(sets)
     }
 
     #[cfg(test)]

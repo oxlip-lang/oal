@@ -22,16 +22,16 @@ struct Args {
 
 /// Loads and parses a source file into a concrete syntax tree.
 fn loader(loc: Locator) -> anyhow::Result<Tree> {
-    eprintln!("Loading module {}", loc);
+    eprintln!("Loading module {loc}");
     let path = loc
         .url()
         .to_file_path()
-        .map_err(|_| anyhow!("not a file path: {}", loc))?;
+        .map_err(|_| anyhow!("not a file path: {loc}"))?;
     let input = std::fs::read_to_string(path)?;
     let (tree, mut errs) = oal_syntax::parse(loc, input);
     if let Some(tree) = tree {
         for err in errs {
-            eprintln!("Error: {}", err);
+            eprintln!("Error: {err}");
         }
         Ok(tree)
     } else {
@@ -41,7 +41,7 @@ fn loader(loc: Locator) -> anyhow::Result<Tree> {
 
 /// Compiles a program.
 fn compiler(mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
-    eprintln!("Compiling module {}", loc);
+    eprintln!("Compiling module {loc}");
     oal_compiler::compile::compile(mods, loc)?;
     Ok(())
 }

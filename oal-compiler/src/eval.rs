@@ -118,7 +118,7 @@ fn cast_schema(from: (Expr, AnnRef)) -> Schema {
         Expr::VariadicOp(o) => SchemaExpr::Op(*o),
         Expr::Reference(r, _) => SchemaExpr::Ref(r),
         Expr::Relation(r) => SchemaExpr::Rel(r),
-        e => panic!("not a schema: {:?}", e),
+        e => panic!("not a schema: {e:?}"),
     };
 
     Schema {
@@ -159,7 +159,7 @@ fn cast_string(from: (Expr, AnnRef)) -> String {
     match from.0 {
         Expr::String(s) => s,
         Expr::Reference(_, v) => cast_string(*v),
-        e => panic!("not a string: {:?}", e),
+        e => panic!("not a string: {e:?}"),
     }
 }
 
@@ -167,7 +167,7 @@ fn cast_property(from: (Expr, AnnRef)) -> Property {
     match from.0 {
         Expr::Property(p) => *p,
         Expr::Reference(_, v) => cast_property(*v),
-        e => panic!("not a property: {:?}", e),
+        e => panic!("not a property: {e:?}"),
     }
 }
 
@@ -179,7 +179,7 @@ fn cast_http_status(from: (Expr, AnnRef)) -> Result<atom::HttpStatus> {
             Ok(s)
         }
         Expr::Reference(_, v) => cast_http_status(*v),
-        e => panic!("not an HTTP status: {:?}", e),
+        e => panic!("not an HTTP status: {e:?}"),
     }
 }
 
@@ -187,7 +187,7 @@ fn cast_object(from: (Expr, AnnRef)) -> Object {
     match from.0 {
         Expr::Object(o) => *o,
         Expr::Reference(_, v) => cast_object(*v),
-        e => panic!("not an object: {:?}", e),
+        e => panic!("not an object: {e:?}"),
     }
 }
 
@@ -195,7 +195,7 @@ fn cast_transfer(from: (Expr, AnnRef)) -> Transfer {
     match from.0 {
         Expr::Transfer(x) => *x,
         Expr::Reference(_, v) => cast_transfer(*v),
-        e => panic!("not a transfer: {:?}", e),
+        e => panic!("not a transfer: {e:?}"),
     }
 }
 
@@ -216,7 +216,7 @@ fn cast_uri(from: (Expr, AnnRef)) -> Uri {
         Expr::Uri(u) => *u,
         Expr::Relation(r) => r.uri,
         Expr::Reference(_, v) => cast_uri(*v),
-        e => panic!("not a uri: {:?}", e),
+        e => panic!("not a uri: {e:?}"),
     }
 }
 
@@ -224,7 +224,7 @@ fn cast_lambda(from: (Expr, AnnRef)) -> syn::Declaration<Core> {
     match from.0 {
         Expr::Lambda(d) => d,
         Expr::Reference(_, v) => cast_lambda(*v),
-        e => panic!("not a lambda: {:?}", e),
+        e => panic!("not a lambda: {e:?}"),
     }
 }
 
@@ -405,8 +405,7 @@ fn eval_variable<'a>(
         eval_terminal(ctx, term, ann)
     } else {
         panic!(
-            "expected variable definition to be either a declaration or a binding: {:?}",
-            definition
+            "expected variable definition to be either a declaration or a binding: {definition:?}"
         )
     }
 }
@@ -660,7 +659,7 @@ fn eval_any<'a>(ctx: &mut Context<'a>, node: NRef<'a>, ann: AnnRef) -> Result<(E
     } else if let Some(xfer) = syn::Transfer::cast(node) {
         eval_transfer(ctx, xfer, ann)
     } else {
-        panic!("unexpected node: {:#?}", node)
+        panic!("unexpected node: {node:#?}")
     }
 }
 
