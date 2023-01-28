@@ -29,7 +29,7 @@ impl UnionFind {
     }
 
     /// Reduces a tag reference by walking the parent path.
-    /// 
+    ///
     /// Flattens the path on the way.
     fn reduce_mut(&mut self, v: usize) -> usize {
         let mut w = v;
@@ -55,7 +55,7 @@ impl UnionFind {
     }
 
     /// Joins the classes of equivalence corresponding to the `left` and `right` tags.
-    /// 
+    ///
     /// The representative of the `right` class always takes over as representative for the `left` class.
     pub fn union(&mut self, left: Tag, right: Tag) {
         let v = self.insert(left);
@@ -76,7 +76,7 @@ impl UnionFind {
     }
 
     /// Finds the representative of the class of equivalence given by `tag`.
-    /// 
+    ///
     /// If a representative is known, also returns whether a reduction happened.
     pub fn find<'a>(&'a self, tag: &Tag) -> Option<(&'a Tag, bool)> {
         if let Some((v, _)) = self.tags.get_full(tag) {

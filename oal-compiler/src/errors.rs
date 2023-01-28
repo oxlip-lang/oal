@@ -66,9 +66,7 @@ impl Display for Error {
         }
         if !self.details.is_empty() {
             writeln!(f, "Details:")?;
-            self.details
-                .iter()
-                .try_for_each(|d| writeln!(f, " {d}"))?;
+            self.details.iter().try_for_each(|d| writeln!(f, " {d}"))?;
         }
         Ok(())
     }

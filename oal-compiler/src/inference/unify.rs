@@ -1,5 +1,5 @@
-use super::union;
 use super::tag::{FuncTag, Tag};
+use super::union;
 use crate::errors::{Error, Kind, Result};
 use oal_model::span::Span;
 
