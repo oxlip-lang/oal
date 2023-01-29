@@ -7,9 +7,10 @@ mod tests;
 #[cfg(test)]
 mod union_tests;
 
+use crate::definition::Definition;
 use crate::errors::{Error, Kind, Result};
 use crate::module::ModuleSet;
-use crate::tree::{definition, get_tag, set_tag};
+use crate::tree::{get_tag, set_tag};
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
@@ -30,7 +31,7 @@ fn literal_tag(t: &lex::TokenValue) -> Tag {
 /// Returns the number of tag variables allocated.
 pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
     let module = mods.get(loc).expect("module not found");
-    let mut seq = Seq::new(loc.clone());
+    let seq = &mut Seq::new(loc.clone());
 
     for node in module.root().descendants() {
         if syn::Literal::cast(node).is_some() {
@@ -58,8 +59,16 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
                 atom::Operator::Range => Tag::Content,
             };
             set_tag(node, tag);
+        } else if syn::Variable::cast(node).is_some() {
+            let tag = {
+                let core = node.syntax().core_ref();
+                match core.definition().expect("variable is not defined") {
+                    Definition::External(ext) => get_tag(ext.node(mods)),
+                    Definition::Internal(int) => int.tag(seq),
+                }
+            };
+            set_tag(node, tag);
         } else if syn::Application::cast(node).is_some()
-            || syn::Variable::cast(node).is_some()
             || syn::Binding::cast(node).is_some()
             || syn::Terminal::cast(node).is_some()
             || syn::SubExpression::cast(node).is_some()
@@ -137,9 +146,6 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
             let range = get_tag(node).into();
             let lambda = get_tag(app.lambda().node());
             set.push(lambda, Tag::Func(FuncTag { bindings, range }), node.span());
-        } else if syn::Variable::cast(node).is_some() {
-            let definition = definition(mods, node).expect("expected variable to be defined");
-            set.push(get_tag(node), get_tag(definition), node.span());
         } else if let Some(term) = syn::Terminal::cast(node) {
             set.push(get_tag(node), get_tag(term.inner()), node.span());
         } else if let Some(expr) = syn::SubExpression::cast(node) {

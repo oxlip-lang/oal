@@ -1,8 +1,8 @@
-use crate::module::External;
+use crate::definition::Definition;
 use oal_syntax::atom::Ident;
 use std::collections::HashMap;
 
-pub type Scope = HashMap<Ident, External>;
+pub type Scope = HashMap<Ident, Definition>;
 
 #[derive(Debug)]
 pub struct Env(Vec<Scope>);
@@ -18,11 +18,11 @@ impl Env {
         Env(vec![Scope::new()])
     }
 
-    pub fn declare(&mut self, n: Ident, e: External) {
-        self.0.last_mut().unwrap().insert(n, e);
+    pub fn declare(&mut self, n: Ident, defn: Definition) {
+        self.0.last_mut().unwrap().insert(n, defn);
     }
 
-    pub fn lookup(&self, n: &Ident) -> Option<&External> {
+    pub fn lookup(&self, n: &Ident) -> Option<&Definition> {
         self.0
             .iter()
             .rev()

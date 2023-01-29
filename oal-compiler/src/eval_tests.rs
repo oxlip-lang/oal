@@ -31,7 +31,7 @@ fn eval_annotation() -> anyhow::Result<()> {
         # description: "some record"
         let r = {};
         let a = /;
-        res a ( put : <r `title: xyz`> -> <r> `description: some content`);
+        res a on put : <r `title: xyz`> -> <r> `description: some content`;
     "#,
     )?;
 
@@ -69,11 +69,11 @@ fn eval_composed_annotation() -> anyhow::Result<()> {
         # description: "a number"
         # title: "a number"
         let a = num `minimum: 0`;
-        res / ( get -> {
+        res / on get -> {
             # description: "a property"
             # required: true
             'prop a `title: "a property type"`
-        } );
+        };
     "#,
     )?;
 
@@ -106,7 +106,7 @@ fn eval_content() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let r = {};
-        res / ( put : r -> <r> );
+        res / on put : r -> <r>;
     "#,
     )?;
 
@@ -127,8 +127,8 @@ fn eval_content() -> anyhow::Result<()> {
 fn eval_ranges() -> anyhow::Result<()> {
     let s = eval(
         r#"
-        res / ( get -> <status=200, {}>
-                    :: <status=500, media="text/plain", headers={ 'h str }, {}> );
+        res / on get -> <status=200, {}>
+                     :: <status=500, media="text/plain", headers={ 'h str }, {}>;
     "#,
     )?;
 
@@ -180,7 +180,7 @@ fn eval_ranges() -> anyhow::Result<()> {
 #[test]
 fn eval_invalid_status() -> anyhow::Result<()> {
     let code = r#"
-        res / ( get -> <status=999,{}> );
+        res / on get -> <status=999,{}>;
     "#;
 
     assert!(matches!(
@@ -203,7 +203,7 @@ fn eval_content_schema() -> anyhow::Result<()> {
             'a num,
             'b str
         };
-        res / ( get -> <r> );
+        res / on get -> <r>;
     "#,
     )?;
 
@@ -227,7 +227,7 @@ fn eval_content_schema() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_any() -> anyhow::Result<()> {
-    let s = eval(r#"res / ( get -> < { 'b [bool], 'c / } ~ num ~ uri > );"#)?;
+    let s = eval(r#"res / on get -> < { 'b [bool], 'c / } ~ num ~ uri >;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -262,7 +262,7 @@ fn eval_operation_any() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_sum() -> anyhow::Result<()> {
-    let s = eval(r#"res / ( get -> < num | str > );"#)?;
+    let s = eval(r#"res / on get -> < num | str >;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -286,7 +286,7 @@ fn eval_operation_sum() -> anyhow::Result<()> {
 
 #[test]
 fn eval_uri() -> anyhow::Result<()> {
-    let s = eval(r#"res /a/{ 'id num }/b?{ 'c str } ( get -> <> );"#)?;
+    let s = eval(r#"res /a/{ 'id num }/b?{ 'c str } on get -> <>;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -308,7 +308,7 @@ fn eval_uri() -> anyhow::Result<()> {
 
 #[test]
 fn eval_uri_params() -> anyhow::Result<()> {
-    let s = eval(r#"res / ( patch, put { 'n num } : {} -> <> );"#)?;
+    let s = eval(r#"res / on patch, put { 'n num } : {} -> <>;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -333,7 +333,7 @@ fn eval_reference() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let @a = {};
-        res / ( get -> @a );
+        res / on get -> @a;
     "#,
     )?;
 
@@ -363,7 +363,7 @@ fn eval_reference_fallback() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let @a = /;
-        res @a ( get -> <> );
+        res @a on get -> <>;
     "#,
     )?;
 
@@ -387,7 +387,7 @@ fn eval_reference_lambda() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let @a x = x;
-        res (@a /) ( get -> <> );
+        res (@a /) on get -> <>;
     "#,
     )?;
 
@@ -408,7 +408,7 @@ fn eval_application() -> anyhow::Result<()> {
         r#"
         let g x = x | bool;
         let f x = { 'p g int, 'q x };
-        res / ( get -> < f str > );
+        res / on get -> < f str >;
     "#,
     )?;
 
@@ -446,7 +446,7 @@ fn eval_subexpr() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let s = {} & ( {} | {} );
-        res / ( get -> s );
+        res / on get -> s;
     "#,
     )?;
 
@@ -502,6 +502,23 @@ fn eval_lambda_binding() -> anyhow::Result<()> {
     let r = s.rels.values().next().unwrap();
     assert_eq!(r.uri.path.len(), 1);
     assert_eq!(*r.uri.path.first().unwrap(), UriSegment::Literal("".into()));
+
+    Ok(())
+}
+
+#[test]
+fn eval_internal() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        res concat (/a) (/b);
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let r = s.rels.values().next().unwrap();
+    assert_eq!(r.uri.path.len(), 2);
+    assert_eq!(r.uri.path[0], UriSegment::Literal("a".into()));
+    assert_eq!(r.uri.path[1], UriSegment::Literal("b".into()));
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 mod annotation;
 pub mod compile;
+mod definition;
 mod env;
 mod errors;
 pub mod eval;
@@ -7,6 +8,7 @@ mod inference;
 pub mod module;
 mod resolve;
 pub mod spec;
+mod stdlib;
 pub mod tree;
 mod typecheck;
 

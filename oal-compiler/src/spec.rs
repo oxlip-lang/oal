@@ -18,6 +18,10 @@ pub struct Uri {
 }
 
 impl Uri {
+    pub fn append(&mut self, mut other: Uri) {
+        self.path.append(&mut other.path);
+    }
+
     pub fn pattern(&self) -> String {
         self.pattern_with(|p| format!("{{{}}}", p.name.untagged()))
     }

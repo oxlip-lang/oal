@@ -74,6 +74,7 @@ impl<G: Grammar> ParseNode<G> {
     }
 }
 
+// TODO: move the core data structure to an arena to avoid wasting space on every single node.
 #[derive(Clone, Debug)]
 pub struct SyntaxNode<T: Core, G: Grammar>(SyntaxTrunk<G>, RefCell<T>);
 

@@ -13,6 +13,27 @@ fn compile(code: &str) -> anyhow::Result<(ModuleSet, usize)> {
 }
 
 #[test]
+fn infer_internal_tag() -> anyhow::Result<()> {
+    let (mods, _) = compile(r#"let x = concat (/a) (/b);"#)?;
+
+    let eqs = constrain(&mods, mods.base())?;
+
+    assert_eq!(eqs.len(), 8);
+
+    let set = eqs.unify()?;
+    substitute(&mods, mods.base(), &set)?;
+    check_complete(&mods, mods.base())?;
+
+    let prog = Program::cast(mods.main().root()).expect("expected a program");
+
+    let decl = prog.declarations().last().expect("expected a declaration");
+    let tag = decl.node().syntax().core_ref().unwrap_tag();
+    assert_eq!(tag, Tag::Uri);
+
+    Ok(())
+}
+
+#[test]
 fn infer_tag() -> anyhow::Result<()> {
     let (mods, _) = compile(
         r#"
@@ -58,7 +79,7 @@ fn infer_tag() -> anyhow::Result<()> {
     let mut vars = vec![t1, t2, t3, t4, t5, t6, t7];
     vars.sort();
     vars.dedup();
-    assert_eq!(vars.len(), 7, "expected unique tag variables");
+    assert_eq!(vars.len(), 6, "expected unique tag variables");
 
     Ok(())
 }
@@ -76,7 +97,7 @@ fn infer_unify() -> anyhow::Result<()> {
 
     let eqs = constrain(&mods, mods.base())?;
 
-    assert_eq!(eqs.len(), 18);
+    assert_eq!(eqs.len(), 13);
 
     let set = eqs.unify()?;
     substitute(&mods, mods.base(), &set)?;

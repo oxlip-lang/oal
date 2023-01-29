@@ -738,9 +738,8 @@ pub fn parser<'a>(
 
         let relation = tree_many(
             term_kind
-                .chain(just_token(TokenKind::Control(lex::Control::ParenLeft)))
-                .chain(xfer_list)
-                .chain(just_token(TokenKind::Control(lex::Control::ParenRight))),
+                .chain(just_token(TokenKind::Keyword(lex::Keyword::On)))
+                .chain(xfer_list),
             SyntaxKind::Relation,
         );
 

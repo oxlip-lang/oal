@@ -1,6 +1,8 @@
+use crate::definition::{Definition, External};
 use crate::env::Env;
 use crate::errors::{Error, Kind, Result};
-use crate::module::{External, ModuleSet};
+use crate::module::ModuleSet;
+use crate::stdlib;
 use crate::tree::NRef;
 use oal_model::grammar::NodeCursor;
 use oal_model::locator::Locator;
@@ -20,6 +22,7 @@ fn define(env: &mut Env, ident: Ident, node: NRef) -> Result<()> {
 
 pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let env = &mut Env::new();
+    stdlib::import(env);
     let current = mods.get(loc).unwrap();
 
     for cursor in mods.get(loc).unwrap().root().traverse() {
@@ -33,13 +36,15 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                         Program::cast(module.root()).expect("module root must be a program");
                     for decl in program.declarations() {
                         let ext = External::new(module, decl.node());
-                        env.declare(decl.ident().clone(), ext);
+                        let defn = Definition::External(ext);
+                        env.declare(decl.ident().clone(), defn);
                     }
                 } else if let Some(decl) = Declaration::cast(node) {
                     env.open();
                     for binding in decl.bindings() {
                         let ext = External::new(current, binding.node());
-                        env.declare(binding.ident(), ext);
+                        let defn = Definition::External(ext);
+                        env.declare(binding.ident(), defn);
                     }
                 } else if let Some(var) = Variable::cast(node) {
                     define(env, var.ident(), var.node())?;
@@ -49,7 +54,8 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                 if let Some(decl) = Declaration::cast(node) {
                     env.close();
                     let ext = External::new(current, node);
-                    env.declare(decl.ident(), ext);
+                    let defn = Definition::External(ext);
+                    env.declare(decl.ident(), defn);
                 }
             }
         }

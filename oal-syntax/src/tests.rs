@@ -368,7 +368,7 @@ fn parse_decl_variadic_op() {
 
 #[test]
 fn parse_decl_relation() {
-    parse("let a = /p ( put : <{}> -> <{}> );", |p: Prog| {
+    parse("let a = /p on put : <{}> -> <{}>;", |p: Prog| {
         let decl = assert_decl(p, "a");
         let rel = Relation::cast(decl.rhs()).expect("expected a relation");
 
@@ -388,10 +388,10 @@ fn parse_decl_relation() {
     });
     parse(
         r#"
-let a = /p (
+let a = /p on
     patch, put : <{}> -> <{}>,
     get               -> <{}>
-);
+;
 "#,
         |p: Prog| {
             let decl = assert_decl(p, "a");
@@ -416,7 +416,7 @@ let a = /p (
             assert!(xfers.next().is_none(), "expected no more transfer");
         },
     );
-    parse("let a = /p ( i, j );", |p: Prog| {
+    parse("let a = /p on i, j;", |p: Prog| {
         let decl = assert_decl(p, "a");
         let rel = Relation::cast(decl.rhs()).expect("expected a relation");
         let xfers = &mut rel.transfers();
@@ -462,7 +462,7 @@ let r = {};
 
 #[test]
 fn parse_resource() {
-    parse("res / (get -> <>);", |p: Prog| {
+    parse("res / on get -> <>;", |p: Prog| {
         let res = p.resources().next().expect("expected a resource");
         let rel = Relation::cast(res.relation()).expect("expected a relation");
         UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");

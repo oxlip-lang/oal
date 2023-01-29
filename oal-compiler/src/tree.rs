@@ -1,24 +1,24 @@
+use crate::definition::Definition;
 use crate::inference::tag::Tag;
-use crate::module::{External, ModuleSet};
 use oal_model::grammar::{NodeRef, SyntaxTree};
 use oal_syntax::parser::Gram;
 
 /// The internally mutable `Core` type for the syntax tree.
 #[derive(Clone, Default, Debug)]
 pub struct Core {
-    defn: Option<External>,
+    defn: Option<Definition>,
     tag: Option<Tag>,
 }
 
 impl Core {
     /// Returns the definition of the current node if any.
-    pub fn definition(&self) -> Option<&External> {
+    pub fn definition(&self) -> Option<&Definition> {
         self.defn.as_ref()
     }
 
     /// Sets the location of the definition for the current node.
-    pub fn define(&mut self, ext: External) {
-        self.defn = Some(ext);
+    pub fn define(&mut self, defn: Definition) {
+        self.defn = Some(defn);
     }
 
     pub fn tag(&self) -> Option<&Tag> {
@@ -44,11 +44,6 @@ pub type Tree = SyntaxTree<Core, Gram>;
 
 /// The node reference type.
 pub type NRef<'a> = NodeRef<'a, Core, Gram>;
-
-/// Returns the definition of the given node if any.
-pub fn definition<'a>(mods: &'a ModuleSet, node: NRef<'a>) -> Option<NRef<'a>> {
-    node.syntax().core_ref().definition().map(|n| n.node(mods))
-}
 
 /// Returns the type tag for the given node.
 pub fn get_tag(n: NRef) -> Tag {

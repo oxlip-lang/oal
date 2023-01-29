@@ -21,17 +21,17 @@ fn compile(code: &str) -> anyhow::Result<ModuleSet> {
 fn typecheck_ok() {
     let cases = [
         "let a = { 'b [bool], 'c / } ~ num ~ uri;",
-        "let a = / ( get -> str );",
-        "let a = / ( get -> <{}> );",
+        "let a = / on get -> str;",
+        "let a = / on get -> <{}>;",
         "let a = /a/{ 'id num }/b?{ 'c str };",
         "let a = patch, put { 'n num } : {} -> {};",
         "let a = get { 'q str } -> {};",
-        "let a = /something?{ 'q str } ( get -> {} );",
+        "let a = /something?{ 'q str } on get -> {};",
         "let a = 'q str; let b = /path/{a};",
         r#"let a = <status=200, media="text/plain", headers={ 'h str }, str>;"#,
         "let @a = {};",
         "res /;",
-        "res / ( delete -> <> );",
+        "res / on delete -> <>;",
     ];
 
     for c in cases {
@@ -43,14 +43,14 @@ fn typecheck_ok() {
 fn typecheck_error() {
     let cases = [
         "let a = <> ~ {};",
-        "let a = / ( num );",
-        "let a = / ( get -> ( get -> str ) );",
+        "let a = / on num;",
+        "let a = / on get -> ( get -> str );",
         "let a = /wrong/{ 'n [num] };",
         r#"let a = <status=num, {}>;"#,
         r#"let a = <media=str, {}>;"#,
         r#"let a = <headers=str, {}>;"#,
         "let @a = 404;",
-        "let a = uri ( get -> str );",
+        "let a = uri on get -> str;",
         "res num;",
     ];
 

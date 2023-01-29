@@ -1,11 +1,20 @@
+use crate::definition::Definition;
 use crate::errors::Kind;
+use crate::module::ModuleSet;
 use crate::resolve::resolve;
 use crate::tests::mods_from;
-use crate::tree::definition;
+use crate::tree::NRef;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser::{
     Application, Binding, Declaration, Primitive, Program, Terminal, Variable,
 };
+
+fn definition<'a>(mods: &'a ModuleSet, node: NRef<'a>) -> NRef<'a> {
+    let core = node.syntax().core_ref();
+    let defn = core.definition().expect("expected a definition");
+    let Definition::External(ext) = defn else { panic!("expected an external") };
+    ext.node(mods)
+}
 
 #[test]
 fn resolve_variable() -> anyhow::Result<()> {
@@ -29,7 +38,7 @@ fn resolve_variable() -> anyhow::Result<()> {
     )
     .expect("expected a variable");
 
-    let defn = definition(&mods, var.node()).expect("expected a definition");
+    let defn = definition(&mods, var.node());
 
     let decl = Declaration::cast(defn).expect("expected a declaration");
 
@@ -64,7 +73,7 @@ fn resolve_application() -> anyhow::Result<()> {
 
     let app = Application::cast(decl.rhs()).expect("expected an application");
 
-    let defn = definition(&mods, app.lambda().node()).expect("expected a definition");
+    let defn = definition(&mods, app.lambda().node());
 
     let decl = Declaration::cast(defn).expect("expected a declaration");
 
@@ -81,7 +90,7 @@ fn resolve_application() -> anyhow::Result<()> {
 
     assert_eq!(var.ident(), "x");
 
-    let defn = definition(&mods, var.node()).expect("expected a definition");
+    let defn = definition(&mods, var.node());
 
     let binding = Binding::cast(defn).expect("expected a binding");
 

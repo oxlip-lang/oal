@@ -1,6 +1,5 @@
 use crate::errors::{Error, Kind};
-use crate::tree::{NRef, Tree};
-use oal_model::grammar::NodeIdx;
+use crate::tree::Tree;
 use oal_model::locator::Locator;
 use oal_syntax::parser::Program;
 use petgraph::algo::toposort;
@@ -43,42 +42,6 @@ impl ModuleSet {
 
     pub fn get(&self, l: &Locator) -> Option<&Tree> {
         self.mods.get(l)
-    }
-}
-
-#[derive(Clone)]
-pub struct External {
-    loc: Locator,
-    index: NodeIdx,
-}
-
-impl External {
-    pub fn new(module: &Tree, node: NRef) -> Self {
-        External {
-            loc: module.locator().clone(),
-            index: node.index(),
-        }
-    }
-
-    pub fn node<'a>(&self, mods: &'a ModuleSet) -> NRef<'a> {
-        if let Some(module) = mods.get(&self.loc) {
-            NRef::from(module, self.index)
-        } else {
-            // All modules must be present in the module-set.
-            panic!("unknown module: {}", self.loc)
-        }
-    }
-}
-
-impl std::fmt::Display for External {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}#{}", &self.loc, &self.index.to_string())
-    }
-}
-
-impl std::fmt::Debug for External {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        <Self as std::fmt::Display>::fmt(self, f)
     }
 }
 
