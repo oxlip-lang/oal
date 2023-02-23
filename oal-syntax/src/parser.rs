@@ -727,9 +727,9 @@ pub fn parser<'a>(
         let xfer_kind = transfer.or(sum_kind);
 
         let xfer_list = tree_many(
-            xfer_kind.clone().chain(
+            expr.clone().chain(
                 just_token(TokenKind::Control(lex::Control::Comma))
-                    .chain(xfer_kind.clone())
+                    .chain(expr)
                     .repeated()
                     .flatten(),
             ),
