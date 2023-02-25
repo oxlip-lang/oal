@@ -9,12 +9,14 @@ pub enum Kind {
     Yaml(#[from] serde_yaml::Error),
     #[error("invalid syntax")]
     Syntax(#[from] oal_syntax::errors::Error),
-    #[error("identifier not in scope")]
+    #[error("not in scope")]
     NotInScope,
-    #[error("invalid types")]
-    InvalidTypes,
+    #[error("invalid type")]
+    InvalidType,
     #[error("cycle detected")]
     CycleDetected,
+    #[error("invalid literal")]
+    InvalidLiteral,
 }
 
 #[derive(Debug)]
@@ -55,20 +57,15 @@ impl Error {
         self.span = span;
         self
     }
+
+    pub fn span(&self) -> Option<&Span> {
+        self.span.as_ref()
+    }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        writeln!(f, "{}", self.kind)?;
-        writeln!(f, "Context: {}", self.msg)?;
-        if let Some(span) = &self.span {
-            writeln!(f, "Location: {span}")?;
-        }
-        if !self.details.is_empty() {
-            writeln!(f, "Details:")?;
-            self.details.iter().try_for_each(|d| writeln!(f, " {d}"))?;
-        }
-        Ok(())
+        writeln!(f, "{}: {}", self.kind, self.msg)
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::annotation::Annotation;
 use crate::definition::{Definition, InternalRef};
-use crate::errors::Result;
+use crate::errors::{Error, Kind, Result};
 use crate::module::ModuleSet;
 use crate::spec::{
     Array, Content, Object, PrimBoolean, PrimInteger, PrimNumber, PrimString, Property, Ranges,
@@ -462,7 +462,13 @@ pub fn eval_content<'a>(
         match meta.tag() {
             lex::Content::Media => media = Some(cast_string(rhs)),
             lex::Content::Headers => headers = Some(cast_object(rhs)),
-            lex::Content::Status => status = Some(cast_http_status(rhs)?),
+            lex::Content::Status => {
+                let s = cast_http_status(rhs).map_err(|_| {
+                    Error::new(Kind::InvalidLiteral, "not a valid HTTP status")
+                        .at(meta.rhs().span())
+                })?;
+                status = Some(s)
+            }
         }
     }
 

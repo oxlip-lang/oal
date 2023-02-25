@@ -61,7 +61,7 @@ fn typecheck_error() {
                 .downcast_ref::<errors::Error>()
                 .expect("expected compiler error")
                 .kind,
-            errors::Kind::InvalidTypes
+            errors::Kind::InvalidType
         ));
     }
 }

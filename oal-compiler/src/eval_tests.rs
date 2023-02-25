@@ -189,7 +189,7 @@ fn eval_invalid_status() -> anyhow::Result<()> {
             .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
             .kind,
-        errors::Kind::Syntax(_)
+        errors::Kind::InvalidLiteral
     ));
 
     Ok(())

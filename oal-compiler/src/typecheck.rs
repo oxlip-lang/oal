@@ -11,17 +11,17 @@ fn check_operation(op: syn::VariadicOp<Core>) -> Result<()> {
     match op.operator() {
         atom::Operator::Join => {
             if !op.operands().all(|o| get_tag(o) == Tag::Object) {
-                return Err(Error::new(Kind::InvalidTypes, "ill-formed join").with(&op));
+                return Err(Error::new(Kind::InvalidType, "ill-formed join").with(&op));
             }
         }
         atom::Operator::Any | atom::Operator::Sum => {
             if !op.operands().all(|o| get_tag(o).is_schema()) {
-                return Err(Error::new(Kind::InvalidTypes, "ill-formed alternative").with(&op));
+                return Err(Error::new(Kind::InvalidType, "ill-formed alternative").with(&op));
             }
         }
         atom::Operator::Range => {
             if !op.operands().all(|o| get_tag(o).is_schema_like()) {
-                return Err(Error::new(Kind::InvalidTypes, "ill-formed ranges").with(&op));
+                return Err(Error::new(Kind::InvalidType, "ill-formed ranges").with(&op));
             }
         }
     }
@@ -33,24 +33,24 @@ fn check_content(content: syn::Content<Core>) -> Result<()> {
         match meta.tag() {
             lex::Content::Media => {
                 if get_tag(meta.rhs()) != Tag::Text {
-                    return Err(Error::new(Kind::InvalidTypes, "ill-formed media").with(&meta));
+                    return Err(Error::new(Kind::InvalidType, "ill-formed media").with(&meta));
                 }
             }
             lex::Content::Headers => {
                 if !get_tag(meta.rhs()).is_schema() {
-                    return Err(Error::new(Kind::InvalidTypes, "ill-formed headers").with(&meta));
+                    return Err(Error::new(Kind::InvalidType, "ill-formed headers").with(&meta));
                 }
             }
             lex::Content::Status => {
                 if !get_tag(meta.rhs()).is_status_like() {
-                    return Err(Error::new(Kind::InvalidTypes, "ill-formed status").with(&meta));
+                    return Err(Error::new(Kind::InvalidType, "ill-formed status").with(&meta));
                 }
             }
         }
     }
     if let Some(body) = content.body() {
         if !get_tag(body).is_schema() {
-            return Err(Error::new(Kind::InvalidTypes, "ill-formed body").with(&content));
+            return Err(Error::new(Kind::InvalidType, "ill-formed body").with(&content));
         }
     }
     Ok(())
@@ -59,21 +59,21 @@ fn check_content(content: syn::Content<Core>) -> Result<()> {
 fn check_transfer(xfer: syn::Transfer<Core>) -> Result<()> {
     if let Some(domain) = xfer.domain() {
         if !get_tag(domain.inner()).is_schema_like() {
-            return Err(Error::new(Kind::InvalidTypes, "ill-formed domain").with(&domain));
+            return Err(Error::new(Kind::InvalidType, "ill-formed domain").with(&domain));
         }
     }
     if !get_tag(xfer.range()).is_schema_like() {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed range").with(&xfer.range()));
+        return Err(Error::new(Kind::InvalidType, "ill-formed range").with(&xfer.range()));
     }
     Ok(())
 }
 
 fn check_relation(relation: syn::Relation<Core>) -> Result<()> {
     if get_tag(relation.uri().inner()) != Tag::Uri {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed uri").with(&relation.uri()));
+        return Err(Error::new(Kind::InvalidType, "ill-formed uri").with(&relation.uri()));
     }
     if !relation.transfers().all(|t| get_tag(t) == Tag::Transfer) {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed transfers").with(&relation));
+        return Err(Error::new(Kind::InvalidType, "ill-formed transfers").with(&relation));
     }
     Ok(())
 }
@@ -85,21 +85,21 @@ fn check_uri(uri: syn::UriTemplate<Core>) -> Result<()> {
             matches!(get_tag(v.inner()), Tag::Property(t) if *t == Tag::Primitive)
         }
     }) {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed uri").with(&uri));
+        return Err(Error::new(Kind::InvalidType, "ill-formed uri").with(&uri));
     }
     Ok(())
 }
 
 fn check_array(array: syn::Array<Core>) -> Result<()> {
     if !get_tag(array.inner()).is_schema() {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed array").with(&array));
+        return Err(Error::new(Kind::InvalidType, "ill-formed array").with(&array));
     }
     Ok(())
 }
 
 fn check_property(prop: syn::Property<Core>) -> Result<()> {
     if !get_tag(prop.rhs()).is_schema() {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed property").with(&prop));
+        return Err(Error::new(Kind::InvalidType, "ill-formed property").with(&prop));
     }
     Ok(())
 }
@@ -109,21 +109,21 @@ fn check_object(object: syn::Object<Core>) -> Result<()> {
         .properties()
         .all(|p| matches!(get_tag(p), Tag::Property(_)))
     {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed object").with(&object));
+        return Err(Error::new(Kind::InvalidType, "ill-formed object").with(&object));
     }
     Ok(())
 }
 
 fn check_declaration(decl: syn::Declaration<Core>) -> Result<()> {
     if decl.ident().is_reference() && !get_tag(decl.rhs()).is_schema() {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed reference").with(&decl));
+        return Err(Error::new(Kind::InvalidType, "ill-formed reference").with(&decl));
     }
     Ok(())
 }
 
 fn check_resource(res: syn::Resource<Core>) -> Result<()> {
     if !get_tag(res.relation()).is_relation_like() {
-        return Err(Error::new(Kind::InvalidTypes, "ill-formed resource").with(&res));
+        return Err(Error::new(Kind::InvalidType, "ill-formed resource").with(&res));
     }
     Ok(())
 }

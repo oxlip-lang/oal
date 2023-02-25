@@ -186,7 +186,7 @@ pub fn check_complete(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     for node in module.root().descendants() {
         if let Some(tag) = node.syntax().core_ref().tag() {
             if has_variable(tag) {
-                return Err(Error::new(Kind::InvalidTypes, "incomplete type inference")
+                return Err(Error::new(Kind::InvalidType, "incomplete type inference")
                     .with(&node)
                     .at(node.span()));
             }

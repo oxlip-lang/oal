@@ -22,14 +22,14 @@ fn unify(sets: &mut union::UnionFind, left: &Tag, right: &Tag) -> Result<()> {
         Ok(())
     } else if let Tag::Var(_) = left {
         if occurs(&left, &right) {
-            Err(Error::new(Kind::InvalidTypes, "recursive type").with(&(left, right)))
+            Err(Error::new(Kind::InvalidType, "recursive type").with(&(left, right)))
         } else {
             sets.union(left, right);
             Ok(())
         }
     } else if let Tag::Var(_) = right {
         if occurs(&right, &left) {
-            Err(Error::new(Kind::InvalidTypes, "recursive type").with(&(right, left)))
+            Err(Error::new(Kind::InvalidType, "recursive type").with(&(right, left)))
         } else {
             sets.union(right, left);
             Ok(())
@@ -46,7 +46,7 @@ fn unify(sets: &mut union::UnionFind, left: &Tag, right: &Tag) -> Result<()> {
     ) = (&left, &right)
     {
         if left_bindings.len() != right_bindings.len() {
-            Err(Error::new(Kind::InvalidTypes, "function arity mismatch")
+            Err(Error::new(Kind::InvalidType, "function arity mismatch")
                 .with(&(left_bindings, right_bindings)))
         } else {
             unify(sets, left_range, right_range).and_then(|_| {
@@ -59,7 +59,10 @@ fn unify(sets: &mut union::UnionFind, left: &Tag, right: &Tag) -> Result<()> {
     } else if let (Tag::Property(left_prop), Tag::Property(right_prop)) = (&left, &right) {
         unify(sets, left_prop, right_prop)
     } else {
-        Err(Error::new(Kind::InvalidTypes, "type mismatch").with(&(left, right)))
+        Err(Error::new(
+            Kind::InvalidType,
+            format!("'{left}' does not match '{right}'"),
+        ))
     }
 }
 

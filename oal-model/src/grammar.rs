@@ -104,7 +104,7 @@ impl<T: Core, G: Grammar> SyntaxNode<T, G> {
 
     pub fn core_mut(&self) -> RefMut<T> {
         RefMut::map(self.1.borrow_mut(), |r| {
-            r.get_or_insert_with(|| Box::new(T::default())).as_mut()
+            r.get_or_insert_with(Box::default).as_mut()
         })
     }
 }

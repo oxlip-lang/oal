@@ -58,6 +58,22 @@ impl chumsky::Span for Span {
     }
 }
 
+impl ariadne::Span for Span {
+    type SourceId = Locator;
+
+    fn source(&self) -> &Self::SourceId {
+        self.locator()
+    }
+
+    fn start(&self) -> usize {
+        self.start()
+    }
+
+    fn end(&self) -> usize {
+        self.end()
+    }
+}
+
 impl Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}#{}..{}", self.locator(), self.start(), self.end())
