@@ -90,7 +90,7 @@ let op2 = get { 'q str } -> cnt1;
 ```
 ```
 // Relations
-let rel1 = uri1 ( op1, op2 );
+let rel1 = uri1 on op1, op2;
 ```
 ```
 // Combining schemas
