@@ -75,10 +75,10 @@ impl<G: Grammar> ParseNode<G> {
 }
 
 /// The wrapper type around the syntax node core.
-/// 
+///
 /// It is allocated on write as we assume that the number of nodes with a core
 /// is small compared to the total number of nodes in a syntax tree.
-/// 
+///
 /// An alternative would be to use an arena instead of heap allocations.
 type CoreCell<T> = RefCell<Option<Box<T>>>;
 
