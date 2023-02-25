@@ -63,7 +63,7 @@ impl<G: Grammar> ParseNode<G> {
 
     pub fn to_tree<T: Core>(self, tree: &mut SyntaxTree<T, G>, parent: Option<NodeIdx>) -> NodeIdx {
         let ParseNode(trunk, children) = self;
-        let node = tree.new_node(SyntaxNode::new(trunk, T::default()));
+        let node = tree.new_node(SyntaxNode::new(trunk));
         if let Some(parent) = parent {
             tree.append(parent, node);
         }
@@ -74,25 +74,38 @@ impl<G: Grammar> ParseNode<G> {
     }
 }
 
-// TODO: move the core data structure to an arena to avoid wasting space on every single node.
+/// The wrapper type around the syntax node core.
+/// 
+/// It is allocated on write as we assume that the number of nodes with a core
+/// is small compared to the total number of nodes in a syntax tree.
+/// 
+/// An alternative would be to use an arena instead of heap allocations.
+type CoreCell<T> = RefCell<Option<Box<T>>>;
+
 #[derive(Clone, Debug)]
-pub struct SyntaxNode<T: Core, G: Grammar>(SyntaxTrunk<G>, RefCell<T>);
+pub struct SyntaxNode<T: Core, G: Grammar>(SyntaxTrunk<G>, CoreCell<T>);
 
 impl<T: Core, G: Grammar> SyntaxNode<T, G> {
-    pub fn new(trunk: SyntaxTrunk<G>, core: T) -> Self {
-        SyntaxNode(trunk, RefCell::new(core))
+    pub fn new(trunk: SyntaxTrunk<G>) -> Self {
+        SyntaxNode(trunk, RefCell::new(None))
     }
 
     pub fn trunk(&self) -> &SyntaxTrunk<G> {
         &self.0
     }
 
+    pub fn core_from(&self, other: &Self) {
+        self.1.replace(other.1.borrow().clone());
+    }
+
     pub fn core_ref(&self) -> Ref<T> {
-        self.1.borrow()
+        Ref::map(self.1.borrow(), |r| r.as_ref().unwrap().as_ref())
     }
 
     pub fn core_mut(&self) -> RefMut<T> {
-        self.1.borrow_mut()
+        RefMut::map(self.1.borrow_mut(), |r| {
+            r.get_or_insert_with(|| Box::new(T::default())).as_mut()
+        })
     }
 }
 
@@ -177,9 +190,8 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
                         t => *t,
                     };
 
-                    let core = node.core_ref().clone();
-
-                    let syntax = SyntaxNode::new(trunk, core);
+                    let syntax = SyntaxNode::new(trunk);
+                    syntax.core_from(node);
 
                     let id = tree.new_node(syntax);
 
