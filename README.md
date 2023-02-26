@@ -20,6 +20,7 @@ This step requires a [local Rust and Cargo installation](https://doc.rust-lang.o
 ```
 cargo install --path oal-cli
 ```
+Optional: a [VSCode language extension](https://github.com/ebastien/openapi-lang-vscode) is available for syntax highlighting and future IDE capabilities.
 
 ## Usage
 ```
