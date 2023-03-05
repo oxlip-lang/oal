@@ -10,6 +10,15 @@ pub enum UriSegment {
     Variable(Box<Property>),
 }
 
+impl UriSegment {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            UriSegment::Literal(l) => l.is_empty(),
+            UriSegment::Variable(_) => false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Uri {
     pub path: Vec<UriSegment>,
@@ -18,8 +27,20 @@ pub struct Uri {
 }
 
 impl Uri {
+    /// Moves all the path segments from `other` to the end of `self`.
+    ///
+    /// The parameters from `other` replace the parameters in `self`.
+    /// The example is set to `None`.
     pub fn append(&mut self, mut other: Uri) {
+        // To avoid redundant URI segment separators (i.e. empty segments),
+        // first remove the trailing empty segment if any.
+        // Note: a path always contains at least one segment.
+        if self.path.last().unwrap().is_empty() {
+            self.path.pop();
+        }
         self.path.append(&mut other.path);
+        self.params = other.params;
+        self.example = None;
     }
 
     pub fn pattern(&self) -> String {
@@ -64,7 +85,7 @@ pub struct Schema {
     pub examples: Option<HashMap<String, String>>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct PrimNumber {
     pub minimum: Option<f64>,
     pub maximum: Option<f64>,
@@ -72,14 +93,14 @@ pub struct PrimNumber {
     pub example: Option<f64>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PrimString {
     pub pattern: Option<String>,
     pub enumeration: Vec<String>,
     pub example: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct PrimBoolean {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

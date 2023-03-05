@@ -21,6 +21,10 @@ mod module_tests;
 #[cfg(test)]
 mod resolve_tests;
 #[cfg(test)]
+mod spec_tests;
+#[cfg(test)]
+mod stdlib_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod typecheck_tests;

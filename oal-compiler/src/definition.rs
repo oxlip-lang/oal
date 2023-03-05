@@ -2,22 +2,16 @@ use crate::errors::Result;
 use crate::eval;
 use crate::inference::tag::{Seq, Tag};
 use crate::module::ModuleSet;
-use crate::tree::{Core, NRef, Tree};
+use crate::tree::{NRef, Tree};
 use oal_model::grammar::NodeIdx;
 use oal_model::locator::Locator;
-use oal_syntax::parser as syn;
 use std::fmt::Debug;
 use std::rc::Rc;
 
 /// Internal identifier definition.
 pub trait Internal: Debug {
     fn tag(&self, seq: &mut Seq) -> Tag;
-    fn eval<'a>(
-        &self,
-        ctx: &mut eval::Context<'a>,
-        args: Vec<syn::Terminal<'a, Core>>,
-        ann: eval::AnnRef,
-    ) -> Result<eval::Value<'a>>;
+    fn eval<'a>(&self, args: Vec<eval::Value<'a>>, ann: eval::AnnRef) -> Result<eval::Value<'a>>;
     fn has_bindings(&self) -> bool;
 }
 

@@ -90,6 +90,14 @@ fn parse_decl_array() {
 
 #[test]
 fn parse_decl_uri() {
+    parse("let a = /;", |p: Prog| {
+        let rhs = assert_term(assert_decl(p, "a").rhs());
+        let segs = &mut UriTemplate::cast(rhs)
+            .expect("expected an URI template")
+            .segments();
+        let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
+        assert_eq!(elem.as_str(), "");
+    });
     parse("let a = /p;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let segs = &mut UriTemplate::cast(rhs)

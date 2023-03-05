@@ -428,7 +428,7 @@ pub fn eval_variable<'a>(
                 let expr = Expr::Lambda(Lambda::Internal(int.clone()));
                 Ok((expr, ann))
             } else {
-                int.eval(ctx, Vec::new(), ann)
+                int.eval(Vec::new(), ann)
             }
         }
     }
@@ -633,8 +633,11 @@ pub fn eval_application<'a>(
 ) -> Result<(Expr<'a>, AnnRef)> {
     match cast_lambda(eval_variable(ctx, app.lambda(), AnnRef::default())?) {
         Lambda::Internal(internal) => {
-            let args: Vec<_> = app.arguments().collect();
-            internal.eval(ctx, args, ann)
+            let args = app
+                .arguments()
+                .map(|a| eval_terminal(ctx, a, AnnRef::default()))
+                .collect::<Result<Vec<_>>>()?;
+            internal.eval(args, ann)
         }
         Lambda::External(decl) => {
             let mut scope = HashMap::new();
