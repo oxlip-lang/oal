@@ -10,7 +10,6 @@ not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/).
 The ambition of the author is to consider OpenAPI as the assembly language of REST API design.
 
 The language is strongly typed with global type inference.
-Due to the experimental nature of this project, error handling is rudimentary.
 The CLI generates OpenAPI 3.0.3 definitions in YAML format from the resources defined
 in the source program.
 
