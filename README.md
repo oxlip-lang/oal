@@ -23,18 +23,19 @@ Optional: a [VSCode language extension](https://github.com/ebastien/openapi-lang
 
 ## Usage
 ```
-    oal-cli [OPTIONS] --input <INPUT> --output <OUTPUT>
+    oal-cli [OPTIONS]
 
 OPTIONS:
-    -b, --base <BASE>        The path to a base OpenAPI description
+    -b, --base <BASE>        The relative URL to a base OpenAPI description
+    -c, --conf <CONFIG>      The path to the configuration file
     -h, --help               Print help information
-    -i, --input <INPUT>      The path to the source program
-    -o, --output <OUTPUT>    The path to the output OpenAPI description
+    -m, --main <MAIN>        The relative URL to the main program
+    -t, --target <TARGET>    The relative URL to the target OpenAPI description
 ```
 
 ### Compiling the example program
 ```
-oal-cli --base examples/base.yaml --input examples/main.oal --output examples/openapi.yaml
+oal-cli --conf examples/oal.toml
 ```
 
 ## Examples of language constructs:

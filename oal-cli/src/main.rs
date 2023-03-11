@@ -1,35 +1,24 @@
-use anyhow::anyhow;
+mod config;
+
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
-use clap::Parser as ClapParser;
 use oal_compiler::module::ModuleSet;
 use oal_compiler::tree::Tree;
 use oal_model::locator::Locator;
 use oal_model::span::Span;
-
-/// Compiles a program into an OpenAPI description in YAML.
-#[derive(ClapParser, Debug)]
-struct Args {
-    /// The path to the source program
-    #[clap(short = 'i', long = "input", parse(from_os_str))]
-    input: std::path::PathBuf,
-
-    /// The path to the output OpenAPI description
-    #[clap(short = 'o', long = "output", parse(from_os_str))]
-    output: std::path::PathBuf,
-
-    /// The path to a base OpenAPI description
-    #[clap(short = 'b', long = "base", parse(from_os_str))]
-    base: Option<std::path::PathBuf>,
-}
+use std::path::PathBuf;
 
 /// Reads the file at the given location.
 fn read_file(loc: &Locator) -> anyhow::Result<String> {
-    let path = loc
-        .url()
-        .to_file_path()
-        .map_err(|_| anyhow!("not a file path: {loc}"))?;
+    let path: PathBuf = loc.try_into()?;
     let input = std::fs::read_to_string(path)?;
     Ok(input)
+}
+
+/// Writes to the file at the given location.
+fn write_file(loc: &Locator, buf: String) -> anyhow::Result<()> {
+    let path: PathBuf = loc.try_into()?;
+    std::fs::write(path, buf)?;
+    Ok(())
 }
 
 /// Reports an error to the standart error output.
@@ -81,14 +70,14 @@ fn compiler(mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let args: Args = Args::parse();
+    let config = config::Config::new()?;
+    let main = config.main()?;
+    let target = config.target()?;
+    let base = config.base()?;
 
-    let base = Locator::try_from(args.input.as_path())?;
-
-    let mods = oal_compiler::module::load(&base, loader, compiler)?;
+    let mods = oal_compiler::module::load(&main, loader, compiler)?;
 
     eprintln!("Generating API definition");
-
     let spec = oal_compiler::eval::eval(&mods, mods.base()).map_err(|err| {
         let msg = "evaluation failed";
         let span = match err.span() {
@@ -101,19 +90,18 @@ fn main() -> anyhow::Result<()> {
 
     let mut builder = oal_codegen::Builder::new().with_spec(spec);
 
-    if let Some(path) = args.base {
+    if let Some(ref loc) = base {
+        let path: PathBuf = loc.try_into()?;
         let file = std::fs::File::open(path)?;
         let base = serde_yaml::from_reader(file)?;
         builder = builder.with_base(base);
     }
 
     let api = builder.into_openapi();
+    let api_yaml = serde_yaml::to_string(&api)?;
 
-    let output = serde_yaml::to_string(&api)?;
-
-    eprintln!("Writing OpenAPI definition to {}", args.output.display());
-
-    std::fs::write(args.output, output)?;
+    eprintln!("Writing OpenAPI definition to {target}");
+    write_file(&target, api_yaml)?;
 
     Ok(())
 }
