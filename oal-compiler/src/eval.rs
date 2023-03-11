@@ -599,6 +599,7 @@ pub fn eval_primitive<'a>(
             let p = PrimString {
                 pattern: ann.get_string("pattern"),
                 enumeration: ann.get_enum("enum").unwrap_or_default(),
+                format: ann.get_string("format"),
                 example: ann.get_string("example"),
             };
             Expr::PrimString(Box::new(p))

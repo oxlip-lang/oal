@@ -97,6 +97,7 @@ pub struct PrimNumber {
 pub struct PrimString {
     pub pattern: Option<String>,
     pub enumeration: Vec<String>,
+    pub format: Option<String>,
     pub example: Option<String>,
 }
 

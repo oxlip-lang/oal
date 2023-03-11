@@ -104,12 +104,17 @@ impl Builder {
             .clone()
             .or_else(|| p.enumeration.first().cloned())
             .map(Into::into);
+        let format = match p.format {
+            Some(ref f) => VariantOrUnknownOrEmpty::Unknown(f.clone()),
+            None => VariantOrUnknownOrEmpty::Empty,
+        };
         Schema {
             schema_data: SchemaData {
                 example,
                 ..Default::default()
             },
             schema_kind: SchemaKind::Type(Type::String(StringType {
+                format,
                 pattern: p.pattern.clone(),
                 enumeration: p.enumeration.iter().map(|s| Some(s.clone())).collect(),
                 ..Default::default()

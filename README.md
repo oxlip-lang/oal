@@ -44,8 +44,9 @@ use "some/other/module.oal";
 ```
 ```
 // Primitives with inline annotations
-let id1 = num  `title: "some identifier"`;
-let name = str `pattern: "^[a-z]+$", example: sarah`;
+let id1   = num `title: "some identifier"`;
+let name  = str `pattern: "^[a-z]+$", example: sarah`;
+let email = str `title: "E-mail address", format: email`;
 ```
 ```
 // Properties with both statement and inline annotations
@@ -64,6 +65,7 @@ let @obj1 = {
   'firstName name     `title: "First name", required: true`
 , 'lastName name      `title: "Last name", required: true`
 , 'middleNames [name] `title: "Middle names"`
+, 'email email
 };
 ```
 ```

@@ -178,6 +178,10 @@ components:
             example: sarah
             type: string
             pattern: ^[a-z]+$
+        email:
+          title: E-mail address
+          type: string
+          format: email
       required:
       - firstName
       - lastName
