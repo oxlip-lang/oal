@@ -95,13 +95,14 @@ impl<'a> Context<'a> {
     }
 }
 
-fn compose_annotations<'a, I>(iter: I) -> Result<Annotation>
+fn compose_annotations<'a, I>(anns: I) -> Result<Annotation>
 where
-    I: Iterator<Item = &'a str>,
+    I: Iterator<Item = syn::Annotation<'a, Core>>,
 {
     let mut ann = Annotation::default();
-    for text in iter {
-        let other = Annotation::try_from(text)?;
+    for a in anns {
+        let other =
+            Annotation::try_from(a.as_str()).map_err(|err| Error::from(err).at(a.node().span()))?;
         ann.extend(other);
     }
     Ok(ann)

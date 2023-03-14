@@ -102,6 +102,26 @@ fn eval_composed_annotation() -> anyhow::Result<()> {
 }
 
 #[test]
+fn eval_invalid_annotation() -> anyhow::Result<()> {
+    let code = r#"
+        # not: an: annotation:
+        let r = {};
+        res / on get -> <r>;
+    "#;
+
+    assert!(matches!(
+        eval(code)
+            .expect_err(format!("expected error evaluating: {}", code).as_str())
+            .downcast_ref::<errors::Error>()
+            .expect("expected compiler error")
+            .kind,
+        errors::Kind::Yaml(_)
+    ));
+
+    Ok(())
+}
+
+#[test]
 fn eval_content() -> anyhow::Result<()> {
     let s = eval(
         r#"

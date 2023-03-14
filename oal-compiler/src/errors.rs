@@ -3,11 +3,11 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Kind {
-    #[error("invalid locator")]
+    #[error("invalid locator: {0}")]
     Locator(#[from] oal_model::locator::Error),
-    #[error("invalid YAML")]
+    #[error("invalid YAML: {0}")]
     Yaml(#[from] serde_yaml::Error),
-    #[error("invalid syntax")]
+    #[error("invalid syntax: {0}")]
     Syntax(#[from] oal_syntax::errors::Error),
     #[error("not in scope")]
     NotInScope,
@@ -65,7 +65,11 @@ impl Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        writeln!(f, "{}: {}", self.kind, self.msg)
+        write!(f, "{}", self.kind)?;
+        if !self.msg.is_empty() {
+            write!(f, ": {}", self.msg)?;
+        }
+        std::fmt::Result::Ok(())
     }
 }
 

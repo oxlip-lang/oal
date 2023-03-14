@@ -233,7 +233,10 @@ fn parse_terminal_annotations() {
     parse(r#"let a = num `title: "number"`;"#, |p: Prog| {
         let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
         assert_eq!(
-            term.annotations().next().expect("expected an annotation"),
+            term.annotations()
+                .next()
+                .expect("expected an annotation")
+                .as_str(),
             r#"title: "number""#
         );
     });
@@ -251,7 +254,7 @@ fn parse_terminal_annotations() {
         |p: Prog| {
             let term = Terminal::cast(assert_decl(p, "a").rhs()).expect("expected a terminal");
             assert_eq!(
-                term.annotations().collect::<Vec<_>>(),
+                term.annotations().map(|a| a.as_str()).collect::<Vec<_>>(),
                 vec![" title: \"number\"\n", " required: true\n", "minimum: 0"]
             );
         },
@@ -448,11 +451,11 @@ let r = {};
             let decl = decls.next().expect("expected a declaration");
             let anns = &mut decl.annotations();
             assert_eq!(
-                anns.next().expect("expected an annotation"),
+                anns.next().expect("expected an annotation").as_str(),
                 " description: \"some identifier\"\n"
             );
             assert_eq!(
-                anns.next().expect("expected an annotation"),
+                anns.next().expect("expected an annotation").as_str(),
                 " required: true\n"
             );
             assert!(anns.next().is_none(), "expected no more annotation");
@@ -460,7 +463,7 @@ let r = {};
             let decl = decls.next().expect("expected another declaration");
             let anns = &mut decl.annotations();
             assert_eq!(
-                anns.next().expect("expected an annotation"),
+                anns.next().expect("expected an annotation").as_str(),
                 " description: \"some record\"\n"
             );
             assert!(anns.next().is_none(), "expected no more annotation");

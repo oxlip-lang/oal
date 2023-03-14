@@ -111,6 +111,14 @@ impl<'a, T: Core> Operator<'a, T> {
     }
 }
 
+terminal_node!(Gram, Annotation, TokenKind::Annotation(_));
+
+impl<'a, T: Core> Annotation<'a, T> {
+    pub fn as_str(&self) -> &'a str {
+        self.node().as_str()
+    }
+}
+
 // TODO: add support for document attributes
 syntax_nodes!(
     Gram,
@@ -170,8 +178,8 @@ impl<'a, T: Core> Resource<'a, T> {
 }
 
 impl<'a, T: Core> Annotations<'a, T> {
-    pub fn items(&self) -> impl Iterator<Item = &'a str> {
-        self.node().children().map(|c| c.as_str())
+    pub fn items(&self) -> impl Iterator<Item = Annotation<'a, T>> {
+        self.node().children().filter_map(Annotation::cast)
     }
 }
 
@@ -189,7 +197,7 @@ impl<'a, T: Core> Declaration<'a, T> {
     const BINDINGS_POS: usize = 3;
     const RHS_POS: usize = 5;
 
-    pub fn annotations(&self) -> impl Iterator<Item = &'a str> {
+    pub fn annotations(&self) -> impl Iterator<Item = Annotation<'a, T>> {
         Annotations::cast(self.node().nth(Self::ANNOTATIONS_POS))
             .expect("expected annotations")
             .items()
@@ -234,20 +242,20 @@ impl<'a, T: Core> Terminal<'a, T> {
         self.node().nth(Self::INNER_POS)
     }
 
-    pub fn prefix_annotations(&self) -> impl Iterator<Item = &'a str> {
+    pub fn prefix_annotations(&self) -> impl Iterator<Item = Annotation<'a, T>> {
         Annotations::cast(self.node().nth(Self::PREFIX_ANN_POS))
             .expect("expected annotations")
             .items()
     }
 
-    pub fn suffix_annotation(&self) -> Option<&'a str> {
+    pub fn suffix_annotation(&self) -> Option<Annotation<'a, T>> {
         self.node()
             .children()
             .nth(Self::SUFFIX_ANN_POS)
-            .map(|n| n.as_str())
+            .map(|n| Annotation::cast(n).expect("expected annotation"))
     }
 
-    pub fn annotations(&self) -> impl Iterator<Item = &'a str> {
+    pub fn annotations(&self) -> impl Iterator<Item = Annotation<'a, T>> {
         self.prefix_annotations()
             .chain(self.suffix_annotation().into_iter())
     }

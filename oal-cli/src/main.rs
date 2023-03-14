@@ -1,5 +1,6 @@
 mod config;
 
+use anyhow::anyhow;
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use oal_compiler::module::ModuleSet;
 use oal_compiler::tree::Tree;
@@ -22,14 +23,14 @@ fn write_file(loc: &Locator, buf: String) -> anyhow::Result<()> {
 }
 
 /// Reports an error to the standart error output.
-fn report<E: ToString>(title: &str, span: Span, err: E) {
+fn report<E: ToString>(span: Span, err: E) {
     let mut colors = ColorGenerator::new();
     let color = colors.next();
     let loc = span.locator();
     let input = read_file(loc).expect("cannot read source file");
     Report::build(ReportKind::Error, loc.clone(), span.start())
-        .with_message(title)
-        .with_label(Label::new(span.clone()).with_message(err).with_color(color))
+        .with_message(err)
+        .with_label(Label::new(span.clone()).with_color(color))
         .finish()
         .eprint((loc.clone(), Source::from(input)))
         .unwrap();
@@ -42,14 +43,13 @@ fn loader(loc: Locator) -> anyhow::Result<Tree> {
     let (tree, mut errs) = oal_syntax::parse(loc.clone(), input);
     if let Some(err) = errs.pop() {
         // We don't care about error recovery for the command line interface.
-        let msg = "parsing failed";
         let span = match err {
             oal_syntax::errors::Error::Grammar(ref err) => err.span(),
             oal_syntax::errors::Error::Lexicon(ref err) => err.span(),
             _ => Span::new(loc, 0..1),
         };
-        report(msg, span, err);
-        Err(anyhow::Error::msg(msg))
+        report(span, &err);
+        Err(anyhow!("parsing failed"))
     } else {
         Ok(tree.unwrap())
     }
@@ -59,13 +59,12 @@ fn loader(loc: Locator) -> anyhow::Result<Tree> {
 fn compiler(mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
     eprintln!("Compiling module {loc}");
     oal_compiler::compile::compile(mods, loc).map_err(|err| {
-        let msg = "compilation failed";
         let span = match err.span() {
             Some(s) => s.clone(),
             None => Span::new(loc.clone(), 0..1),
         };
-        report(msg, span, err);
-        anyhow::Error::msg(msg)
+        report(span, &err);
+        anyhow!("compilation failed")
     })
 }
 
@@ -79,13 +78,12 @@ fn main() -> anyhow::Result<()> {
 
     eprintln!("Generating API definition");
     let spec = oal_compiler::eval::eval(&mods, mods.base()).map_err(|err| {
-        let msg = "evaluation failed";
         let span = match err.span() {
             Some(s) => s.clone(),
             None => Span::new(mods.base().clone(), 0..1),
         };
-        report(msg, span, err);
-        anyhow::Error::msg(msg)
+        report(span, &err);
+        anyhow!("evaluation failed")
     })?;
 
     let mut builder = oal_codegen::Builder::new().with_spec(spec);
