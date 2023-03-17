@@ -1,5 +1,5 @@
 [package]
-name = "oal-codegen"
+name = "oal-openapi"
 version = "0.1.0"
 edition = "2021"
 

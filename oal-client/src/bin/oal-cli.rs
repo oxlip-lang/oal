@@ -1,26 +1,11 @@
-mod config;
-
 use anyhow::anyhow;
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
+use oal_client::{config, read_file, write_file};
 use oal_compiler::module::ModuleSet;
 use oal_compiler::tree::Tree;
 use oal_model::locator::Locator;
 use oal_model::span::Span;
 use std::path::PathBuf;
-
-/// Reads the file at the given location.
-fn read_file(loc: &Locator) -> anyhow::Result<String> {
-    let path: PathBuf = loc.try_into()?;
-    let input = std::fs::read_to_string(path)?;
-    Ok(input)
-}
-
-/// Writes to the file at the given location.
-fn write_file(loc: &Locator, buf: String) -> anyhow::Result<()> {
-    let path: PathBuf = loc.try_into()?;
-    std::fs::write(path, buf)?;
-    Ok(())
-}
 
 /// Reports an error to the standart error output.
 fn report<E: ToString>(span: Span, err: E) {
@@ -69,7 +54,7 @@ fn compiler(mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let config = config::Config::new()?;
+    let config = config::Config::new(None)?;
     let main = config.main()?;
     let target = config.target()?;
     let base = config.base()?;
@@ -86,7 +71,7 @@ fn main() -> anyhow::Result<()> {
         anyhow!("evaluation failed")
     })?;
 
-    let mut builder = oal_codegen::Builder::new().with_spec(spec);
+    let mut builder = oal_openapi::Builder::new().with_spec(spec);
 
     if let Some(ref loc) = base {
         let path: PathBuf = loc.try_into()?;

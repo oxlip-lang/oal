@@ -1,6 +1,7 @@
 use clap::Parser as ClapParser;
 use oal_model::locator::Locator;
 use serde::Deserialize;
+use std::path::{Path, PathBuf};
 
 /// Compiles a program into an OpenAPI description in YAML.
 #[derive(ClapParser, Debug)]
@@ -19,21 +20,22 @@ struct Args {
 
     /// The path to the configuration file
     #[clap(short = 'c', long = "conf", parse(from_os_str))]
-    config: Option<std::path::PathBuf>,
+    config: Option<PathBuf>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Debug)]
 struct File {
     api: Api,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Debug)]
 struct Api {
     main: Option<String>,
     target: Option<String>,
     base: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct Config {
     args: Args,
     file: File,
@@ -41,11 +43,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(cfg: Option<&Path>) -> anyhow::Result<Self> {
         let args: Args = Args::parse();
 
-        let (root, file) = if let Some(ref path) = args.config {
-            let root = Locator::try_from(path.as_path())?;
+        let config = cfg.or(args.config.as_deref());
+
+        let (root, file) = if let Some(path) = config {
+            let root = Locator::try_from(path)?;
             let cfg = std::fs::read_to_string(path)?;
             let file = toml::from_str::<File>(&cfg)?;
             (root, file)

@@ -44,16 +44,16 @@
 //!
 //! {"jsonrpc": "2.0", "method": "exit", "params": null}
 //! ```
-use std::error::Error;
-
+use anyhow::anyhow;
+use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
 use lsp_types::OneOf;
 use lsp_types::{
     request::GotoDefinition, GotoDefinitionResponse, InitializeParams, ServerCapabilities,
 };
+use oal_client::config::Config;
+use url::Url;
 
-use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
-
-fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
+fn main() -> anyhow::Result<()> {
     // Note that  we must have our logging only write out to stderr.
     eprintln!("starting generic LSP server");
 
@@ -76,12 +76,48 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     Ok(())
 }
 
-fn main_loop(
-    connection: Connection,
-    params: serde_json::Value,
-) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let _params: InitializeParams = serde_json::from_value(params).unwrap();
-    eprintln!("starting example main loop");
+#[derive(Debug)]
+struct Folder {
+    uri: Url,
+    config: Config,
+}
+
+impl Folder {
+    fn new(folder: lsp_types::WorkspaceFolder) -> anyhow::Result<Self> {
+        const DEFAULT_CONFIG_FILE: &str = "oal.toml";
+        if folder.uri.scheme() != "file" {
+            Err(anyhow!("not a file"))
+        } else {
+            let mut uri = folder.uri;
+            // The original URL can be a base so path_segments_mut should never fail.
+            uri.path_segments_mut().unwrap().push(DEFAULT_CONFIG_FILE);
+            let path = uri.to_file_path().map_err(|_| anyhow!("not a path"))?;
+            let config = Config::new(Some(path.as_path()))?;
+            Ok(Folder { uri, config })
+        }
+    }
+}
+
+fn main_loop(connection: Connection, params: serde_json::Value) -> anyhow::Result<()> {
+    let params: InitializeParams = serde_json::from_value(params).unwrap();
+
+    eprintln!("starting main loop with: {params:#?}");
+
+    let folders = params
+        .workspace_folders
+        .unwrap_or_default()
+        .into_iter()
+        .map(Folder::new)
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    for f in folders.iter() {
+        eprintln!("loading configuration at {}", f.uri);
+        let _main = f.config.main()?;
+        let _target = f.config.target()?;
+        let _base = f.config.base()?;
+        // TODO: load and compile
+    }
+
     for msg in &connection.receiver {
         eprintln!("got msg: {msg:?}");
         match msg {
@@ -89,10 +125,10 @@ fn main_loop(
                 if connection.handle_shutdown(&req)? {
                     return Ok(());
                 }
-                eprintln!("got request: {req:?}");
+                eprintln!("got request: {req:#?}");
                 match cast::<GotoDefinition>(req) {
                     Ok((id, params)) => {
-                        eprintln!("got gotoDefinition request #{id}: {params:?}");
+                        eprintln!("got gotoDefinition request #{id}: {params:#?}");
                         let result = Some(GotoDefinitionResponse::Array(Vec::new()));
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response {
@@ -103,16 +139,16 @@ fn main_loop(
                         connection.sender.send(Message::Response(resp))?;
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
+                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
                     Err(ExtractError::MethodMismatch(req)) => req,
                 };
                 // ...
             }
             Message::Response(resp) => {
-                eprintln!("got response: {resp:?}");
+                eprintln!("got response: {resp:#?}");
             }
             Message::Notification(not) => {
-                eprintln!("got notification: {not:?}");
+                eprintln!("got notification: {not:#?}");
             }
         }
     }

@@ -1,5 +1,5 @@
 [package]
-name = "oal-cli"
+name = "oal-client"
 version = "0.1.0"
 edition = "2021"
 authors = ["Emmanuel Bastien <os@ebastien.name>"]
@@ -15,11 +15,14 @@ categories = ["compilers"]
 oal-model = { path = "../oal-model" }
 oal-syntax = { path = "../oal-syntax" }
 oal-compiler = { path = "../oal-compiler" }
-oal-codegen = { path = "../oal-codegen" }
+oal-openapi = { path = "../oal-openapi" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.81"
 serde_yaml = "0.9.14"
 clap = { version = "3.2.23", features = ["derive"] }
 anyhow = "1.0.66"
-ariadne = "0.1.5"
+ariadne = "0.2.0"
 toml = "0.7.2"
+lsp-server = "0.7.0"
+lsp-types = "0.94.0"
+url = "2.2.2"
