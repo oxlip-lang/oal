@@ -51,6 +51,9 @@ use lsp_types::{
     request::GotoDefinition, GotoDefinitionResponse, InitializeParams, ServerCapabilities,
 };
 use oal_client::config::Config;
+use oal_client::Context;
+use oal_compiler::module::ModuleSet;
+use oal_compiler::spec::Spec;
 use url::Url;
 
 fn main() -> anyhow::Result<()> {
@@ -80,6 +83,8 @@ fn main() -> anyhow::Result<()> {
 struct Folder {
     uri: Url,
     config: Config,
+    mods: Option<ModuleSet>,
+    spec: Option<Spec>,
 }
 
 impl Folder {
@@ -93,7 +98,14 @@ impl Folder {
             uri.path_segments_mut().unwrap().push(DEFAULT_CONFIG_FILE);
             let path = uri.to_file_path().map_err(|_| anyhow!("not a path"))?;
             let config = Config::new(Some(path.as_path()))?;
-            Ok(Folder { uri, config })
+            let mods = None;
+            let spec = None;
+            Ok(Folder {
+                uri,
+                config,
+                mods,
+                spec,
+            })
         }
     }
 }
@@ -103,19 +115,23 @@ fn main_loop(connection: Connection, params: serde_json::Value) -> anyhow::Resul
 
     eprintln!("starting main loop with: {params:#?}");
 
-    let folders = params
+    let mut ctx = Context::new(std::io::stderr());
+
+    let mut folders = params
         .workspace_folders
         .unwrap_or_default()
         .into_iter()
         .map(Folder::new)
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    for f in folders.iter() {
+    for f in folders.iter_mut() {
         eprintln!("loading configuration at {}", f.uri);
-        let _main = f.config.main()?;
-        let _target = f.config.target()?;
-        let _base = f.config.base()?;
-        // TODO: load and compile
+        let main = f.config.main()?;
+        f.mods = oal_compiler::module::load(&mut ctx, &main).ok();
+        if let Some(ref m) = f.mods {
+            f.spec = ctx.eval(m).ok();
+        }
+        eprintln!("done");
     }
 
     for msg in &connection.receiver {

@@ -3,6 +3,7 @@ pub mod config;
 use anyhow::anyhow;
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use oal_compiler::module::{Loader, ModuleSet};
+use oal_compiler::spec::Spec;
 use oal_compiler::tree::Tree;
 use oal_model::{locator::Locator, span::Span};
 use std::path::PathBuf;
@@ -54,6 +55,23 @@ impl<W> Context<W> {
 
     pub fn console(&mut self) -> &mut W {
         &mut self.console
+    }
+}
+
+impl<W: std::io::Write> Context<W> {
+    /// Evaluates a program.
+    pub fn eval(&mut self, mods: &ModuleSet) -> anyhow::Result<Spec> {
+        match oal_compiler::eval::eval(mods, mods.base()) {
+            Err(err) => {
+                let span = match err.span() {
+                    Some(s) => s.clone(),
+                    None => Span::new(mods.base().clone(), 0..0),
+                };
+                report(self.console(), span, &err)?;
+                Err(anyhow!("evaluation failed"))
+            }
+            Ok(spec) => Ok(spec),
+        }
     }
 }
 
