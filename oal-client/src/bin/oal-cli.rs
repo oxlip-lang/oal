@@ -1,57 +1,7 @@
 use anyhow::anyhow;
-use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
-use oal_client::{config, read_file, write_file};
-use oal_compiler::module::ModuleSet;
-use oal_compiler::tree::Tree;
-use oal_model::locator::Locator;
+use oal_client::{config, report, write_file, Context};
 use oal_model::span::Span;
 use std::path::PathBuf;
-
-/// Reports an error to the standart error output.
-fn report<E: ToString>(span: Span, err: E) {
-    let mut colors = ColorGenerator::new();
-    let color = colors.next();
-    let loc = span.locator();
-    let input = read_file(loc).expect("cannot read source file");
-    Report::build(ReportKind::Error, loc.clone(), span.start())
-        .with_message(err)
-        .with_label(Label::new(span.clone()).with_color(color))
-        .finish()
-        .eprint((loc.clone(), Source::from(input)))
-        .unwrap();
-}
-
-/// Loads and parses a source file into a concrete syntax tree.
-fn loader(loc: Locator) -> anyhow::Result<Tree> {
-    eprintln!("Loading module {loc}");
-    let input = read_file(&loc)?;
-    let (tree, mut errs) = oal_syntax::parse(loc.clone(), input);
-    if let Some(err) = errs.pop() {
-        // We don't care about error recovery for the command line interface.
-        let span = match err {
-            oal_syntax::errors::Error::Grammar(ref err) => err.span(),
-            oal_syntax::errors::Error::Lexicon(ref err) => err.span(),
-            _ => Span::new(loc, 0..1),
-        };
-        report(span, &err);
-        Err(anyhow!("parsing failed"))
-    } else {
-        Ok(tree.unwrap())
-    }
-}
-
-/// Compiles a program.
-fn compiler(mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
-    eprintln!("Compiling module {loc}");
-    oal_compiler::compile::compile(mods, loc).map_err(|err| {
-        let span = match err.span() {
-            Some(s) => s.clone(),
-            None => Span::new(loc.clone(), 0..1),
-        };
-        report(span, &err);
-        anyhow!("compilation failed")
-    })
-}
 
 fn main() -> anyhow::Result<()> {
     let config = config::Config::new(None)?;
@@ -59,17 +9,22 @@ fn main() -> anyhow::Result<()> {
     let target = config.target()?;
     let base = config.base()?;
 
-    let mods = oal_compiler::module::load(&main, loader, compiler)?;
+    let mut ctx = Context::new(std::io::stderr());
+
+    let mods = oal_compiler::module::load(&mut ctx, &main)?;
 
     eprintln!("Generating API definition");
-    let spec = oal_compiler::eval::eval(&mods, mods.base()).map_err(|err| {
-        let span = match err.span() {
-            Some(s) => s.clone(),
-            None => Span::new(mods.base().clone(), 0..1),
-        };
-        report(span, &err);
-        anyhow!("evaluation failed")
-    })?;
+    let spec = match oal_compiler::eval::eval(&mods, mods.base()) {
+        Err(err) => {
+            let span = match err.span() {
+                Some(s) => s.clone(),
+                None => Span::new(mods.base().clone(), 0..0),
+            };
+            report(ctx.console(), span, &err)?;
+            Err(anyhow!("evaluation failed"))
+        }
+        Ok(spec) => Ok(spec),
+    }?;
 
     let mut builder = oal_openapi::Builder::new().with_spec(spec);
 

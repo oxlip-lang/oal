@@ -45,47 +45,23 @@ impl ModuleSet {
     }
 }
 
-pub trait Loader<E>: FnMut(Locator) -> std::result::Result<Tree, E>
-where
-    E: From<Error>,
-{
+pub trait Loader<E: From<Error>> {
+    /// Loads and parses a source file into a concrete syntax tree.
+    fn load(&mut self, loc: Locator) -> std::result::Result<Tree, E>;
+    /// Compiles a program.
+    fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
 }
 
-impl<E, F> Loader<E> for F
-where
-    E: From<Error>,
-    F: FnMut(Locator) -> std::result::Result<Tree, E>,
-{
-}
-
-pub trait Compiler<E>: FnMut(&ModuleSet, &Locator) -> std::result::Result<(), E>
-where
-    E: From<Error>,
-{
-}
-
-impl<E, F> Compiler<E> for F
-where
-    E: From<Error>,
-    F: FnMut(&ModuleSet, &Locator) -> std::result::Result<(), E>,
-{
-}
-
-pub fn load<E, L, C>(
-    base: &Locator,
-    mut loader: L,
-    mut compiler: C,
-) -> std::result::Result<ModuleSet, E>
+pub fn load<E, L>(loader: &mut L, base: &Locator) -> std::result::Result<ModuleSet, E>
 where
     E: From<Error>,
     L: Loader<E>,
-    C: Compiler<E>,
 {
     let mut deps = HashMap::new();
     let mut graph = Graph::new();
     let mut queue = Vec::new();
 
-    let main = loader(base.clone())?;
+    let main = loader.load(base.clone())?;
     let mut mods = ModuleSet::new(main);
 
     let root = graph.add_node(base.clone());
@@ -107,7 +83,7 @@ where
             if let Some(m) = deps.get(&import) {
                 graph.add_edge(*m, n, ());
             } else {
-                let module = loader(import.clone())?;
+                let module = loader.load(import.clone())?;
                 mods.insert(module);
 
                 let m = graph.add_node(import.clone());
@@ -124,7 +100,7 @@ where
     })?;
     for node in topo {
         let loc = graph.node_weight(node).unwrap();
-        compiler(&mods, loc)?;
+        loader.compile(&mods, loc)?;
     }
 
     Ok(mods)

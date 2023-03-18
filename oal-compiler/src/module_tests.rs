@@ -1,16 +1,18 @@
 use crate::errors;
-use crate::module::{load, ModuleSet};
+use crate::module::{load, Loader, ModuleSet};
+use crate::tree::Tree;
 use oal_model::locator::Locator;
 
-#[test]
-fn module_cycle() -> anyhow::Result<()> {
-    let base = Locator::try_from("file::///base.oal")?;
-    let module = Locator::try_from("file::///module.oal")?;
+struct ContextCycle {
+    base: Locator,
+    module: Locator,
+}
 
-    let loader = |loc: Locator| {
-        let code = if loc == base {
+impl Loader<anyhow::Error> for ContextCycle {
+    fn load(&mut self, loc: Locator) -> anyhow::Result<Tree> {
+        let code = if loc == self.base {
             r#"use "module.oal";"#
-        } else if loc == module {
+        } else if loc == self.module {
             r#"use "base.oal";"#
         } else {
             unreachable!()
@@ -19,11 +21,23 @@ fn module_cycle() -> anyhow::Result<()> {
         assert!(errs.is_empty());
         let tree = tree.expect("parsing failed");
         Ok(tree)
+    }
+
+    fn compile(&mut self, _mods: &ModuleSet, _loc: &Locator) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn module_cycle() -> anyhow::Result<()> {
+    let base = Locator::try_from("file::///base.oal")?;
+    let module = Locator::try_from("file::///module.oal")?;
+    let mut ctx = ContextCycle {
+        base: base.clone(),
+        module,
     };
 
-    let compiler = |_mods: &ModuleSet, _loc: &Locator| Ok(());
-
-    let err: anyhow::Error = load(&base, loader, compiler).expect_err("expected an error");
+    let err: anyhow::Error = load(&mut ctx, &base).expect_err("expected an error");
 
     assert!(matches!(
         err.downcast_ref::<errors::Error>()
@@ -35,23 +49,25 @@ fn module_cycle() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn module_sort() -> anyhow::Result<()> {
-    let base = Locator::try_from("file::///base.oal")?;
-    let module1 = Locator::try_from("file::///module1.oal")?;
-    let module2 = Locator::try_from("file::///module2.oal")?;
+struct ContextSort {
+    base: Locator,
+    module1: Locator,
+    module2: Locator,
+    order: Vec<Locator>,
+}
 
-    let loader = |loc: Locator| {
-        let code = if loc == base {
+impl Loader<anyhow::Error> for ContextSort {
+    fn load(&mut self, loc: Locator) -> anyhow::Result<Tree> {
+        let code = if loc == self.base {
             r#"
             use "module2.oal";
             res a;
             "#
-        } else if loc == module1 {
+        } else if loc == self.module1 {
             r#"
             let a = /;
             "#
-        } else if loc == module2 {
+        } else if loc == self.module2 {
             r#"
             use "module1.oal";
             "#
@@ -62,21 +78,33 @@ fn module_sort() -> anyhow::Result<()> {
         assert!(errs.is_empty());
         let tree = tree.expect("parsing failed");
         Ok(tree)
-    };
+    }
 
-    let mut order = Vec::new();
-
-    let compiler = |_mods: &ModuleSet, loc: &Locator| {
-        order.push(loc.clone());
+    fn compile(&mut self, _mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
+        self.order.push(loc.clone());
         anyhow::Ok(())
+    }
+}
+
+#[test]
+fn module_sort() -> anyhow::Result<()> {
+    let base = Locator::try_from("file::///base.oal")?;
+    let module1 = Locator::try_from("file::///module1.oal")?;
+    let module2 = Locator::try_from("file::///module2.oal")?;
+
+    let mut ctx = ContextSort {
+        base: base.clone(),
+        module1: module1.clone(),
+        module2: module2.clone(),
+        order: Vec::new(),
     };
 
-    let _mods = load(&base, loader, compiler).expect("loading failed");
+    let _mods = load(&mut ctx, &base).expect("loading failed");
 
-    assert_eq!(order.len(), 3, "expected 3 compilation units");
-    assert_eq!(order[0], module1, "expect module1 to be compiled first");
-    assert_eq!(order[1], module2, "expect module1 to be compiled first");
-    assert_eq!(order[2], base, "expect module1 to be compiled first");
+    assert_eq!(ctx.order.len(), 3, "expected 3 compilation units");
+    assert_eq!(ctx.order[0], module1, "expect module1 to be compiled first");
+    assert_eq!(ctx.order[1], module2, "expect module1 to be compiled first");
+    assert_eq!(ctx.order[2], base, "expect module1 to be compiled first");
 
     Ok(())
 }
