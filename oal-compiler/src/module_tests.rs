@@ -2,6 +2,7 @@ use crate::errors;
 use crate::module::{load, Loader, ModuleSet};
 use crate::tree::Tree;
 use oal_model::locator::Locator;
+use std::cell::RefCell;
 
 struct ContextCycle {
     base: Locator,
@@ -9,7 +10,7 @@ struct ContextCycle {
 }
 
 impl Loader<anyhow::Error> for ContextCycle {
-    fn load(&mut self, loc: Locator) -> anyhow::Result<Tree> {
+    fn load(&self, loc: Locator) -> anyhow::Result<Tree> {
         let code = if loc == self.base {
             r#"use "module.oal";"#
         } else if loc == self.module {
@@ -23,7 +24,7 @@ impl Loader<anyhow::Error> for ContextCycle {
         Ok(tree)
     }
 
-    fn compile(&mut self, _mods: &ModuleSet, _loc: &Locator) -> anyhow::Result<()> {
+    fn compile(&self, _mods: &ModuleSet, _loc: &Locator) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -53,11 +54,11 @@ struct ContextSort {
     base: Locator,
     module1: Locator,
     module2: Locator,
-    order: Vec<Locator>,
+    order: RefCell<Vec<Locator>>,
 }
 
 impl Loader<anyhow::Error> for ContextSort {
-    fn load(&mut self, loc: Locator) -> anyhow::Result<Tree> {
+    fn load(&self, loc: Locator) -> anyhow::Result<Tree> {
         let code = if loc == self.base {
             r#"
             use "module2.oal";
@@ -80,8 +81,8 @@ impl Loader<anyhow::Error> for ContextSort {
         Ok(tree)
     }
 
-    fn compile(&mut self, _mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
-        self.order.push(loc.clone());
+    fn compile(&self, _mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
+        self.order.borrow_mut().push(loc.clone());
         anyhow::Ok(())
     }
 }
@@ -96,15 +97,17 @@ fn module_sort() -> anyhow::Result<()> {
         base: base.clone(),
         module1: module1.clone(),
         module2: module2.clone(),
-        order: Vec::new(),
+        order: Default::default(),
     };
 
     let _mods = load(&mut ctx, &base).expect("loading failed");
 
-    assert_eq!(ctx.order.len(), 3, "expected 3 compilation units");
-    assert_eq!(ctx.order[0], module1, "expect module1 to be compiled first");
-    assert_eq!(ctx.order[1], module2, "expect module1 to be compiled first");
-    assert_eq!(ctx.order[2], base, "expect module1 to be compiled first");
+    let order = ctx.order.borrow();
+
+    assert_eq!(order.len(), 3, "expected 3 compilation units");
+    assert_eq!(order[0], module1, "expect module1 to be compiled first");
+    assert_eq!(order[1], module2, "expect module1 to be compiled first");
+    assert_eq!(order[2], base, "expect module1 to be compiled first");
 
     Ok(())
 }

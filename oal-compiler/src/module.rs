@@ -47,12 +47,12 @@ impl ModuleSet {
 
 pub trait Loader<E: From<Error>> {
     /// Loads and parses a source file into a concrete syntax tree.
-    fn load(&mut self, loc: Locator) -> std::result::Result<Tree, E>;
+    fn load(&self, loc: Locator) -> std::result::Result<Tree, E>;
     /// Compiles a program.
-    fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
+    fn compile(&self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
 }
 
-pub fn load<E, L>(loader: &mut L, base: &Locator) -> std::result::Result<ModuleSet, E>
+pub fn load<E, L>(loader: &L, base: &Locator) -> std::result::Result<ModuleSet, E>
 where
     E: From<Error>,
     L: Loader<E>,

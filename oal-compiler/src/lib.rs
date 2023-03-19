@@ -2,7 +2,7 @@ mod annotation;
 pub mod compile;
 mod definition;
 mod env;
-mod errors;
+pub mod errors;
 pub mod eval;
 mod inference;
 pub mod module;
