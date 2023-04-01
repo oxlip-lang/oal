@@ -472,6 +472,7 @@ impl Builder {
     fn uri_segment_label(&self, s: &spec::UriSegment) -> String {
         match s {
             spec::UriSegment::Literal(l) => {
+                let l = l.as_ref();
                 if l.is_empty() {
                     "root".to_owned()
                 } else {

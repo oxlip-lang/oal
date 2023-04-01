@@ -180,6 +180,21 @@ fn parse_decl_property() {
         let prop =
             Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
         assert_eq!(prop.name(), "q");
+        assert_eq!(prop.required(), None);
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+    });
+    parse("let a = 'q? str;", |p: Prog| {
+        let prop =
+            Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
+        assert_eq!(prop.name(), "q");
+        assert_eq!(prop.required(), Some(false));
+        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+    });
+    parse("let a = 'q! str;", |p: Prog| {
+        let prop =
+            Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
+        assert_eq!(prop.name(), "q");
+        assert_eq!(prop.required(), Some(true));
         assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
     })
 }
@@ -495,7 +510,7 @@ fn parse_grammar_error() {
 #[test]
 fn parse_lexicon_error() {
     let loc = Locator::try_from("file:///test.oal").unwrap();
-    let (_tree, mut errs) = crate::parse::<_, ()>(loc, "!!! / ( get -> );");
+    let (_tree, mut errs) = crate::parse::<_, ()>(loc, "*** / ( get -> );");
     assert_eq!(errs.len(), 2, "expected two errors");
     assert!(
         matches!(errs.pop().unwrap(), crate::errors::Error::Grammar(_)),

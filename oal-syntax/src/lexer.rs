@@ -50,6 +50,7 @@ pub enum Operator {
     Colon,
     DoubleColon,
     QuestionMark,
+    ExclamationMark,
     Arrow,
     Ampersand,
     Tilde,
@@ -285,6 +286,7 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = ParserError> 
         .to(Operator::Arrow)
         .or(just("::").to(Operator::DoubleColon))
         .or(just('?').to(Operator::QuestionMark))
+        .or(just('!').to(Operator::ExclamationMark))
         .or(just(':').to(Operator::Colon))
         .or(just('=').to(Operator::Equal))
         .or(just('&').to(Operator::Ampersand))

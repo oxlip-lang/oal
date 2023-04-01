@@ -4,8 +4,47 @@ use std::fmt::{Debug, Display, Formatter};
 use std::num::NonZeroU16;
 use std::rc::Rc;
 
-pub type Text = Rc<str>;
+/// Text syntax token.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Text(Rc<str>);
 
+impl From<&str> for Text {
+    fn from(s: &str) -> Self {
+        Text(s.into())
+    }
+}
+
+impl AsRef<str> for Text {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl From<Text> for String {
+    fn from(text: Text) -> Self {
+        text.as_ref().to_owned()
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self.0.as_ref(), f)
+    }
+}
+
+impl PartialEq<&str> for Text {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_ref() == *other
+    }
+}
+
+impl PartialEq<Text> for &str {
+    fn eq(&self, other: &Text) -> bool {
+        *self == other.as_ref()
+    }
+}
+
+/// Identifier syntax token.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Ident(Rc<str>);
 

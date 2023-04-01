@@ -555,7 +555,7 @@ pub fn eval_property<'a>(
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
     let desc = ann.get_string("description");
-    let required = ann.get_bool("required");
+    let required = ann.get_bool("required").or_else(|| property.required());
 
     let name = property.name();
     let schema = cast_schema(eval_any(ctx, property.rhs(), AnnRef::default())?);

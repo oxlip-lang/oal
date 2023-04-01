@@ -71,8 +71,7 @@ fn eval_composed_annotation() -> anyhow::Result<()> {
         let a = num `minimum: 0`;
         res / on get -> {
             # description: "a property"
-            # required: true
-            'prop a `title: "a property type"`
+            'prop! a `title: "a property type"`
         };
     "#,
     )?;

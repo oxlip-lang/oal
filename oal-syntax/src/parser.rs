@@ -52,7 +52,7 @@ impl<'a, T: Core> PathElement<'a, T> {
 terminal_node!(Gram, PropertyName, TokenKind::Property);
 
 impl<'a, T: Core> PropertyName<'a, T> {
-    pub fn as_ident(&self) -> atom::Ident {
+    pub fn as_text(&self) -> atom::Text {
         self.node().as_str().into()
     }
 }
@@ -107,6 +107,19 @@ impl<'a, T: Core> Operator<'a, T> {
             lex::Operator::Tilde => atom::Operator::Any,
             lex::Operator::VerticalBar => atom::Operator::Sum,
             _ => unreachable!("not a variadic operator {:?}", op),
+        }
+    }
+}
+
+terminal_node!(Gram, OptionMark, TokenKind::Operator(_));
+
+impl<'a, T: Core> OptionMark<'a, T> {
+    pub fn required(&self) -> bool {
+        let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
+        match op {
+            lex::Operator::ExclamationMark => true,
+            lex::Operator::QuestionMark => false,
+            _ => unreachable!("not an option mark {:?}", op),
         }
     }
 }
@@ -326,17 +339,27 @@ impl<'a, T: Core> UriParams<'a, T> {
 }
 
 impl<'a, T: Core> Property<'a, T> {
-    const NAME_POS: usize = 0;
-    const RHS_POS: usize = 1;
+    const OPTION_POS: usize = 1;
 
-    pub fn name(&self) -> atom::Ident {
-        PropertyName::cast(self.node().nth(Self::NAME_POS))
+    pub fn name(&self) -> atom::Text {
+        PropertyName::cast(self.node().first())
             .expect("expected a property name")
-            .as_ident()
+            .as_text()
+    }
+
+    pub fn required(&self) -> Option<bool> {
+        self.node()
+            .children()
+            .nth(Self::OPTION_POS)
+            .and_then(OptionMark::cast)
+            .map(|m| m.required())
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
-        self.node().nth(Self::RHS_POS)
+        self.node()
+            .children()
+            .last()
+            .expect("expected a right-hand side")
     }
 }
 
@@ -633,7 +656,13 @@ pub fn parser<'a>(
         );
 
         let property = tree_many(
-            just_token(TokenKind::Property).chain(expr.clone()),
+            just_token(TokenKind::Property)
+                .chain(
+                    just_token(TokenKind::Operator(lex::Operator::ExclamationMark))
+                        .or(just_token(TokenKind::Operator(lex::Operator::QuestionMark)))
+                        .or_not(),
+                )
+                .chain(expr.clone()),
             SyntaxKind::Property,
         );
 

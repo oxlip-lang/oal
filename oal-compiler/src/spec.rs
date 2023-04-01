@@ -13,7 +13,7 @@ pub enum UriSegment {
 impl UriSegment {
     pub fn is_empty(&self) -> bool {
         match self {
-            UriSegment::Literal(l) => l.is_empty(),
+            UriSegment::Literal(l) => l.as_ref().is_empty(),
             UriSegment::Variable(_) => false,
         }
     }
@@ -44,7 +44,7 @@ impl Uri {
     }
 
     pub fn pattern(&self) -> String {
-        self.pattern_with(|p| format!("{{{}}}", p.name.untagged()))
+        self.pattern_with(|p| format!("{{{}}}", p.name))
     }
 
     pub fn pattern_with<F>(&self, f: F) -> String
@@ -57,7 +57,7 @@ impl Uri {
         for s in self.path.iter() {
             b.push('/');
             match s {
-                UriSegment::Literal(l) => b.push_str(l),
+                UriSegment::Literal(l) => b.push_str(l.as_ref()),
                 UriSegment::Variable(t) => b.push_str(f(t).as_str()),
             }
         }
@@ -128,7 +128,7 @@ pub enum SchemaExpr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Property {
-    pub name: atom::Ident,
+    pub name: atom::Text,
     pub schema: Schema,
     /// The property description when used as a parameter
     pub desc: Option<String>,
