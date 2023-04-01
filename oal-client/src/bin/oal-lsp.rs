@@ -60,7 +60,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Refreshes the folders state following a workspace event.
-/// Publishes the diagnostics to the LSP client. 
+/// Publishes the diagnostics to the LSP client.
 fn refresh(
     conn: &Connection,
     ws: &Workspace,
