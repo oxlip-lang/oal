@@ -196,7 +196,7 @@ impl Builder {
             .props
             .iter()
             .filter_map(|p| {
-                if p.schema.required.unwrap_or(false) {
+                if p.required.or(p.schema.required).unwrap_or(false) {
                     Some(p.name.as_ref().to_owned())
                 } else {
                     None

@@ -63,8 +63,8 @@ let prop3 = 'age int `minimum: 0, maximum: 999`;
 // is registered as a component in the OpenAPI output.
 # description: "some stuff"
 let @obj1 = {
-  'firstName name     `title: "First name", required: true`
-, 'lastName name      `title: "Last name", required: true`
+  'firstName! name    `title: "First name"`
+, 'lastName! name     `title: "Last name"`
 , 'middleNames [name] `title: "Middle names"`
 , 'email email
 };
@@ -120,8 +120,7 @@ let @obj3 = f { 'height num } { 'stuff any1 };
 ```
 // Headers
 # description: "identifier for a specific version of a resource"
-# required: true
-let etag = 'ETag str `example: "675af34563dc-tr34"`;
+let etag = 'ETag! str `example: "675af34563dc-tr34"`;
 
 # description: "makes the request conditional"
 let ifnmatch = 'If-None-Match str;
@@ -142,9 +141,7 @@ let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "a
 // Binding everything together as resources
 res rel1;
 
-res /something?{ 'q str } (
-  get : <headers={ifnmatch}> -> with_err @obj3
-);
+res /something?{ 'q! str } on get : <headers={ifnmatch}> -> with_err @obj3;
 ```
 ```
 /*

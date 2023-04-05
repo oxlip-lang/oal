@@ -130,9 +130,7 @@ pub enum SchemaExpr {
 pub struct Property {
     pub name: atom::Text,
     pub schema: Schema,
-    /// The property description when used as a parameter
     pub desc: Option<String>,
-    /// Whether the property is required when used as a parameter
     pub required: Option<bool>,
 }
 

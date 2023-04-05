@@ -15,8 +15,8 @@ let prop3 = 'age int `minimum: 0, maximum: 999`;
 // is registered as a component in the OpenAPI output.
 # description: "some stuff"
 let @obj1 = {
-  'firstName name     `title: "First name", required: true`
-, 'lastName name      `title: "Last name", required: true`
+  'firstName! name    `title: "First name"`
+, 'lastName! name     `title: "Last name"`
 , 'middleNames [name] `title: "Middle names"`
 , 'email email
 };
