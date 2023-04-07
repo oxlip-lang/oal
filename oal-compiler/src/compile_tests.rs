@@ -4,7 +4,7 @@ use oal_model::locator::Locator;
 
 #[test]
 fn compile_modules() -> anyhow::Result<()> {
-    let base = Locator::try_from("file:///main.oal")?;
+    let base = Locator::try_from("file:main.oal")?;
     let input = std::fs::read_to_string("../examples/main.oal")?;
     let (main, errs) = oal_syntax::parse(base.clone(), input);
     assert!(errs.is_empty());
@@ -12,7 +12,7 @@ fn compile_modules() -> anyhow::Result<()> {
 
     let mut mods = ModuleSet::new(main);
 
-    let loc = Locator::try_from("file:///module.oal")?;
+    let loc = Locator::try_from("file:module.oal")?;
     let input = std::fs::read_to_string("../examples/module.oal")?;
     let (module, errs) = oal_syntax::parse(loc.clone(), input);
     assert!(errs.is_empty());

@@ -31,8 +31,8 @@ impl Loader<anyhow::Error> for ContextCycle {
 
 #[test]
 fn module_cycle() -> anyhow::Result<()> {
-    let base = Locator::try_from("file::///base.oal")?;
-    let module = Locator::try_from("file::///module.oal")?;
+    let base = Locator::try_from("file:base.oal")?;
+    let module = Locator::try_from("file:module.oal")?;
     let mut ctx = ContextCycle {
         base: base.clone(),
         module,
@@ -89,9 +89,9 @@ impl Loader<anyhow::Error> for ContextSort {
 
 #[test]
 fn module_sort() -> anyhow::Result<()> {
-    let base = Locator::try_from("file::///base.oal")?;
-    let module1 = Locator::try_from("file::///module1.oal")?;
-    let module2 = Locator::try_from("file::///module2.oal")?;
+    let base = Locator::try_from("file:base.oal")?;
+    let module1 = Locator::try_from("file:module1.oal")?;
+    let module2 = Locator::try_from("file:module2.oal")?;
 
     let mut ctx = ContextSort {
         base: base.clone(),

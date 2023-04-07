@@ -27,7 +27,6 @@ fn lsp_range(text: &str, range: Range<usize>) -> anyhow::Result<lsp_types::Range
 
 #[derive(Debug)]
 pub struct Folder {
-    uri: Url,
     config: Config,
     mods: Option<ModuleSet>,
     spec: Option<Spec>,
@@ -45,7 +44,6 @@ impl Folder {
             let path = uri.to_file_path().map_err(|_| anyhow!("not a path"))?;
             let config = Config::new(Some(path.as_path()))?;
             Ok(Folder {
-                uri,
                 config,
                 mods: None,
                 spec: None,
@@ -54,18 +52,14 @@ impl Folder {
     }
 
     pub fn contains(&self, loc: &Locator) -> bool {
-        self.uri
-            .make_relative(loc.url())
-            .map(|r| !r.starts_with(".."))
-            .unwrap_or(false)
-            || self.mods.as_ref().and_then(|m| m.get(loc)).is_some()
+        self.mods.as_ref().and_then(|m| m.get(loc)).is_some()
     }
 
     pub fn eval(&mut self, ws: &Workspace) {
         if let Ok(main) = self.config.main() {
-            self.mods = oal_compiler::module::load(&ws.loader(), &main).ok();
-            if let Some(ref m) = self.mods {
-                self.spec = ws.eval(m).ok();
+            if let Ok(mods) = oal_compiler::module::load(&ws.loader(), &main) {
+                self.spec = ws.eval(&mods).ok();
+                self.mods = Some(mods);
             }
         }
     }

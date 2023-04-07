@@ -75,7 +75,7 @@ where
         let mut imports = Vec::new();
         let prog = Program::cast(module.root()).expect("expected a program");
         for import in prog.imports() {
-            let i = base.join(import.module()).map_err(Error::from)?;
+            let i = loc.join(import.module()).map_err(Error::from)?;
             imports.push(i);
         }
 

@@ -6,7 +6,7 @@ use oal_model::locator::Locator;
 fn union() {
     let mut sets = UnionFind::new();
 
-    let loc = Locator::try_from("file::///module.oal").unwrap();
+    let loc = Locator::try_from("file:module.oal").unwrap();
     let mut seq = Seq::new(loc);
 
     let v0 = Tag::Var(seq.next());
