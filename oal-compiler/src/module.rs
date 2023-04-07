@@ -1,6 +1,7 @@
 use crate::errors::{Error, Kind};
 use crate::tree::Tree;
 use oal_model::locator::Locator;
+use oal_model::span::Span;
 use oal_syntax::parser::Program;
 use petgraph::algo::toposort;
 use petgraph::prelude::*;
@@ -46,8 +47,10 @@ impl ModuleSet {
 }
 
 pub trait Loader<E: From<Error>> {
-    /// Loads and parses a source file into a concrete syntax tree.
-    fn load(&self, loc: Locator) -> std::result::Result<Tree, E>;
+    /// Loads a source file.
+    fn load(&self, loc: &Locator) -> std::io::Result<String>;
+    /// Parses a source file into a concrete syntax tree.
+    fn parse(&self, loc: Locator, input: String) -> std::result::Result<Tree, E>;
     /// Compiles a program.
     fn compile(&self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
 }
@@ -61,7 +64,8 @@ where
     let mut graph = Graph::new();
     let mut queue = Vec::new();
 
-    let main = loader.load(base.clone())?;
+    let input = loader.load(base).map_err(Error::from)?;
+    let main = loader.parse(base.clone(), input)?;
     let mut mods = ModuleSet::new(main);
 
     let root = graph.add_node(base.clone());
@@ -75,15 +79,21 @@ where
         let mut imports = Vec::new();
         let prog = Program::cast(module.root()).expect("expected a program");
         for import in prog.imports() {
-            let i = loc.join(import.module()).map_err(Error::from)?;
-            imports.push(i);
+            let s = import.node().span();
+            let i = base
+                .join(import.module())
+                .map_err(|err| Error::from(err).at(s.clone()))?;
+            imports.push((i, s));
         }
 
-        for import in imports {
+        for (import, span) in imports {
             if let Some(m) = deps.get(&import) {
                 graph.add_edge(*m, n, ());
             } else {
-                let module = loader.load(import.clone())?;
+                let input = loader
+                    .load(&import)
+                    .map_err(|err| Error::from(err).at(span))?;
+                let module = loader.parse(import.clone(), input)?;
                 mods.insert(module);
 
                 let m = graph.add_node(import.clone());
@@ -96,7 +106,8 @@ where
 
     let topo = toposort(&graph, None).map_err(|err| {
         let loc = graph.node_weight(err.node_id()).unwrap();
-        Error::new(Kind::CycleDetected, "cycle in module dependencies").with(loc)
+        Error::new(Kind::CycleDetected, "cycle in module dependencies")
+            .at(Some(Span::new(loc.clone(), 0..0)))
     })?;
     for node in topo {
         let loc = graph.node_weight(node).unwrap();

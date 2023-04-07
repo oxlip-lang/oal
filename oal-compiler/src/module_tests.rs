@@ -1,4 +1,4 @@
-use crate::errors;
+use crate::errors::{Error, Kind};
 use crate::module::{load, Loader, ModuleSet};
 use crate::tree::Tree;
 use oal_model::locator::Locator;
@@ -10,15 +10,19 @@ struct ContextCycle {
 }
 
 impl Loader<anyhow::Error> for ContextCycle {
-    fn load(&self, loc: Locator) -> anyhow::Result<Tree> {
-        let code = if loc == self.base {
+    fn load(&self, loc: &Locator) -> std::io::Result<String> {
+        let code = if *loc == self.base {
             r#"use "module.oal";"#
-        } else if loc == self.module {
+        } else if *loc == self.module {
             r#"use "base.oal";"#
         } else {
             unreachable!()
         };
-        let (tree, errs) = oal_syntax::parse(loc, code);
+        Ok(code.to_owned())
+    }
+
+    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+        let (tree, errs) = oal_syntax::parse(loc, input);
         assert!(errs.is_empty());
         let tree = tree.expect("parsing failed");
         Ok(tree)
@@ -38,13 +42,13 @@ fn module_cycle() -> anyhow::Result<()> {
         module,
     };
 
-    let err: anyhow::Error = load(&mut ctx, &base).expect_err("expected an error");
+    let err = load(&mut ctx, &base).expect_err("expected an error");
 
     assert!(matches!(
-        err.downcast_ref::<errors::Error>()
+        err.downcast_ref::<Error>()
             .expect("expected compiler error")
             .kind,
-        errors::Kind::CycleDetected
+        Kind::CycleDetected
     ));
 
     Ok(())
@@ -58,24 +62,28 @@ struct ContextSort {
 }
 
 impl Loader<anyhow::Error> for ContextSort {
-    fn load(&self, loc: Locator) -> anyhow::Result<Tree> {
-        let code = if loc == self.base {
+    fn load(&self, loc: &Locator) -> std::io::Result<String> {
+        let code = if *loc == self.base {
             r#"
             use "module2.oal";
             res a;
             "#
-        } else if loc == self.module1 {
+        } else if *loc == self.module1 {
             r#"
             let a = /;
             "#
-        } else if loc == self.module2 {
+        } else if *loc == self.module2 {
             r#"
             use "module1.oal";
             "#
         } else {
             unreachable!()
         };
-        let (tree, errs) = oal_syntax::parse(loc, code);
+        Ok(code.to_owned())
+    }
+
+    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+        let (tree, errs) = oal_syntax::parse(loc, input);
         assert!(errs.is_empty());
         let tree = tree.expect("parsing failed");
         Ok(tree)
@@ -83,7 +91,7 @@ impl Loader<anyhow::Error> for ContextSort {
 
     fn compile(&self, _mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
         self.order.borrow_mut().push(loc.clone());
-        anyhow::Ok(())
+        Ok(())
     }
 }
 

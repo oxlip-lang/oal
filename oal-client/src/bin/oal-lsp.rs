@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use crossbeam_channel::select;
 use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
@@ -10,7 +11,7 @@ use lsp_types::{
     PublishDiagnosticsParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
 };
 use oal_client::lsp::{Folder, Workspace};
-use oal_model::locator::Locator;
+use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
     // Note that we must have our logging only write out to stderr.
@@ -41,7 +42,7 @@ fn main() -> anyhow::Result<()> {
         .and_then(|e| e.contains(&PositionEncodingKind::UTF16).then_some(()))
         .ok_or_else(|| anyhow!("UTF-16 not supported by client"))?;
 
-    let folders = params
+    let mut folders = params
         .workspace_folders
         .unwrap_or_default()
         .into_iter()
@@ -49,6 +50,8 @@ fn main() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let workspace = Workspace::default();
+
+    refresh(&conn, &workspace, &mut folders)?;
 
     main_loop(conn, workspace, folders)?;
 
@@ -61,79 +64,81 @@ fn main() -> anyhow::Result<()> {
 
 /// Refreshes the folders state following a workspace event.
 /// Publishes the diagnostics to the LSP client.
-fn refresh(
-    conn: &Connection,
-    ws: &Workspace,
-    folders: &mut [Folder],
-    loc: Option<&Locator>,
-) -> anyhow::Result<()> {
+fn refresh(conn: &Connection, ws: &Workspace, folders: &mut [Folder]) -> anyhow::Result<()> {
     for f in folders.iter_mut() {
-        if loc.map(|l| f.contains(l)).unwrap_or(true) {
-            f.eval(ws);
-            let diags = ws.diagnostics()?;
-            for (loc, diagnostics) in diags.into_iter() {
-                let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
-                    uri: loc.url().clone(),
-                    diagnostics,
-                    version: None,
-                });
-                conn.sender.send(Message::Notification(info))?;
-            }
+        f.eval(ws);
+        let diags = ws.diagnostics()?;
+        for (loc, diagnostics) in diags.into_iter() {
+            let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
+                uri: loc.url().clone(),
+                diagnostics,
+                version: None,
+            });
+            conn.sender.send(Message::Notification(info))?;
         }
     }
     Ok(())
 }
 
 fn main_loop(conn: Connection, ws: Workspace, mut folders: Vec<Folder>) -> anyhow::Result<()> {
-    refresh(&conn, &ws, &mut folders, None)?;
-
-    for msg in &conn.receiver {
-        match msg {
-            Message::Request(req) => {
-                if conn.handle_shutdown(&req)? {
-                    return Ok(());
+    let mut must_refresh = false;
+    loop {
+        select! {
+            recv(conn.receiver) -> msg => {
+                match msg? {
+                    Message::Request(req) => {
+                        if conn.handle_shutdown(&req)? {
+                            return Ok(());
+                        }
+                        match cast_request::<GotoDefinition>(req) {
+                            Ok((id, params)) => {
+                                goto_definition(&conn, id, params)?;
+                                continue;
+                            }
+                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
+                            Err(ExtractError::MethodMismatch(_)) => (),
+                        };
+                    }
+                    Message::Response(_resp) => {}
+                    Message::Notification(not) => {
+                        let not = match cast_notification::<DidOpenTextDocument>(not) {
+                            Ok(params) => {
+                                ws.open(params)?;
+                                must_refresh = true;
+                                continue;
+                            }
+                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
+                            Err(ExtractError::MethodMismatch(not)) => not,
+                        };
+                        let not = match cast_notification::<DidCloseTextDocument>(not) {
+                            Ok(params) => {
+                                ws.close(params)?;
+                                must_refresh = true;
+                                continue;
+                            }
+                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
+                            Err(ExtractError::MethodMismatch(not)) => not,
+                        };
+                        let _not = match cast_notification::<DidChangeTextDocument>(not) {
+                            Ok(params) => {
+                                ws.change(params)?;
+                                must_refresh = true;
+                                continue;
+                            }
+                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
+                            Err(ExtractError::MethodMismatch(not)) => not,
+                        };
+                    }
                 }
-                match cast_request::<GotoDefinition>(req) {
-                    Ok((id, params)) => {
-                        goto_definition(&conn, id, params)?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                    Err(ExtractError::MethodMismatch(_)) => (),
-                };
-            }
-            Message::Response(_resp) => {}
-            Message::Notification(not) => {
-                let not = match cast_notification::<DidOpenTextDocument>(not) {
-                    Ok(params) => {
-                        let loc = ws.open(params)?;
-                        refresh(&conn, &ws, &mut folders, Some(&loc))?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                    Err(ExtractError::MethodMismatch(not)) => not,
-                };
-                let not = match cast_notification::<DidCloseTextDocument>(not) {
-                    Ok(params) => {
-                        let _loc = ws.close(params)?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                    Err(ExtractError::MethodMismatch(not)) => not,
-                };
-                let _not = match cast_notification::<DidChangeTextDocument>(not) {
-                    Ok(params) => {
-                        let loc = ws.change(params)?;
-                        refresh(&conn, &ws, &mut folders, Some(&loc))?;
-                        continue;
-                    }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                    Err(ExtractError::MethodMismatch(not)) => not,
-                };
+            },
+            default(Duration::from_millis(1000)) => {
+                if must_refresh {
+                    must_refresh = false;
+                    refresh(&conn, &ws, &mut folders)?;
+                }
             }
         }
     }
-    Ok(())
 }
 
 fn cast_request<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>

@@ -17,6 +17,8 @@ pub enum Kind {
     CycleDetected,
     #[error("invalid literal")]
     InvalidLiteral,
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 #[derive(Debug)]

@@ -57,7 +57,7 @@ impl Folder {
 
     pub fn eval(&mut self, ws: &Workspace) {
         if let Ok(main) = self.config.main() {
-            if let Ok(mods) = oal_compiler::module::load(&ws.loader(), &main) {
+            if let Ok(mods) = ws.load(&main) {
                 self.spec = ws.eval(&mods).ok();
                 self.mods = Some(mods);
             }
@@ -108,6 +108,17 @@ impl Workspace {
         Ok(loc)
     }
 
+    pub fn load(&self, loc: &Locator) -> anyhow::Result<ModuleSet> {
+        self.syntax_errors.replace(Default::default());
+        self.compiler_error.replace(Default::default());
+        oal_compiler::module::load(&WorkspaceLoader(self), loc).map_err(|err| {
+            if let Ok(err) = err.downcast::<oal_compiler::errors::Error>() {
+                self.compiler_error.replace(Some((loc.clone(), err)));
+            }
+            anyhow!("loading failed")
+        })
+    }
+
     /// Evaluates a program. Resets evaluation errors.
     pub fn eval(&self, mods: &ModuleSet) -> anyhow::Result<Spec> {
         self.eval_error.replace(Default::default());
@@ -122,13 +133,6 @@ impl Workspace {
             }
             Ok(spec) => Ok(spec),
         }
-    }
-
-    /// Returns a program loader. Resets syntax and compilation errors.
-    pub fn loader(&self) -> impl Loader<anyhow::Error> + '_ {
-        self.syntax_errors.replace(Default::default());
-        self.compiler_error.replace(Default::default());
-        WorkspaceLoader(self)
     }
 
     /// Creates an LSP diagnostic from the given span and error.
@@ -251,9 +255,13 @@ impl<'a> WorkspaceDiags<'a> {
 struct WorkspaceLoader<'a>(&'a Workspace);
 
 impl<'a> Loader<anyhow::Error> for WorkspaceLoader<'a> {
+    /// Loads a source file.
+    fn load(&self, loc: &Locator) -> std::io::Result<String> {
+        self.0.read_file(loc)
+    }
+
     /// Loads and parses a source file into a concrete syntax tree.
-    fn load(&self, loc: Locator) -> anyhow::Result<Tree> {
-        let input = self.0.read_file(&loc)?;
+    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
         let (tree, errs) = oal_syntax::parse(loc.clone(), input);
         self.0.syntax_errors.borrow_mut().insert(loc, errs);
         tree.ok_or_else(|| anyhow!("parsing failed"))

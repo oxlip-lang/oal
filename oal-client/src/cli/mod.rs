@@ -58,10 +58,15 @@ impl Processor {
 struct ProcLoader<'a>(&'a Processor);
 
 impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
-    /// Loads and parses a source file into a concrete syntax tree.
-    fn load(&self, loc: Locator) -> anyhow::Result<Tree> {
+    /// Loads a source file.
+    fn load(&self, loc: &Locator) -> std::io::Result<String> {
         eprintln!("Loading module {loc}");
-        let input = DefaultFileSystem.read_file(&loc)?;
+        DefaultFileSystem.read_file(loc)
+    }
+
+    /// Parses a source file into a concrete syntax tree.
+    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+        eprintln!("Parsing module {loc}");
         let (tree, mut errs) = oal_syntax::parse(loc.clone(), input);
         if let Some(err) = errs.pop() {
             // We don't care about error recovery for the command line interface.
