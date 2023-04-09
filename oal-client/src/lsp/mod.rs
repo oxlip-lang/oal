@@ -1,3 +1,6 @@
+pub mod dispatcher;
+pub mod handlers;
+pub mod state;
 #[cfg(test)]
 mod tests;
 
@@ -67,6 +70,7 @@ impl Folder {
 
 pub type Diagnostics = HashMap<Locator, Vec<Diagnostic>>;
 
+// TODO: revisit the need for `RefCell` instead of using a mutable `Workspace`.
 #[derive(Default)]
 pub struct Workspace {
     docs: RefCell<HashMap<Url, Text>>,

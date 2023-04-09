@@ -36,8 +36,12 @@ impl Locator {
 
     /// Appends a relative path to the locator base.
     pub fn join(&self, path: &str) -> Result<Self, Error> {
-        let url = self.url.join(path).map(Arc::new)?;
-        Ok(Locator { url })
+        if path.is_empty() {
+            Err(Error::InvalidPath(path.into()))
+        } else {
+            let url = self.url.join(path).map(Arc::new)?;
+            Ok(Locator { url })
+        }
     }
 }
 

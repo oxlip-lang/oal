@@ -1,16 +1,18 @@
 use anyhow::anyhow;
 use crossbeam_channel::select;
-use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
+use lsp_server::{Connection, Message, Notification};
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
 };
 use lsp_types::request::GotoDefinition;
 use lsp_types::OneOf;
 use lsp_types::{
-    GotoDefinitionParams, GotoDefinitionResponse, InitializeParams, PositionEncodingKind,
-    PublishDiagnosticsParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    InitializeParams, PositionEncodingKind, PublishDiagnosticsParams, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind,
 };
-use oal_client::lsp::{Folder, Workspace};
+use oal_client::lsp::dispatcher::{NotificationDispatcher, RequestDispatcher};
+use oal_client::lsp::state::GlobalState;
+use oal_client::lsp::{handlers, Folder, Workspace};
 use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
@@ -42,7 +44,7 @@ fn main() -> anyhow::Result<()> {
         .and_then(|e| e.contains(&PositionEncodingKind::UTF16).then_some(()))
         .ok_or_else(|| anyhow!("UTF-16 not supported by client"))?;
 
-    let mut folders = params
+    let folders = params
         .workspace_folders
         .unwrap_or_default()
         .into_iter()
@@ -51,110 +53,20 @@ fn main() -> anyhow::Result<()> {
 
     let workspace = Workspace::default();
 
-    refresh(&conn, &workspace, &mut folders)?;
+    let state = &mut GlobalState {
+        conn,
+        workspace,
+        folders,
+        is_stale: true,
+    };
 
-    main_loop(conn, workspace, folders)?;
+    main_loop(state)?;
 
     threads.join()?;
 
     // Shut down gracefully.
     eprintln!("shutting down OpenAPI Lang server");
     Ok(())
-}
-
-/// Refreshes the folders state following a workspace event.
-/// Publishes the diagnostics to the LSP client.
-fn refresh(conn: &Connection, ws: &Workspace, folders: &mut [Folder]) -> anyhow::Result<()> {
-    for f in folders.iter_mut() {
-        f.eval(ws);
-        let diags = ws.diagnostics()?;
-        for (loc, diagnostics) in diags.into_iter() {
-            let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
-                uri: loc.url().clone(),
-                diagnostics,
-                version: None,
-            });
-            conn.sender.send(Message::Notification(info))?;
-        }
-    }
-    Ok(())
-}
-
-fn main_loop(conn: Connection, ws: Workspace, mut folders: Vec<Folder>) -> anyhow::Result<()> {
-    let mut must_refresh = false;
-    loop {
-        select! {
-            recv(conn.receiver) -> msg => {
-                match msg? {
-                    Message::Request(req) => {
-                        if conn.handle_shutdown(&req)? {
-                            return Ok(());
-                        }
-                        match cast_request::<GotoDefinition>(req) {
-                            Ok((id, params)) => {
-                                goto_definition(&conn, id, params)?;
-                                continue;
-                            }
-                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                            Err(ExtractError::MethodMismatch(_)) => (),
-                        };
-                    }
-                    Message::Response(_resp) => {}
-                    Message::Notification(not) => {
-                        let not = match cast_notification::<DidOpenTextDocument>(not) {
-                            Ok(params) => {
-                                ws.open(params)?;
-                                must_refresh = true;
-                                continue;
-                            }
-                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                            Err(ExtractError::MethodMismatch(not)) => not,
-                        };
-                        let not = match cast_notification::<DidCloseTextDocument>(not) {
-                            Ok(params) => {
-                                ws.close(params)?;
-                                must_refresh = true;
-                                continue;
-                            }
-                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                            Err(ExtractError::MethodMismatch(not)) => not,
-                        };
-                        let _not = match cast_notification::<DidChangeTextDocument>(not) {
-                            Ok(params) => {
-                                ws.change(params)?;
-                                must_refresh = true;
-                                continue;
-                            }
-                            Err(err @ ExtractError::JsonError { .. }) => panic!("{err:#?}"),
-                            Err(ExtractError::MethodMismatch(not)) => not,
-                        };
-                    }
-                }
-            },
-            default(Duration::from_millis(1000)) => {
-                if must_refresh {
-                    must_refresh = false;
-                    refresh(&conn, &ws, &mut folders)?;
-                }
-            }
-        }
-    }
-}
-
-fn cast_request<R>(req: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
-where
-    R: lsp_types::request::Request,
-    R::Params: serde::de::DeserializeOwned,
-{
-    req.extract(R::METHOD)
-}
-
-fn cast_notification<N>(not: Notification) -> Result<N::Params, ExtractError<Notification>>
-where
-    N: lsp_types::notification::Notification,
-    N::Params: serde::de::DeserializeOwned,
-{
-    not.extract(N::METHOD)
 }
 
 fn notify<N>(p: N::Params) -> Notification
@@ -164,18 +76,62 @@ where
     Notification::new(N::METHOD.to_owned(), p)
 }
 
-fn goto_definition(
-    conn: &Connection,
-    id: RequestId,
-    _params: GotoDefinitionParams,
-) -> anyhow::Result<()> {
-    let result = Some(GotoDefinitionResponse::Array(Vec::new()));
-    let result = serde_json::to_value(&result).unwrap();
-    let resp = Response {
-        id,
-        result: Some(result),
-        error: None,
-    };
-    conn.sender.send(Message::Response(resp))?;
+/// Refreshes the folders state following a workspace event.
+/// Publishes the diagnostics to the LSP client.
+fn refresh(state: &mut GlobalState) -> anyhow::Result<()> {
+    state.is_stale = false;
+    for f in state.folders.iter_mut() {
+        f.eval(&state.workspace);
+        let diags = state.workspace.diagnostics()?;
+        for (loc, diagnostics) in diags.into_iter() {
+            let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
+                uri: loc.url().clone(),
+                diagnostics,
+                version: None,
+            });
+            state.conn.sender.send(Message::Notification(info))?;
+        }
+    }
     Ok(())
+}
+
+fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
+    loop {
+        select! {
+            recv(state.conn.receiver) -> msg => {
+                match msg? {
+                    Message::Request(req) => {
+                        if state.conn.handle_shutdown(&req)? {
+                            return Ok(());
+                        }
+                        RequestDispatcher::new(state, req).on::<GotoDefinition>(handlers::goto_definition)?;
+                    }
+                    Message::Response(_resp) => {}
+                    Message::Notification(not) => {
+                        NotificationDispatcher::new(state, not)
+                        .on::<DidOpenTextDocument>(|state, params| {
+                            state.workspace.open(params)?;
+                            state.is_stale = true;
+                            Ok(())
+                        })?
+                        .on::<DidCloseTextDocument>(|state, params| {
+                            state.workspace.close(params)?;
+                            state.is_stale = true;
+                            Ok(())
+                        })?
+                        .on::<DidChangeTextDocument>(|state, params| {
+                            state.workspace.change(params)?;
+                            state.is_stale = true;
+                            Ok(())
+                        })?;
+                    }
+                }
+            },
+            default(Duration::from_millis(1000)) => {
+                if state.is_stale {
+                    refresh(state)?;
+                }
+            }
+        }
+    }
 }
