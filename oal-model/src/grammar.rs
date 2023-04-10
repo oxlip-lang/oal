@@ -375,7 +375,7 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
         }
     }
 
-    /// Returns the index of the first token, if any.
+    /// Returns a reference to the first token, if any.
     pub fn start(&self) -> Option<TokenRef<'a, G>> {
         match self.syntax().trunk() {
             SyntaxTrunk::Leaf(t) => Some(TokenRef::from(&self.tree.tokens, t.index())),
@@ -383,7 +383,7 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
         }
     }
 
-    /// Returns the index of the last token, if any.
+    /// Returns a reference to the last token, if any.
     pub fn end(&self) -> Option<TokenRef<'a, G>> {
         match self.syntax().trunk() {
             SyntaxTrunk::Leaf(t) => Some(TokenRef::from(&self.tree.tokens, t.index())),

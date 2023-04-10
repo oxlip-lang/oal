@@ -54,6 +54,14 @@ impl Folder {
         }
     }
 
+    pub fn modules(&self) -> Option<&ModuleSet> {
+        self.mods.as_ref()
+    }
+
+    pub fn module(&self, loc: &Locator) -> Option<&Tree> {
+        self.mods.as_ref().and_then(|m| m.get(loc))
+    }
+
     pub fn contains(&self, loc: &Locator) -> bool {
         self.mods.as_ref().and_then(|m| m.get(loc)).is_some()
     }
@@ -71,6 +79,7 @@ impl Folder {
 pub type Diagnostics = HashMap<Locator, Vec<Diagnostic>>;
 
 // TODO: revisit the need for `RefCell` instead of using a mutable `Workspace`.
+// TODO: store documents as UTF-8.
 #[derive(Default)]
 pub struct Workspace {
     docs: RefCell<HashMap<Url, Text>>,

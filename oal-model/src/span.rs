@@ -2,7 +2,7 @@ use crate::locator::Locator;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
-/// The parsing span type.
+/// The parsing span type, expressed as Unicode character indices.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     start: usize,

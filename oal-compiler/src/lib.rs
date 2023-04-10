@@ -1,6 +1,6 @@
 mod annotation;
 pub mod compile;
-mod definition;
+pub mod definition;
 mod env;
 pub mod errors;
 pub mod eval;
