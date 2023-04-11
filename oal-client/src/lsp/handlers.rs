@@ -21,15 +21,13 @@ pub fn goto_definition(
         let text = state.workspace.read_file(&loc)?;
         let index = char_index(&text, pos);
 
-        // TODO: pre-compute variable spans in each folders
-        let vars: Vec<_> = tree
+        let variable = tree
             .root()
             .descendants()
             .filter_map(oal_syntax::parser::Variable::cast)
-            .map(|v| (v.clone(), v.node().span().unwrap()))
-            .collect();
+            .find(|v| v.node().span().unwrap().range().contains(&index));
 
-        if let Some((v, _)) = vars.iter().find(|(_, s)| s.range().contains(&index)) {
+        if let Some(v) = variable {
             if let Some(Definition::External(ext)) = v.node().syntax().core_ref().definition() {
                 let definition = ext.node(folder.modules().unwrap());
                 let span = definition.span().unwrap();
