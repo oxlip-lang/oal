@@ -80,7 +80,7 @@ where
         let prog = Program::cast(module.root()).expect("expected a program");
         for import in prog.imports() {
             let s = import.node().span();
-            let i = base
+            let i = loc
                 .join(import.module())
                 .map_err(|err| Error::from(err).at(s.clone()))?;
             imports.push((i, s));
