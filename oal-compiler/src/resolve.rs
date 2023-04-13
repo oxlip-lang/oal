@@ -25,13 +25,13 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     stdlib::import(env);
     let current = mods.get(loc).unwrap();
 
-    for cursor in mods.get(loc).unwrap().root().traverse() {
+    for cursor in current.root().traverse() {
         match cursor {
             NodeCursor::Start(node) => {
                 if let Some(import) = Import::cast(node) {
-                    let loc = mods.base().join(import.module())?;
+                    let other = loc.join(import.module())?;
                     // All modules that are to be imported must be present in the module-set.
-                    let Some(module) = mods.get(&loc) else { panic!("unknown module: {loc}") };
+                    let Some(module) = mods.get(&other) else { panic!("unknown module: {other}") };
                     let program =
                         Program::cast(module.root()).expect("module root must be a program");
                     for decl in program.declarations() {
