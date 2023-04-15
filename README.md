@@ -4,7 +4,7 @@
 # An OpenAPI Language
 OAL is a high-level functional programming language for designing
 OpenAPI definitions.
-It is not a general purpose language. It is not Turing-complete, by design.
+As an [Interface Description Language](https://en.wikipedia.org/wiki/Interface_description_language), it is not general purpose and not Turing-complete, by design.
 The motivation is to experiment with algebraic language abstractions over REST concepts,
 not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/).
 The ambition of the author is to consider OpenAPI as the assembly language of REST API design.
@@ -19,7 +19,7 @@ This step requires a [local Rust and Cargo installation](https://doc.rust-lang.o
 ```
 cargo install --path oal-client
 ```
-Optional: a [VSCode language extension](https://github.com/ebastien/openapi-lang-vscode) is available for syntax highlighting and future IDE capabilities.
+Optional: a [VSCode language extension](https://github.com/ebastien/openapi-lang-vscode) is available for syntax highlighting and IDE capabilities.
 
 ## Usage
 ```
@@ -151,6 +151,11 @@ res /something?{ 'q! str } on get : <headers={ifnmatch}> -> with_err @obj3;
 ```
 
 [OpenAPI definition generated from this program](examples/openapi.yaml)
+
+## Design decisions
+- Rust got chosen both as a learning material and because of the maturity of its ecosystem for the development of compilers.
+- An external domain specific language was preferred to minimize dependencies with language SDKs and runtimes for end-users.
+- The parser emits a concrete syntax tree instead of an abstract syntax tree to enable interactive source code refactoring capabilities.
 
 ## Related work and comparison with OAL
 - [Cadl](https://github.com/microsoft/cadl)
