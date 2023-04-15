@@ -44,18 +44,22 @@ impl ModuleSet {
     pub fn get(&self, l: &Locator) -> Option<&Tree> {
         self.mods.get(l)
     }
+
+    pub fn locators(&self) -> impl Iterator<Item = &Locator> {
+        self.mods.keys()
+    }
 }
 
 pub trait Loader<E: From<Error>> {
     /// Loads a source file.
-    fn load(&self, loc: &Locator) -> std::io::Result<String>;
+    fn load(&mut self, loc: &Locator) -> std::io::Result<String>;
     /// Parses a source file into a concrete syntax tree.
-    fn parse(&self, loc: Locator, input: String) -> std::result::Result<Tree, E>;
+    fn parse(&mut self, loc: Locator, input: String) -> std::result::Result<Tree, E>;
     /// Compiles a program.
-    fn compile(&self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
+    fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
 }
 
-pub fn load<E, L>(loader: &L, base: &Locator) -> std::result::Result<ModuleSet, E>
+pub fn load<E, L>(loader: &mut L, base: &Locator) -> std::result::Result<ModuleSet, E>
 where
     E: From<Error>,
     L: Loader<E>,

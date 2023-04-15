@@ -59,13 +59,13 @@ struct ProcLoader<'a>(&'a Processor);
 
 impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
     /// Loads a source file.
-    fn load(&self, loc: &Locator) -> std::io::Result<String> {
+    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
         eprintln!("Loading module {loc}");
         DefaultFileSystem.read_file(loc)
     }
 
     /// Parses a source file into a concrete syntax tree.
-    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+    fn parse(&mut self, loc: Locator, input: String) -> anyhow::Result<Tree> {
         eprintln!("Parsing module {loc}");
         let (tree, mut errs) = oal_syntax::parse(loc.clone(), input);
         if let Some(err) = errs.pop() {
@@ -83,7 +83,7 @@ impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
     }
 
     /// Compiles a program.
-    fn compile(&self, mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
+    fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
         eprintln!("Compiling module {loc}");
         if let Err(err) = oal_compiler::compile::compile(mods, loc) {
             let span = match err.span() {

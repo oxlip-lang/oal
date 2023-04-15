@@ -81,9 +81,9 @@ where
 fn refresh(state: &mut GlobalState) -> anyhow::Result<()> {
     state.is_stale = false;
     for f in state.folders.iter_mut() {
-        f.eval(&state.workspace);
+        f.eval(&mut state.workspace);
         let diags = state.workspace.diagnostics()?;
-        for (loc, diagnostics) in diags.into_iter() {
+        for (loc, diagnostics) in diags {
             let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
                 uri: loc.url().clone(),
                 diagnostics,
@@ -104,7 +104,7 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
                         if state.conn.handle_shutdown(&req)? {
                             return Ok(());
                         }
-                        RequestDispatcher::new(state, req).on::<GotoDefinition>(handlers::goto_definition)?;
+                        RequestDispatcher::new(state, req).on::<GotoDefinition>(handlers::go_to_definition)?;
                     }
                     Message::Response(_resp) => {}
                     Message::Notification(not) => {

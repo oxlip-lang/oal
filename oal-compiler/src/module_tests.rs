@@ -10,7 +10,7 @@ struct ContextCycle {
 }
 
 impl Loader<anyhow::Error> for ContextCycle {
-    fn load(&self, loc: &Locator) -> std::io::Result<String> {
+    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
         let code = if *loc == self.base {
             r#"use "module.oal";"#
         } else if *loc == self.module {
@@ -21,14 +21,14 @@ impl Loader<anyhow::Error> for ContextCycle {
         Ok(code.to_owned())
     }
 
-    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+    fn parse(&mut self, loc: Locator, input: String) -> anyhow::Result<Tree> {
         let (tree, errs) = oal_syntax::parse(loc, input);
         assert!(errs.is_empty());
         let tree = tree.expect("parsing failed");
         Ok(tree)
     }
 
-    fn compile(&self, _mods: &ModuleSet, _loc: &Locator) -> anyhow::Result<()> {
+    fn compile(&mut self, _mods: &ModuleSet, _loc: &Locator) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -62,7 +62,7 @@ struct ContextSort {
 }
 
 impl Loader<anyhow::Error> for ContextSort {
-    fn load(&self, loc: &Locator) -> std::io::Result<String> {
+    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
         let code = if *loc == self.base {
             r#"
             use "module2.oal";
@@ -82,14 +82,14 @@ impl Loader<anyhow::Error> for ContextSort {
         Ok(code.to_owned())
     }
 
-    fn parse(&self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+    fn parse(&mut self, loc: Locator, input: String) -> anyhow::Result<Tree> {
         let (tree, errs) = oal_syntax::parse(loc, input);
         assert!(errs.is_empty());
         let tree = tree.expect("parsing failed");
         Ok(tree)
     }
 
-    fn compile(&self, _mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
+    fn compile(&mut self, _mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
         self.order.borrow_mut().push(loc.clone());
         Ok(())
     }

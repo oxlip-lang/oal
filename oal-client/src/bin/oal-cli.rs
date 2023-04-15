@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     let target = config.target()?;
     let base = config.base()?;
 
-    let mods = oal_compiler::module::load(&proc.loader(), &main)?;
+    let mods = oal_compiler::module::load(&mut proc.loader(), &main)?;
 
     eprintln!("Generating API definition");
     let spec = proc.eval(&mods)?;

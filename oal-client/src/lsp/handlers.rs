@@ -1,12 +1,23 @@
-use super::lsp_range;
 use super::state::GlobalState;
+use super::utf16_range;
 use crate::utf16::char_index;
 use lsp_server::{Message, RequestId, Response};
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Location};
 use oal_compiler::definition::Definition;
+use oal_compiler::tree::{Core, Tree};
 use oal_model::locator::Locator;
+use oal_syntax::parser::Variable;
 
-pub fn goto_definition(
+/// Returns the variable syntax node at the given position, if any.
+fn variable_at(tree: &Tree, pos: usize) -> Option<Variable<Core>> {
+    tree.root()
+        .descendants()
+        .filter_map(oal_syntax::parser::Variable::cast)
+        .find(|v| v.node().span().unwrap().range().contains(&pos))
+}
+
+/// Implements the go-to-definition capability.
+pub fn go_to_definition(
     state: &mut GlobalState,
     id: RequestId,
     params: GotoDefinitionParams,
@@ -20,19 +31,12 @@ pub fn goto_definition(
         let tree = folder.module(&loc).unwrap();
         let text = state.workspace.read_file(&loc)?;
         let index = char_index(&text, pos);
-
-        let variable = tree
-            .root()
-            .descendants()
-            .filter_map(oal_syntax::parser::Variable::cast)
-            .find(|v| v.node().span().unwrap().range().contains(&index));
-
-        if let Some(v) = variable {
+        if let Some(v) = variable_at(tree, index) {
             if let Some(Definition::External(ext)) = v.node().syntax().core_ref().definition() {
                 let definition = ext.node(folder.modules().unwrap());
                 let span = definition.span().unwrap();
                 let text = state.workspace.read_file(span.locator())?;
-                let range = lsp_range(&text, span.range())?;
+                let range = utf16_range(&text, span.range())?;
                 res = GotoDefinitionResponse::Scalar(Location::new(
                     span.locator().url().clone(),
                     range,
