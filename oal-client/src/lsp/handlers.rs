@@ -36,7 +36,7 @@ pub fn go_to_definition(
                 let definition = ext.node(folder.modules().unwrap());
                 let span = definition.span().unwrap();
                 let text = state.workspace.read_file(span.locator())?;
-                let range = utf16_range(&text, span.range())?;
+                let range = utf16_range(&text, span.range());
                 res = GotoDefinitionResponse::Scalar(Location::new(
                     span.locator().url().clone(),
                     range,

@@ -5,7 +5,7 @@ pub mod state;
 mod tests;
 
 use crate::config::Config;
-use crate::utf16::{utf16_index, utf16_position, Text};
+use crate::utf16::{utf16_position, utf8_index};
 use crate::{DefaultFileSystem, FileSystem};
 use anyhow::anyhow;
 use lsp_types::{
@@ -21,10 +21,10 @@ use std::io;
 use std::ops::Range;
 
 /// Converts a Unicode character range to a UTF-16 range.
-fn utf16_range(text: &str, range: Range<usize>) -> anyhow::Result<lsp_types::Range> {
-    let start = utf16_position(text, range.start)?;
-    let end = utf16_position(text, range.end)?;
-    Ok(lsp_types::Range { start, end })
+fn utf16_range(text: &str, range: Range<usize>) -> lsp_types::Range {
+    let start = utf16_position(text, range.start);
+    let end = utf16_position(text, range.end);
+    lsp_types::Range { start, end }
 }
 
 /// A folder in the workspace.
@@ -84,10 +84,9 @@ impl Folder {
 pub type Diagnostics = HashMap<Locator, Vec<Diagnostic>>;
 
 /// A workspace.
-// TODO: store documents as UTF-8.
 #[derive(Default)]
 pub struct Workspace {
-    docs: HashMap<Locator, Text>,
+    docs: HashMap<Locator, String>,
     errors: Option<Vec<(Span, String)>>,
 }
 
@@ -95,8 +94,7 @@ impl Workspace {
     /// Reacts to an open file event.
     pub fn open(&mut self, p: DidOpenTextDocumentParams) -> anyhow::Result<Locator> {
         let loc = Locator::from(p.text_document.uri);
-        let text = p.text_document.text.encode_utf16().collect();
-        self.docs.insert(loc.clone(), text);
+        self.docs.insert(loc.clone(), p.text_document.text);
         Ok(loc)
     }
 
@@ -113,11 +111,11 @@ impl Workspace {
         if let Some(text) = self.docs.get_mut(&loc) {
             for change in p.content_changes.into_iter() {
                 if let Some(r) = change.range {
-                    let start = utf16_index(text, r.start)?;
-                    let end = utf16_index(text, r.end)?;
-                    let _ = text.splice(start..end, change.text.encode_utf16()).count();
+                    let start = utf8_index(text, r.start);
+                    let end = utf8_index(text, r.end);
+                    text.replace_range(start..end, &change.text);
                 } else {
-                    *text = change.text.encode_utf16().collect();
+                    *text = change.text;
                 }
             }
         }
@@ -181,7 +179,7 @@ impl Workspace {
     /// Creates an LSP diagnostic from the given span and error.
     fn diagnostic<E: ToString>(&mut self, span: &Span, err: E) -> anyhow::Result<Diagnostic> {
         let text = self.read_file(span.locator())?;
-        let range = utf16_range(&text, span.range())?;
+        let range = utf16_range(&text, span.range());
         Ok(Diagnostic {
             message: err.to_string(),
             range,
@@ -217,24 +215,13 @@ impl Workspace {
     /// Reads a file from the workspace.
     fn read_file(&mut self, loc: &Locator) -> io::Result<String> {
         match self.docs.entry(loc.clone()) {
-            Entry::Occupied(e) => {
-                let file = String::from_utf16(e.get())
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-                Ok(file)
-            }
+            Entry::Occupied(e) => Ok(e.get().clone()),
             Entry::Vacant(e) => {
                 let file = DefaultFileSystem.read_file(loc)?;
-                e.insert(file.encode_utf16().collect());
+                e.insert(file.clone());
                 Ok(file)
             }
         }
-    }
-
-    /// Writes a file to the workspace.
-    #[allow(dead_code)]
-    fn write_file(&mut self, loc: &Locator, buf: String) -> io::Result<()> {
-        self.docs.insert(loc.clone(), buf.encode_utf16().collect());
-        DefaultFileSystem.write_file(loc, buf)
     }
 }
 
