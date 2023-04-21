@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 #[repr(u32)]
 enum Identifier {
-    Concat
+    Concat,
 }
 
 #[derive(Debug)]
