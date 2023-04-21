@@ -4,6 +4,7 @@ use crate::module::ModuleSet;
 use crate::resolve::resolve;
 use crate::tests::mods_from;
 use crate::tree::NRef;
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser::{
     Application, Binding, Declaration, Primitive, Program, Terminal, Variable,

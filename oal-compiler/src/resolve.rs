@@ -4,7 +4,7 @@ use crate::errors::{Error, Kind, Result};
 use crate::module::ModuleSet;
 use crate::stdlib;
 use crate::tree::NRef;
-use oal_model::grammar::NodeCursor;
+use oal_model::grammar::{AbstractSyntaxNode, NodeCursor};
 use oal_model::locator::Locator;
 use oal_syntax::atom::Ident;
 use oal_syntax::parser::{Declaration, Import, Program, Variable};

@@ -11,6 +11,7 @@ use crate::definition::Definition;
 use crate::errors::{Error, Kind, Result};
 use crate::module::ModuleSet;
 use crate::tree::{get_tag, set_tag};
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;

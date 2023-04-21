@@ -2,6 +2,7 @@ use crate::errors::{Error, Kind, Result};
 use crate::inference::tag::Tag;
 use crate::module::ModuleSet;
 use crate::tree::{get_tag, Core};
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;

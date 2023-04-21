@@ -13,12 +13,21 @@ pub trait Internal: Debug {
     fn tag(&self, seq: &mut Seq) -> Tag;
     fn eval<'a>(&self, args: Vec<eval::Value<'a>>, ann: eval::AnnRef) -> Result<eval::Value<'a>>;
     fn has_bindings(&self) -> bool;
+    fn id(&self) -> u32;
 }
+
+impl PartialEq for dyn Internal {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id()
+    }
+}
+
+impl Eq for dyn Internal {}
 
 pub type InternalRef = Rc<dyn Internal>;
 
 /// External identifier definition.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct External {
     loc: Locator,
     index: NodeIdx,
@@ -60,3 +69,15 @@ pub enum Definition {
     External(External),
     Internal(InternalRef),
 }
+
+impl PartialEq for Definition {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::External(l), Self::External(r)) => l == r,
+            (Self::Internal(l), Self::Internal(r)) => l == r,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Definition {}

@@ -5,8 +5,13 @@ use crate::eval::{cast_uri, AnnRef, Expr, Value};
 use crate::inference::tag;
 use std::rc::Rc;
 
+#[repr(u32)]
+enum Identifier {
+    Concat
+}
+
 #[derive(Debug)]
-pub struct Concat {}
+pub struct Concat;
 
 impl Internal for Concat {
     fn tag(&self, _seq: &mut tag::Seq) -> tag::Tag {
@@ -28,6 +33,10 @@ impl Internal for Concat {
 
     fn has_bindings(&self) -> bool {
         true
+    }
+
+    fn id(&self) -> u32 {
+        Identifier::Concat as u32
     }
 }
 

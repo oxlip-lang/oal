@@ -3,6 +3,7 @@ use crate::inference::tag::Tag;
 use crate::module::ModuleSet;
 use crate::resolve::resolve;
 use crate::tests::mods_from;
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_syntax::parser::{Application, Program, Terminal, Variable};
 
 fn compile(code: &str) -> anyhow::Result<(ModuleSet, usize)> {

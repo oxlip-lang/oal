@@ -1,12 +1,12 @@
 use crate::errors::{Error, Kind};
 use crate::tree::Tree;
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_model::span::Span;
 use oal_syntax::parser::Program;
 use petgraph::algo::toposort;
 use petgraph::prelude::*;
 use std::collections::HashMap;
-
 #[derive(Debug)]
 pub struct ModuleSet {
     base: Locator,
@@ -47,6 +47,10 @@ impl ModuleSet {
 
     pub fn locators(&self) -> impl Iterator<Item = &Locator> {
         self.mods.keys()
+    }
+
+    pub fn modules(&self) -> impl Iterator<Item = &Tree> {
+        self.mods.values()
     }
 }
 

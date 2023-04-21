@@ -226,6 +226,10 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
         id.reverse_children(&self.tree)
     }
 
+    fn ancestors(&self, id: NodeIdx) -> impl Iterator<Item = NodeIdx> + '_ {
+        id.ancestors(&self.tree)
+    }
+
     fn descendants(&self, id: NodeIdx) -> impl Iterator<Item = NodeIdx> + '_ {
         id.descendants(&self.tree)
     }
@@ -351,6 +355,12 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
         node
     }
 
+    pub fn ancestors(&self) -> impl Iterator<Item = NodeRef<'a, T, G>> + 'a {
+        self.tree
+            .ancestors(self.idx)
+            .map(|id| NodeRef::from(self.tree, id))
+    }
+
     pub fn descendants(&self) -> impl Iterator<Item = NodeRef<'a, T, G>> + 'a {
         self.tree
             .descendants(self.idx)
@@ -416,6 +426,15 @@ impl<'a, T: Core, G: Grammar> Debug for NodeRef<'a, T, G> {
     }
 }
 
+/// An abstract type over a concrete syntax node.
+pub trait AbstractSyntaxNode<'a, T: Core, G: Grammar>
+where
+    Self: Sized,
+{
+    fn cast(node: NodeRef<'a, T, G>) -> Option<Self>;
+    fn node(&self) -> NodeRef<'a, T, G>;
+}
+
 #[macro_export]
 macro_rules! syntax_nodes {
     ( $grammar:ident, $( $node:ident ),+ ) => {
@@ -431,16 +450,16 @@ macro_rules! syntax_nodes {
             pub struct $node<'a, T: Core>(NodeRef<'a, T, $grammar>);
 
             #[allow(dead_code)]
-            impl<'a, T: Core> $node<'a, T>
+            impl<'a, T: Core> AbstractSyntaxNode<'a, T, $grammar> for $node<'a, T>
             {
-                pub fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
+                fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
                     match node.syntax().trunk() {
                         SyntaxTrunk::Tree(SyntaxKind::$node) => Some($node(node)),
                         _ => None,
                     }
                 }
 
-                pub fn node(&self) -> NodeRef<'a, T, $grammar> {
+                fn node(&self) -> NodeRef<'a, T, $grammar> {
                    self.0
                 }
             }
@@ -456,15 +475,15 @@ macro_rules! terminal_node {
         pub struct $node<'a, T: Core>(NodeRef<'a, T, $grammar>);
 
         #[allow(dead_code)]
-        impl<'a, T: Core> $node<'a, T> {
-            pub fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
+        impl<'a, T: Core> AbstractSyntaxNode<'a, T, $grammar> for $node<'a, T> {
+            fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
                 match node.syntax().trunk() {
                     SyntaxTrunk::Leaf(t) if matches!(t.kind(), $pat) => Some(Self(node)),
                     _ => None,
                 }
             }
 
-            pub fn node(&self) -> NodeRef<'a, T, $grammar> {
+            fn node(&self) -> NodeRef<'a, T, $grammar> {
                 self.0
             }
         }

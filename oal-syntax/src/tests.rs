@@ -4,7 +4,7 @@ use super::parser::{
     Program, Property, Relation, Terminal, Transfer, UriSegment, UriTemplate, Variable, VariadicOp,
 };
 use crate::atom;
-use oal_model::grammar::NodeRef;
+use oal_model::grammar::{AbstractSyntaxNode, NodeRef};
 use oal_model::locator::Locator;
 
 type Prog<'a> = Program<'a, ()>;

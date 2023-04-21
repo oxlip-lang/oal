@@ -4,7 +4,7 @@ use lsp_server::{Connection, Message, Notification};
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
 };
-use lsp_types::request::GotoDefinition;
+use lsp_types::request::{GotoDefinition, References};
 use lsp_types::OneOf;
 use lsp_types::{
     InitializeParams, PositionEncodingKind, PublishDiagnosticsParams, ServerCapabilities,
@@ -30,6 +30,7 @@ fn main() -> anyhow::Result<()> {
         )),
         position_encoding: Some(PositionEncodingKind::UTF16),
         definition_provider: Some(OneOf::Left(true)),
+        references_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })
     .unwrap();
@@ -79,6 +80,9 @@ where
 /// Refreshes the folders state following a workspace event.
 /// Publishes the diagnostics to the LSP client.
 fn refresh(state: &mut GlobalState) -> anyhow::Result<()> {
+    if !state.is_stale {
+        return Ok(());
+    }
     state.is_stale = false;
     for f in state.folders.iter_mut() {
         f.eval(&mut state.workspace);
@@ -104,7 +108,9 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
                         if state.conn.handle_shutdown(&req)? {
                             return Ok(());
                         }
-                        RequestDispatcher::new(state, req).on::<GotoDefinition>(handlers::go_to_definition)?;
+                        RequestDispatcher::new(state, req)
+                        .on::<GotoDefinition>(handlers::go_to_definition)?
+                        .on::<References>(handlers::references)?;
                     }
                     Message::Response(_resp) => {}
                     Message::Notification(not) => {
@@ -128,9 +134,7 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
                 }
             },
             default(Duration::from_millis(1000)) => {
-                if state.is_stale {
-                    refresh(state)?;
-                }
+                refresh(state)?;
             }
         }
     }

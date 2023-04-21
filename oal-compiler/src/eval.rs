@@ -10,6 +10,7 @@ use crate::spec::{
 use crate::tree::{Core, NRef};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
