@@ -216,10 +216,13 @@ impl<'a, T: Core> Declaration<'a, T> {
             .items()
     }
 
-    pub fn ident(&self) -> atom::Ident {
+    pub fn identifier(&self) -> Identifier<'a, T> {
         Identifier::cast(self.node().nth(Self::IDENTIFIER_POS))
             .expect("declaration lhs must be an identifier")
-            .ident()
+    }
+
+    pub fn ident(&self) -> atom::Ident {
+        self.identifier().ident()
     }
 
     pub fn bindings(&self) -> impl Iterator<Item = Binding<'a, T>> {

@@ -4,12 +4,12 @@ use lsp_server::{Connection, Message, Notification};
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
 };
-use lsp_types::request::{GotoDefinition, References};
-use lsp_types::OneOf;
+use lsp_types::request::{GotoDefinition, PrepareRenameRequest, References, Rename};
 use lsp_types::{
     InitializeParams, PositionEncodingKind, PublishDiagnosticsParams, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind,
 };
+use lsp_types::{OneOf, RenameOptions};
 use oal_client::lsp::dispatcher::{NotificationDispatcher, RequestDispatcher};
 use oal_client::lsp::state::GlobalState;
 use oal_client::lsp::{handlers, Folder, Workspace};
@@ -31,6 +31,10 @@ fn main() -> anyhow::Result<()> {
         position_encoding: Some(PositionEncodingKind::UTF16),
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
+        rename_provider: Some(OneOf::Right(RenameOptions {
+            prepare_provider: Some(true),
+            work_done_progress_options: Default::default(),
+        })),
         ..Default::default()
     })
     .unwrap();
@@ -104,13 +108,16 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
         select! {
             recv(state.conn.receiver) -> msg => {
                 match msg? {
+                    // TODO: refresh the compiler state before processing requests.
                     Message::Request(req) => {
                         if state.conn.handle_shutdown(&req)? {
                             return Ok(());
                         }
                         RequestDispatcher::new(state, req)
-                        .on::<GotoDefinition>(handlers::go_to_definition)?
-                        .on::<References>(handlers::references)?;
+                        .on::<GotoDefinition, _>(handlers::go_to_definition)?
+                        .on::<References, _>(handlers::references)?
+                        .on::<PrepareRenameRequest, _>(handlers::prepare_rename)?
+                        .on::<Rename, _>(handlers::rename)?;
                     }
                     Message::Response(_resp) => {}
                     Message::Notification(not) => {

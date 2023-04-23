@@ -1,5 +1,6 @@
 use super::state::GlobalState;
-use lsp_server::{ExtractError, Notification, Request, RequestId};
+use lsp_server::{ExtractError, Message, Notification, Request, Response};
+use serde::Serialize;
 
 pub struct RequestDispatcher<'a> {
     state: &'a mut GlobalState,
@@ -14,19 +15,20 @@ impl<'a> RequestDispatcher<'a> {
         }
     }
 
-    pub fn on<N>(
+    pub fn on<R, T>(
         &mut self,
-        hook: fn(&mut GlobalState, RequestId, N::Params) -> anyhow::Result<()>,
+        hook: fn(&mut GlobalState, R::Params) -> anyhow::Result<T>,
     ) -> anyhow::Result<&mut Self>
     where
-        N: lsp_types::request::Request,
-        N::Params: serde::de::DeserializeOwned,
+        R: lsp_types::request::Request,
+        R::Params: serde::de::DeserializeOwned,
+        T: Serialize,
     {
         let req = match self.req.take() {
             Some(r) => r,
             None => return Ok(self),
         };
-        let (id, params) = match req.extract::<N::Params>(N::METHOD) {
+        let (id, params) = match req.extract::<R::Params>(R::METHOD) {
             Ok(p) => p,
             Err(err @ ExtractError::JsonError { .. }) => return Err(anyhow::Error::from(err)),
             Err(ExtractError::MethodMismatch(req)) => {
@@ -34,7 +36,13 @@ impl<'a> RequestDispatcher<'a> {
                 return Ok(self);
             }
         };
-        hook(self.state, id, params)?;
+        let result = hook(self.state, params)?;
+        let resp = Response {
+            id,
+            result: Some(serde_json::to_value(result).unwrap()),
+            error: None,
+        };
+        self.state.conn.sender.send(Message::Response(resp))?;
         Ok(self)
     }
 }
