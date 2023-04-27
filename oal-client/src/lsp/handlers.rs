@@ -126,7 +126,7 @@ pub fn references(
     Ok(Some(refs))
 }
 
-// Implemented the preparation of the identifier rename capability.
+// Implements the preparation of the identifier rename capability.
 pub fn prepare_rename(
     state: &mut GlobalState,
     params: TextDocumentPositionParams,
@@ -151,7 +151,7 @@ pub fn prepare_rename(
     }
 }
 
-// Implemented the identifier rename capability.
+// Implements the identifier rename capability.
 pub fn rename(
     state: &mut GlobalState,
     params: RenameParams,
