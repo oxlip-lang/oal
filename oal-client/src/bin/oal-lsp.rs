@@ -108,11 +108,11 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
         select! {
             recv(state.conn.receiver) -> msg => {
                 match msg? {
-                    // TODO: refresh the compiler state before processing requests.
                     Message::Request(req) => {
                         if state.conn.handle_shutdown(&req)? {
                             return Ok(());
                         }
+                        refresh(state)?;
                         RequestDispatcher::new(state, req)
                         .on::<GotoDefinition, _>(handlers::go_to_definition)?
                         .on::<References, _>(handlers::references)?

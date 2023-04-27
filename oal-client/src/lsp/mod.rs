@@ -72,6 +72,8 @@ impl Folder {
 
     /// Evaluates a workspace folder.
     pub fn eval(&mut self, ws: &mut Workspace) {
+        self.mods = None;
+        self.spec = None;
         if let Ok(main) = self.config.main() {
             if let Ok(mods) = ws.load(&main) {
                 self.spec = ws.eval(&mods).ok();
