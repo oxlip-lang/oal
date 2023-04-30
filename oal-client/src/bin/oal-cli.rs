@@ -11,6 +11,7 @@ fn main() -> anyhow::Result<()> {
     let base = config.base()?;
 
     let mods = oal_compiler::module::load(&mut proc.loader(), &main)?;
+    oal_compiler::compile::finalize(&mods, &main)?;
 
     eprintln!("Generating API definition");
     let spec = proc.eval(&mods)?;

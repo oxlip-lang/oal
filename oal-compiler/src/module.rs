@@ -59,10 +59,11 @@ pub trait Loader<E: From<Error>> {
     fn load(&mut self, loc: &Locator) -> std::io::Result<String>;
     /// Parses a source file into a concrete syntax tree.
     fn parse(&mut self, loc: Locator, input: String) -> std::result::Result<Tree, E>;
-    /// Compiles a program.
+    /// Compiles a module.
     fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> std::result::Result<(), E>;
 }
 
+/// Loads and compiles the set of modules for a main program.
 pub fn load<E, L>(loader: &mut L, base: &Locator) -> std::result::Result<ModuleSet, E>
 where
     E: From<Error>,

@@ -121,6 +121,7 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
                     }
                     Message::Response(_resp) => {}
                     Message::Notification(not) => {
+                        // TODO: react to folder changes
                         NotificationDispatcher::new(state, not)
                         .on::<DidOpenTextDocument>(|state, params| {
                             state.workspace.open(params)?;

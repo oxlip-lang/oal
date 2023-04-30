@@ -85,7 +85,7 @@ impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
     /// Compiles a program.
     fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
         eprintln!("Compiling module {loc}");
-        if let Err(err) = oal_compiler::compile::compile(mods, loc) {
+        if let Err(err) = oal_compiler::compile::prepare(mods, loc) {
             let span = match err.span() {
                 Some(s) => s.clone(),
                 None => Span::new(loc.clone(), 0..0),

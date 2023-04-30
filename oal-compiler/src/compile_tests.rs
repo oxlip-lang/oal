@@ -1,4 +1,4 @@
-use crate::compile::compile;
+use crate::compile::{finalize, prepare};
 use crate::module::ModuleSet;
 use oal_model::locator::Locator;
 
@@ -20,8 +20,9 @@ fn compile_modules() -> anyhow::Result<()> {
 
     mods.insert(module);
 
-    compile(&mods, &loc)?;
-    compile(&mods, &base)?;
+    prepare(&mods, &loc)?;
+    prepare(&mods, &base)?;
+    finalize(&mods, &base)?;
 
     Ok(())
 }
