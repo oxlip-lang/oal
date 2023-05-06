@@ -35,6 +35,20 @@ impl Processor {
         report.eprint((loc.clone(), Source::from(input)))
     }
 
+    pub fn load(&self, main: &Locator) -> anyhow::Result<ModuleSet> {
+        let mods = oal_compiler::module::load(&mut self.loader(), main)?;
+        if let Err(err) = oal_compiler::compile::finalize(&mods, main) {
+            let span = match err.span() {
+                Some(s) => s.clone(),
+                None => Span::new(main.clone(), 0..0),
+            };
+            self.report(span, &err)?;
+            Err(anyhow!("loading failed"))
+        } else {
+            Ok(mods)
+        }
+    }
+
     /// Evaluates a program.
     pub fn eval(&self, mods: &ModuleSet) -> anyhow::Result<Spec> {
         match oal_compiler::eval::eval(mods, mods.base()) {
