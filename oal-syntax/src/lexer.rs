@@ -168,7 +168,7 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = ParserError> 
         filter(|c: &char| c.is_ascii_alphanumeric() || *c == '$' || *c == '-' || *c == '_')
             .repeated();
 
-    let val_ident = filter(|c: &char| c.is_ascii_alphabetic())
+    let val_ident = filter(|c: &char| c.is_ascii_alphabetic() || *c == '_')
         .chain(ident_chars)
         .collect::<String>()
         .map(|i| {
