@@ -32,6 +32,7 @@ fn typecheck_ok() {
         "let @a = {};",
         "res /;",
         "res / on delete -> <>;",
+        "let a = ('prop str) !;",
     ];
 
     for c in cases {
@@ -52,6 +53,7 @@ fn typecheck_error() {
         "let @a = 404;",
         "let a = uri on get -> str;",
         "res num;",
+        "let a = str !;",
     ];
 
     for c in cases {

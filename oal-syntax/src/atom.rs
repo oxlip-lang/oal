@@ -149,9 +149,15 @@ pub enum Method {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Operator {
+pub enum VariadicOperator {
     Join,
     Any,
     Sum,
     Range,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum UnaryOperator {
+    Optional,
+    Required,
 }

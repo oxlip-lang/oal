@@ -263,10 +263,10 @@ impl Builder {
                 spec::SchemaExpr::Object(obj) => self.object_schema(obj),
                 spec::SchemaExpr::Array(array) => self.array_schema(array),
                 spec::SchemaExpr::Op(operation) => match operation.op {
-                    atom::Operator::Join => self.join_schema(&operation.schemas),
-                    atom::Operator::Sum => self.sum_schema(&operation.schemas),
-                    atom::Operator::Any => self.any_schema(&operation.schemas),
-                    atom::Operator::Range => unreachable!(),
+                    atom::VariadicOperator::Join => self.join_schema(&operation.schemas),
+                    atom::VariadicOperator::Sum => self.sum_schema(&operation.schemas),
+                    atom::VariadicOperator::Any => self.any_schema(&operation.schemas),
+                    atom::VariadicOperator::Range => unreachable!(),
                 },
                 spec::SchemaExpr::Ref(_) => unreachable!(),
             };

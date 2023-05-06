@@ -4,7 +4,7 @@ use crate::resolve::resolve;
 use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
 use crate::tests::mods_from;
 use crate::typecheck::type_check;
-use oal_syntax::atom::{HttpStatus, Method, Operator};
+use oal_syntax::atom::{HttpStatus, Method, VariadicOperator};
 
 fn eval(code: &str) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
@@ -256,7 +256,7 @@ fn eval_operation_any() -> anyhow::Result<()> {
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
     let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
-    assert_eq!(op.op, Operator::Any);
+    assert_eq!(op.op, VariadicOperator::Any);
     assert_eq!(op.schemas.len(), 3);
 
     let s = op.schemas.get(0).expect("expected a schema");
@@ -291,7 +291,7 @@ fn eval_operation_sum() -> anyhow::Result<()> {
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
     let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
-    assert_eq!(op.op, Operator::Sum);
+    assert_eq!(op.op, VariadicOperator::Sum);
     assert_eq!(op.schemas.len(), 2);
 
     let s = op.schemas.get(0).expect("expected a schema");
@@ -299,6 +299,27 @@ fn eval_operation_sum() -> anyhow::Result<()> {
 
     let s = op.schemas.get(1).expect("expected a schema");
     assert!(matches!(s.expr, SchemaExpr::Str(_)));
+
+    Ok(())
+}
+
+#[test]
+fn eval_operation_required() -> anyhow::Result<()> {
+    let s = eval(r#"res / on get -> <{ ('a! str) ? }>;"#)?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    let (_, p) = s.rels.iter().next().unwrap();
+    let x = p.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
+    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+    assert_eq!(o.props.len(), 1);
+    let p = &o.props[0];
+    assert_eq!(p.name, "a");
+    assert!(matches!(p.schema.expr, SchemaExpr::Str(_)));
+    assert_eq!(p.required, Some(false));
 
     Ok(())
 }
@@ -444,7 +465,7 @@ fn eval_application() -> anyhow::Result<()> {
     let p = &o.props[0];
     assert_eq!(p.name, "p");
     let SchemaExpr::Op(op) = &p.schema.expr else { panic!("expected an operation") };
-    assert_eq!(op.op, Operator::Sum);
+    assert_eq!(op.op, VariadicOperator::Sum);
     assert_eq!(op.schemas.len(), 2);
 
     let s = op.schemas.get(0).expect("expected a schema");
@@ -477,7 +498,7 @@ fn eval_subexpr() -> anyhow::Result<()> {
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
     let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
 
-    assert_eq!(op.op, Operator::Join);
+    assert_eq!(op.op, VariadicOperator::Join);
     assert_eq!(op.schemas.len(), 2);
 
     let s = op.schemas.get(0).expect("expected a schema");

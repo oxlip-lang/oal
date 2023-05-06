@@ -57,10 +57,10 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
         } else if let Some(op) = syn::VariadicOp::cast(node) {
             let operator = op.operator();
             let tag = match operator {
-                atom::Operator::Join => Tag::Object,
-                atom::Operator::Any => Tag::Any,
-                atom::Operator::Sum => Tag::Var(seq.next()),
-                atom::Operator::Range => Tag::Content,
+                atom::VariadicOperator::Join => Tag::Object,
+                atom::VariadicOperator::Any => Tag::Any,
+                atom::VariadicOperator::Sum => Tag::Var(seq.next()),
+                atom::VariadicOperator::Range => Tag::Content,
             };
             set_tag(node, tag);
         } else if syn::Variable::cast(node).is_some() {
@@ -78,6 +78,7 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
             || syn::SubExpression::cast(node).is_some()
             || syn::Declaration::cast(node).is_some()
             || syn::Property::cast(node).is_some()
+            || syn::UnaryOp::cast(node).is_some()
         {
             set_tag(node, Tag::Var(seq.next()));
         }
@@ -127,11 +128,17 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
         } else if let Some(op) = syn::VariadicOp::cast(node) {
             for operand in op.operands() {
                 if let Some(t) = match op.operator() {
-                    atom::Operator::Range | atom::Operator::Any => None,
-                    atom::Operator::Join => Some(Tag::Object),
-                    atom::Operator::Sum => Some(get_tag(node)),
+                    atom::VariadicOperator::Range | atom::VariadicOperator::Any => None,
+                    atom::VariadicOperator::Join => Some(Tag::Object),
+                    atom::VariadicOperator::Sum => Some(get_tag(node)),
                 } {
                     set.push(get_tag(operand), t, operand.span());
+                }
+            }
+        } else if let Some(op) = syn::UnaryOp::cast(node) {
+            match op.operator() {
+                atom::UnaryOperator::Optional | atom::UnaryOperator::Required => {
+                    set.push(get_tag(node), get_tag(op.operand()), node.span());
                 }
             }
         } else if let Some(decl) = syn::Declaration::cast(node) {

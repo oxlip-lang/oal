@@ -99,14 +99,23 @@ impl<'a, T: Core> ContentTag<'a, T> {
 terminal_node!(Gram, Operator, TokenKind::Operator(_));
 
 impl<'a, T: Core> Operator<'a, T> {
-    pub fn operator(&self) -> atom::Operator {
+    pub fn variadic(&self) -> atom::VariadicOperator {
         let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
         match op {
-            lex::Operator::DoubleColon => atom::Operator::Range,
-            lex::Operator::Ampersand => atom::Operator::Join,
-            lex::Operator::Tilde => atom::Operator::Any,
-            lex::Operator::VerticalBar => atom::Operator::Sum,
+            lex::Operator::DoubleColon => atom::VariadicOperator::Range,
+            lex::Operator::Ampersand => atom::VariadicOperator::Join,
+            lex::Operator::Tilde => atom::VariadicOperator::Any,
+            lex::Operator::VerticalBar => atom::VariadicOperator::Sum,
             _ => unreachable!("not a variadic operator {:?}", op),
+        }
+    }
+
+    pub fn unary(&self) -> atom::UnaryOperator {
+        let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
+        match op {
+            lex::Operator::ExclamationMark => atom::UnaryOperator::Required,
+            lex::Operator::QuestionMark => atom::UnaryOperator::Optional,
+            _ => unreachable!("not an unary operator {:?}", op),
         }
     }
 }
@@ -156,6 +165,7 @@ syntax_nodes!(
     Object,
     Application,
     VariadicOp,
+    UnaryOp,
     XferMethods,
     XferParams,
     XferDomain,
@@ -446,14 +456,28 @@ impl<'a, T: Core> Transfer<'a, T> {
 impl<'a, T: Core> VariadicOp<'a, T> {
     const OPERATOR_POS: usize = 1;
 
-    pub fn operator(&self) -> atom::Operator {
+    pub fn operator(&self) -> atom::VariadicOperator {
         Operator::cast(self.node().nth(Self::OPERATOR_POS))
             .expect("expected an operator")
-            .operator()
+            .variadic()
     }
 
     pub fn operands(&self) -> impl Iterator<Item = NodeRef<'a, T, Gram>> {
         self.node().children().step_by(2)
+    }
+}
+
+impl<'a, T: Core> UnaryOp<'a, T> {
+    const OPERATOR_POS: usize = 1;
+
+    pub fn operator(&self) -> atom::UnaryOperator {
+        Operator::cast(self.node().nth(Self::OPERATOR_POS))
+            .expect("expected an operator")
+            .unary()
+    }
+
+    pub fn operand(&self) -> NodeRef<'a, T, Gram> {
+        self.node().first()
     }
 }
 
@@ -730,12 +754,28 @@ pub fn parser<'a>(
             SyntaxKind::Terminal,
         );
 
+        let required_kind = tree_many(
+            term_kind.clone().chain(just_token(TokenKind::Operator(
+                lex::Operator::ExclamationMark,
+            ))),
+            SyntaxKind::UnaryOp,
+        );
+
+        let optional_kind = tree_many(
+            term_kind
+                .clone()
+                .chain(just_token(TokenKind::Operator(lex::Operator::QuestionMark))),
+            SyntaxKind::UnaryOp,
+        );
+
+        let unary_kind = optional_kind.or(required_kind).or(term_kind.clone());
+
         let application = tree_many(
-            variable.chain(term_kind.clone().repeated().at_least(1)),
+            variable.chain(unary_kind.clone().repeated().at_least(1)),
             SyntaxKind::Application,
         );
 
-        let apply_kind = application.or(term_kind.clone());
+        let apply_kind = application.or(unary_kind);
 
         let range_kind = variadic_op(lex::Operator::DoubleColon, apply_kind);
 

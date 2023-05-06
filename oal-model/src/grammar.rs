@@ -98,6 +98,10 @@ impl<T: Core, G: Grammar> SyntaxNode<T, G> {
         self.1.replace(other.1.borrow().clone());
     }
 
+    pub fn has_core(&self) -> bool {
+        self.1.borrow().is_some()
+    }
+
     pub fn core_ref(&self) -> Ref<T> {
         Ref::map(self.1.borrow(), |r| r.as_ref().unwrap().as_ref())
     }
@@ -412,12 +416,10 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
 
 impl<'a, T: Core, G: Grammar> Debug for NodeRef<'a, T, G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:?} ({:?})",
-            self.syntax().trunk(),
-            self.syntax().core_ref()
-        )?;
+        write!(f, "{:?}", self.syntax().trunk())?;
+        if self.syntax().has_core() {
+            write!(f, " ({:?})", self.syntax().core_ref())?;
+        }
         if !self.is_empty() {
             write!(f, " -> ")?;
             f.debug_list().entries(self.children()).finish()?;

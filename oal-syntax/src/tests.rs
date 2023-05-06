@@ -4,6 +4,7 @@ use super::parser::{
     Program, Property, Relation, Terminal, Transfer, UriSegment, UriTemplate, Variable, VariadicOp,
 };
 use crate::atom;
+use crate::parser::UnaryOp;
 use oal_model::grammar::{AbstractSyntaxNode, NodeRef};
 use oal_model::locator::Locator;
 
@@ -163,7 +164,7 @@ fn parse_decl_transfer() {
     parse("let a = get -> <{}> :: <{}>;", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");
         let op = VariadicOp::cast(xfer.range()).expect("expected an operation");
-        assert_eq!(op.operator(), atom::Operator::Range);
+        assert_eq!(op.operator(), atom::VariadicOperator::Range);
 
         let opds = &mut op.operands();
         Content::cast(assert_term(opds.next().expect("expected operand")))
@@ -376,7 +377,7 @@ fn parse_decl_variadic_op() {
         let decl = assert_decl(p, "a");
 
         let op = VariadicOp::cast(decl.rhs()).expect("expected variadic operator");
-        assert_eq!(op.operator(), atom::Operator::Any);
+        assert_eq!(op.operator(), atom::VariadicOperator::Any);
 
         let opds = &mut op.operands();
         Object::cast(assert_term(opds.next().expect("expected operand"))).expect("expected object");
@@ -389,6 +390,20 @@ fn parse_decl_variadic_op() {
             lex::Primitive::Bool,
         );
         assert!(opds.next().is_none(), "expected no more operand");
+    })
+}
+
+#[test]
+fn parse_decl_unary_op() {
+    parse("let a = ('prop str) !;", |p: Prog| {
+        let decl = assert_decl(p, "a");
+        let op = UnaryOp::cast(decl.rhs()).expect("expected unary operator");
+        assert_eq!(op.operator(), atom::UnaryOperator::Required);
+    });
+    parse("let a = ('prop str) ?;", |p: Prog| {
+        let decl = assert_decl(p, "a");
+        let op = UnaryOp::cast(decl.rhs()).expect("expected unary operator");
+        assert_eq!(op.operator(), atom::UnaryOperator::Optional);
     })
 }
 

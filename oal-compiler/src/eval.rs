@@ -501,13 +501,13 @@ pub fn eval_object<'a>(
     Ok((expr, ann))
 }
 
-pub fn eval_operation<'a>(
+pub fn eval_variadic_operation<'a>(
     ctx: &mut Context<'a>,
     operation: syn::VariadicOp<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
     let op = operation.operator();
-    let expr = if op == atom::Operator::Range {
+    let expr = if op == atom::VariadicOperator::Range {
         let mut ranges = Ranges::new();
         for operand in operation.operands() {
             let c = cast_content(eval_any(ctx, operand, AnnRef::default())?);
@@ -523,6 +523,20 @@ pub fn eval_operation<'a>(
         let var_op = VariadicOp { op, schemas };
         Expr::VariadicOp(Box::new(var_op))
     };
+    Ok((expr, ann))
+}
+
+pub fn eval_unary_operation<'a>(
+    ctx: &mut Context<'a>,
+    operation: syn::UnaryOp<'a, Core>,
+    ann: AnnRef,
+) -> Result<(Expr<'a>, AnnRef)> {
+    let mut prop = cast_property(eval_any(ctx, operation.operand(), AnnRef::default())?);
+    match operation.operator() {
+        atom::UnaryOperator::Optional => prop.required = Some(false),
+        atom::UnaryOperator::Required => prop.required = Some(true),
+    };
+    let expr = Expr::Property(Box::new(prop));
     Ok((expr, ann))
 }
 
@@ -689,7 +703,9 @@ pub fn eval_any<'a>(
     } else if let Some(object) = syn::Object::cast(node) {
         eval_object(ctx, object, ann)
     } else if let Some(operation) = syn::VariadicOp::cast(node) {
-        eval_operation(ctx, operation, ann)
+        eval_variadic_operation(ctx, operation, ann)
+    } else if let Some(operation) = syn::UnaryOp::cast(node) {
+        eval_unary_operation(ctx, operation, ann)
     } else if let Some(literal) = syn::Literal::cast(node) {
         eval_literal(ctx, literal, ann)
     } else if let Some(property) = syn::Property::cast(node) {

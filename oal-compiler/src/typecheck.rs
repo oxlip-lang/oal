@@ -8,21 +8,32 @@ use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;
 
-fn check_operation(op: syn::VariadicOp<Core>) -> Result<()> {
+fn check_variadic_operation(op: syn::VariadicOp<Core>) -> Result<()> {
     match op.operator() {
-        atom::Operator::Join => {
+        atom::VariadicOperator::Join => {
             if !op.operands().all(|o| get_tag(o) == Tag::Object) {
                 return Err(Error::new(Kind::InvalidType, "ill-formed join").with(&op));
             }
         }
-        atom::Operator::Any | atom::Operator::Sum => {
+        atom::VariadicOperator::Any | atom::VariadicOperator::Sum => {
             if !op.operands().all(|o| get_tag(o).is_schema()) {
                 return Err(Error::new(Kind::InvalidType, "ill-formed alternative").with(&op));
             }
         }
-        atom::Operator::Range => {
+        atom::VariadicOperator::Range => {
             if !op.operands().all(|o| get_tag(o).is_schema_like()) {
                 return Err(Error::new(Kind::InvalidType, "ill-formed ranges").with(&op));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_unary_operation(op: syn::UnaryOp<Core>) -> Result<()> {
+    match op.operator() {
+        atom::UnaryOperator::Optional | atom::UnaryOperator::Required => {
+            if !matches!(get_tag(op.operand()), Tag::Property(_)) {
+                return Err(Error::new(Kind::InvalidType, "ill-formed optionality").with(&op));
             }
         }
     }
@@ -135,7 +146,9 @@ pub fn type_check(mods: &ModuleSet, loc: &Locator) -> Result<()> {
 
     for node in module.root().descendants() {
         if let Some(operation) = syn::VariadicOp::cast(node) {
-            check_operation(operation)
+            check_variadic_operation(operation)
+        } else if let Some(operation) = syn::UnaryOp::cast(node) {
+            check_unary_operation(operation)
         } else if let Some(content) = syn::Content::cast(node) {
             check_content(content)
         } else if let Some(xfer) = syn::Transfer::cast(node) {

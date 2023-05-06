@@ -72,7 +72,7 @@ pub struct Array {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VariadicOp {
-    pub op: atom::Operator,
+    pub op: atom::VariadicOperator,
     pub schemas: Vec<Schema>,
 }
 
