@@ -133,7 +133,6 @@ impl Workspace {
             }
             anyhow!("loading failed")
         })?;
-        oal_compiler::compile::finalize(&mods, loc)?;
         Ok(mods)
     }
 
@@ -246,7 +245,7 @@ impl<'a> Loader<anyhow::Error> for WorkspaceLoader<'a> {
 
     /// Compiles a program.
     fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
-        if let Err(err) = oal_compiler::compile::prepare(mods, loc) {
+        if let Err(err) = oal_compiler::compile::compile(mods, loc) {
             let loc = match err.span() {
                 Some(s) => s.locator().clone(),
                 None => loc.clone(),

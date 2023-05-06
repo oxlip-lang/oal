@@ -7,8 +7,11 @@ mod tests;
 #[cfg(test)]
 mod union_tests;
 
+#[cfg(test)]
+use crate::errors::{Error, Kind};
+
 use crate::definition::Definition;
-use crate::errors::{Error, Kind, Result};
+use crate::errors::Result;
 use crate::module::ModuleSet;
 use crate::tree::{get_tag, set_tag};
 use oal_model::grammar::AbstractSyntaxNode;
@@ -171,6 +174,7 @@ pub fn substitute(mods: &ModuleSet, loc: &Locator, sets: &union::UnionFind) -> R
     Ok(())
 }
 
+#[cfg(test)]
 fn has_variable(tag: &Tag) -> bool {
     match tag {
         Tag::Var(_) => true,
@@ -180,6 +184,7 @@ fn has_variable(tag: &Tag) -> bool {
     }
 }
 
+#[cfg(test)]
 /// Returns an error if there is at least one remaining tag variable.
 pub fn check_complete(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");

@@ -37,16 +37,7 @@ impl Processor {
 
     pub fn load(&self, main: &Locator) -> anyhow::Result<ModuleSet> {
         let mods = oal_compiler::module::load(&mut self.loader(), main)?;
-        if let Err(err) = oal_compiler::compile::finalize(&mods, main) {
-            let span = match err.span() {
-                Some(s) => s.clone(),
-                None => Span::new(main.clone(), 0..0),
-            };
-            self.report(span, &err)?;
-            Err(anyhow!("loading failed"))
-        } else {
-            Ok(mods)
-        }
+        Ok(mods)
     }
 
     /// Evaluates a program.
@@ -99,7 +90,7 @@ impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
     /// Compiles a program.
     fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
         eprintln!("Compiling module {loc}");
-        if let Err(err) = oal_compiler::compile::prepare(mods, loc) {
+        if let Err(err) = oal_compiler::compile::compile(mods, loc) {
             let span = match err.span() {
                 Some(s) => s.clone(),
                 None => Span::new(loc.clone(), 0..0),

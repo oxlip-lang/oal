@@ -1,12 +1,12 @@
 use crate::errors::Result;
-use crate::inference::{check_complete, constrain, substitute, tag};
+use crate::inference::{constrain, substitute, tag};
 use crate::module::ModuleSet;
 use crate::resolve::resolve;
 use crate::typecheck::type_check;
 use oal_model::locator::Locator;
 
-/// Runs all compilation phases but the type checks.
-pub fn prepare(mods: &ModuleSet, loc: &Locator) -> Result<()> {
+/// Runs all compilation phases.
+pub fn compile(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     // Resolve variable and function references.
     resolve(mods, loc)?;
     // Tag expressions with concrete and variable types.
@@ -17,13 +17,6 @@ pub fn prepare(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let set = eqs.unify()?;
     // Substitute tags in each class of equivalence with the representative tag.
     substitute(mods, loc, &set)?;
-    Ok(())
-}
-
-/// Runs the remaining compilation phases.
-pub fn finalize(mods: &ModuleSet, loc: &Locator) -> Result<()> {
-    // Check for remaining type tag variables.
-    check_complete(mods, loc)?;
     // Check type tags against expectations.
     type_check(mods, loc)?;
     Ok(())
