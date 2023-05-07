@@ -63,6 +63,12 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
                 atom::VariadicOperator::Range => Tag::Content,
             };
             set_tag(node, tag);
+        } else if let Some(op) = syn::UnaryOp::cast(node) {
+            match op.operator() {
+                atom::UnaryOperator::Optional | atom::UnaryOperator::Required => {
+                    set_tag(node, Tag::Property(Tag::Var(seq.next()).into()));
+                }
+            }
         } else if syn::Variable::cast(node).is_some() {
             let tag = {
                 let core = node.syntax().core_ref();
@@ -72,13 +78,13 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
                 }
             };
             set_tag(node, tag);
+        } else if syn::Property::cast(node).is_some() {
+            set_tag(node, Tag::Property(Tag::Var(seq.next()).into()));
         } else if syn::Application::cast(node).is_some()
             || syn::Binding::cast(node).is_some()
             || syn::Terminal::cast(node).is_some()
             || syn::SubExpression::cast(node).is_some()
             || syn::Declaration::cast(node).is_some()
-            || syn::Property::cast(node).is_some()
-            || syn::UnaryOp::cast(node).is_some()
         {
             set_tag(node, Tag::Var(seq.next()));
         }
