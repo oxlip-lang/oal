@@ -82,6 +82,13 @@ impl Annotation {
             .and_then(Value::as_i64)
     }
 
+    pub fn get_size(&self, s: &str) -> Option<usize> {
+        self.props
+            .get(&Value::String(s.to_owned()))
+            .and_then(Value::as_u64)
+            .map(|u| u as usize)
+    }
+
     pub fn get_enum(&self, s: &str) -> Option<Vec<String>> {
         self.props
             .get(&Value::String(s.to_owned()))

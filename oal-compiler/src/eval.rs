@@ -617,6 +617,8 @@ pub fn eval_primitive<'a>(
                 enumeration: ann.get_enum("enum").unwrap_or_default(),
                 format: ann.get_string("format"),
                 example: ann.get_string("example"),
+                min_length: ann.get_size("minLength"),
+                max_length: ann.get_size("maxLength"),
             };
             Expr::PrimString(Box::new(p))
         }

@@ -99,6 +99,8 @@ pub struct PrimString {
     pub enumeration: Vec<String>,
     pub format: Option<String>,
     pub example: Option<String>,
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

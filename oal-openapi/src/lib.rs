@@ -115,9 +115,10 @@ impl Builder {
             },
             schema_kind: SchemaKind::Type(Type::String(StringType {
                 format,
+                min_length: p.min_length,
+                max_length: p.max_length,
                 pattern: p.pattern.clone(),
                 enumeration: p.enumeration.iter().map(|s| Some(s.clone())).collect(),
-                ..Default::default()
             })),
         }
     }
