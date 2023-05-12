@@ -241,6 +241,13 @@ fn parse_import() {
     parse(r#"use "module";"#, |p: Prog| {
         let imp = p.imports().next().expect("expected an import");
         assert_eq!(imp.module(), "module");
+    });
+    parse(r#"use "module" as mod;"#, |p: Prog| {
+        let imp = p.imports().next().expect("expected an import");
+        assert_eq!(imp.module(), "module");
+        let Some(qualifier) = imp.qualifier()
+            else { panic!("expected qualifier") };
+        assert_eq!(qualifier.ident(), "mod");
     })
 }
 

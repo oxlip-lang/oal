@@ -171,6 +171,7 @@ syntax_nodes!(
     XferDomain,
     Transfer,
     Import,
+    Qualifier,
     Resource,
     XferList,
     Relation,
@@ -251,11 +252,29 @@ impl<'a, T: Core> Declaration<'a, T> {
     }
 }
 
+impl<'a, T: Core> Qualifier<'a, T> {
+    const IDENTIFIER_POS: usize = 1;
+
+    pub fn identifier(&self) -> Option<Identifier<'a, T>> {
+        self.node()
+            .children()
+            .nth(Self::IDENTIFIER_POS)
+            .map(|n| Identifier::cast(n).expect("qualifier must be an identifier"))
+    }
+}
+
 impl<'a, T: Core> Import<'a, T> {
     const MODULE_POS: usize = 1;
+    const QUALIFIER_POS: usize = 2;
 
     pub fn module(&self) -> &'a str {
         self.node().nth(Self::MODULE_POS).as_str()
+    }
+
+    pub fn qualifier(&self) -> Option<Identifier<'a, T>> {
+        Qualifier::cast(self.node().nth(Self::QUALIFIER_POS))
+            .expect("expected qualifier")
+            .identifier()
     }
 }
 
@@ -851,9 +870,18 @@ pub fn parser<'a>(
         SyntaxKind::Resource,
     );
 
+    let qualifier = tree_many(
+        just_token(TokenKind::Keyword(lex::Keyword::As))
+            .chain(identifier)
+            .or_not()
+            .flatten(),
+        SyntaxKind::Qualifier,
+    );
+
     let import = tree_many(
         just_token(TokenKind::Keyword(lex::Keyword::Use))
             .chain(just_token(TokenKind::Literal(lex::Literal::String)))
+            .chain(qualifier)
             .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
         SyntaxKind::Import,
     );
