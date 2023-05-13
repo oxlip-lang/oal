@@ -13,8 +13,14 @@ type NRef<'a> = NodeRef<'a, (), Gram>;
 
 fn parse<F: Fn(Prog)>(i: &str, f: F) {
     let loc = Locator::try_from("file:///test.oal").unwrap();
-    let (tree, _errs) = crate::parse(loc, i);
-    let tree = tree.expect("parsing failed");
+    let (tree, errs) = crate::parse(loc, i);
+    if !errs.is_empty() {
+        for err in errs {
+            eprintln!("{err}");
+        }
+        panic!("parsing failed");
+    }
+    let tree = tree.unwrap();
     let prog = Program::cast(tree.root()).expect("expected a program");
     f(prog)
 }
@@ -76,6 +82,13 @@ fn parse_decl_ident() {
     parse("let a = b;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let var = Variable::cast(rhs).expect("expected a variable");
+        assert!(var.qualifier().is_none());
+        assert_eq!(var.ident(), "b");
+    });
+    parse("let a = mod.b;", |p: Prog| {
+        let rhs = assert_term(assert_decl(p, "a").rhs());
+        let var = Variable::cast(rhs).expect("expected a variable");
+        assert_eq!(var.qualifier().unwrap(), "mod");
         assert_eq!(var.ident(), "b");
     })
 }

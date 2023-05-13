@@ -575,12 +575,21 @@ impl<'a, T: Core> Relation<'a, T> {
 }
 
 impl<'a, T: Core> Variable<'a, T> {
-    const INNER_POS: usize = 0;
-
     pub fn ident(&self) -> atom::Ident {
-        Identifier::cast(self.node().nth(Self::INNER_POS))
+        Identifier::cast(self.node().last())
             .expect("expected an identifier")
             .ident()
+    }
+
+    pub fn qualifier(&self) -> Option<atom::Ident> {
+        if self.node().children().count() > 1 {
+            let ident = Identifier::cast(self.node().first())
+                .expect("expected an identifier")
+                .ident();
+            Some(ident)
+        } else {
+            None
+        }
     }
 }
 
@@ -754,7 +763,13 @@ pub fn parser<'a>(
             SyntaxKind::SubExpression,
         );
 
-        let variable = tree_one(identifier, SyntaxKind::Variable);
+        let variable = tree_many(
+            identifier
+                .chain(just_token(TokenKind::Control(lex::Control::FullStop)))
+                .chain(identifier)
+                .or(identifier.map(move |n| vec![n])),
+            SyntaxKind::Variable,
+        );
 
         let term_kind = tree_many(
             line_annotations()

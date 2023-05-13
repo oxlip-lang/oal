@@ -351,7 +351,11 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     }
 
     pub fn first(&self) -> NodeRef<'a, T, G> {
-        self.nth(0)
+        self.children().next().unwrap()
+    }
+
+    pub fn last(&self) -> NodeRef<'a, T, G> {
+        self.reverse_children().next().unwrap()
     }
 
     pub fn nth(&self, n: usize) -> NodeRef<'a, T, G> {

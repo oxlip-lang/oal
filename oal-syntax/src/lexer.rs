@@ -43,6 +43,7 @@ pub enum Control {
     ChevronRight,
     Semicolon,
     Comma,
+    FullStop,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -307,6 +308,7 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = ParserError> 
         '>' => Control::ChevronRight,
         ';' => Control::Semicolon,
         ',' => Control::Comma,
+        '.' => Control::FullStop,
     }
     .map(|c| Token::new(TokenKind::Control(c), TokenValue::None));
 
