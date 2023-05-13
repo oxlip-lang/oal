@@ -3,6 +3,7 @@ use crate::env::Env;
 use crate::errors::Result;
 use crate::eval::{cast_uri, AnnRef, Expr, Value};
 use crate::inference::tag;
+use oal_syntax::atom::Ident;
 use std::rc::Rc;
 
 #[repr(u32)]
@@ -44,6 +45,7 @@ impl Internal for Concat {
 pub fn import(env: &mut Env) {
     let internals = [("concat", Rc::new(Concat {}))];
     for i in internals.into_iter() {
-        env.declare(i.0.into(), Definition::Internal(i.1))
+        let entry = Ident::from(i.0).into();
+        env.declare(entry, Definition::Internal(i.1))
     }
 }

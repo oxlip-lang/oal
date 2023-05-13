@@ -260,7 +260,7 @@ fn parse_import() {
         assert_eq!(imp.module(), "module");
         let Some(qualifier) = imp.qualifier()
             else { panic!("expected qualifier") };
-        assert_eq!(qualifier.ident(), "mod");
+        assert_eq!(qualifier, "mod");
     })
 }
 

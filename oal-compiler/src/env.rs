@@ -2,7 +2,22 @@ use crate::definition::Definition;
 use oal_syntax::atom::Ident;
 use std::collections::HashMap;
 
-pub type Scope = HashMap<Ident, Definition>;
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct Entry(Ident, Option<Ident>);
+
+impl Entry {
+    pub fn new(ident: Ident, qualifier: Option<Ident>) -> Self {
+        Entry(ident, qualifier)
+    }
+}
+
+impl From<Ident> for Entry {
+    fn from(i: Ident) -> Self {
+        Entry(i, None)
+    }
+}
+
+pub type Scope = HashMap<Entry, Definition>;
 
 #[derive(Debug)]
 pub struct Env(Vec<Scope>);
@@ -18,15 +33,15 @@ impl Env {
         Env(vec![Scope::new()])
     }
 
-    pub fn declare(&mut self, n: Ident, defn: Definition) {
-        self.0.last_mut().unwrap().insert(n, defn);
+    pub fn declare(&mut self, e: Entry, defn: Definition) {
+        self.0.last_mut().unwrap().insert(e, defn);
     }
 
-    pub fn lookup(&self, n: &Ident) -> Option<&Definition> {
+    pub fn lookup(&self, e: &Entry) -> Option<&Definition> {
         self.0
             .iter()
             .rev()
-            .map(|s| s.get(n))
+            .map(|s| s.get(e))
             .skip_while(Option::is_none)
             .map(|s| s.unwrap())
             .next()

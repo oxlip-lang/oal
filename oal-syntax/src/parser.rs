@@ -255,11 +255,12 @@ impl<'a, T: Core> Declaration<'a, T> {
 impl<'a, T: Core> Qualifier<'a, T> {
     const IDENTIFIER_POS: usize = 1;
 
-    pub fn identifier(&self) -> Option<Identifier<'a, T>> {
-        self.node()
-            .children()
-            .nth(Self::IDENTIFIER_POS)
-            .map(|n| Identifier::cast(n).expect("qualifier must be an identifier"))
+    pub fn ident(&self) -> Option<atom::Ident> {
+        self.node().children().nth(Self::IDENTIFIER_POS).map(|n| {
+            Identifier::cast(n)
+                .expect("qualifier must be an identifier")
+                .ident()
+        })
     }
 }
 
@@ -271,10 +272,10 @@ impl<'a, T: Core> Import<'a, T> {
         self.node().nth(Self::MODULE_POS).as_str()
     }
 
-    pub fn qualifier(&self) -> Option<Identifier<'a, T>> {
+    pub fn qualifier(&self) -> Option<atom::Ident> {
         Qualifier::cast(self.node().nth(Self::QUALIFIER_POS))
             .expect("expected qualifier")
-            .identifier()
+            .ident()
     }
 }
 

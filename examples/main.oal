@@ -1,9 +1,9 @@
-use "module.oal";
+use "module.oal" as m;
 
 // Function application
 # description: "some other stuff"
 # examples: { default: "examples/other_stuff.json" }
-let @obj3 = f { 'height num } { 'stuff any1 };
+let @obj3 = m.f { 'height num } { 'stuff m.any1 };
 
 // Headers
 # description: "identifier for a specific version of a resource"
@@ -23,7 +23,7 @@ let with_err s = <status=200, media=vendor, headers={etag}, s>  `description: "a
               :: <>                                             `description: "no content"`;
 
 // Binding everything together as resources
-res rel1;
+res m.rel1;
 
 res /something?{ 'q! str } on get : <headers={ifnmatch}> -> with_err @obj3;
 

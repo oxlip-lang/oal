@@ -65,8 +65,8 @@ impl Loader<anyhow::Error> for ContextSort {
     fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
         let code = if *loc == self.base {
             r#"
-            use "module2.oal";
-            res a;
+            use "module2.oal" as mod;
+            res mod.a;
             "#
         } else if *loc == self.module1 {
             r#"
