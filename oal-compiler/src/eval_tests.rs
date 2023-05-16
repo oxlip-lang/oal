@@ -152,7 +152,6 @@ fn eval_ranges() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    assert_eq!(s.rels.len(), 1);
     let (_, p) = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
@@ -193,6 +192,23 @@ fn eval_ranges() -> anyhow::Result<()> {
     assert_eq!(p.name, "h");
     assert!(matches!(p.schema.expr, SchemaExpr::Str(_)));
 
+    Ok(())
+}
+
+#[test]
+fn eval_ranges_combined() -> anyhow::Result<()> {
+    let s = eval(
+        r#"
+        let r = <status=200> :: <status=202>;
+        res / on get -> r :: <status=204>;
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
+    let (_, p) = s.rels.iter().next().unwrap();
+    let x = p.xfers[Method::Get]
+        .as_ref()
+        .expect("expected transfer on HTTP GET");
+    assert_eq!(x.ranges.len(), 3);
     Ok(())
 }
 

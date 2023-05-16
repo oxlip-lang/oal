@@ -33,10 +33,12 @@ fn typecheck_ok() {
         "res /;",
         "res / on delete -> <>;",
         "let a = ('prop str) !;",
+        "let a = (<> :: <>) :: <>;",
     ];
 
     for c in cases {
-        compile(c).expect(format!("error evaluating: {}", c).as_str());
+        let mods = compile(c).expect(format!("error evaluating: {}", c).as_str());
+        eprintln!("{:#?}", mods.main());
     }
 }
 

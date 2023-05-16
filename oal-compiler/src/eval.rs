@@ -510,8 +510,8 @@ pub fn eval_variadic_operation<'a>(
     let expr = if op == atom::VariadicOperator::Range {
         let mut ranges = Ranges::new();
         for operand in operation.operands() {
-            let c = cast_content(eval_any(ctx, operand, AnnRef::default())?);
-            ranges.insert((c.status, c.media.clone()), c);
+            let r = cast_ranges(eval_any(ctx, operand, AnnRef::default())?);
+            ranges.extend(r.into_iter());
         }
         Expr::Ranges(Box::new(ranges))
     } else {
