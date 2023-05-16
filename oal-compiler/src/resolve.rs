@@ -9,7 +9,8 @@ use oal_model::locator::Locator;
 use oal_syntax::parser::{Declaration, Import, Program, Variable};
 
 fn define_variable(env: &mut Env, var: Variable<'_, Core>) -> Result<()> {
-    let entry = Entry::new(var.ident(), var.qualifier());
+    let qualifier = var.qualifier().map(|q| q.ident());
+    let entry = Entry::new(var.ident(), qualifier);
     if let Some(ext) = env.lookup(&entry) {
         var.node().syntax().core_mut().define(ext.clone());
         Ok(())

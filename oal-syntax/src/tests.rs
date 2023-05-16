@@ -88,7 +88,7 @@ fn parse_decl_ident() {
     parse("let a = mod.b;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let var = Variable::cast(rhs).expect("expected a variable");
-        assert_eq!(var.qualifier().unwrap(), "mod");
+        assert_eq!(var.qualifier().unwrap().ident(), "mod");
         assert_eq!(var.ident(), "b");
     })
 }

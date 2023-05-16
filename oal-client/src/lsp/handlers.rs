@@ -66,7 +66,7 @@ fn find_references(
     for module in folder.modules().unwrap().modules() {
         for var in module.root().descendants().filter_map(Variable::cast) {
             if definition == *var.node().syntax().core_ref().definition().unwrap() {
-                let location = node_location(workspace, var.node())?;
+                let location = node_location(workspace, var.identifier().node())?;
                 refs.push(location);
             }
         }
@@ -144,8 +144,15 @@ pub fn prepare_rename(
     let index = char_index(&text, pos);
 
     if let Some(ident) = syntax_at::<Identifier<_>>(tree, index) {
-        let range = ident.node().span().unwrap().range();
-        Ok(Some(utf16_range(&text, range)))
+        // Get the unqualified identifier from either a declaration or a variable.
+        // TODO: add support for module alias rename
+        let parent = ident.node().ancestors().nth(1).unwrap();
+        let identifier = if let Some(decl) = Declaration::cast(parent) {
+            Some(decl.identifier().node())
+        } else {
+            Variable::cast(parent).map(|var| var.identifier().node())
+        };
+        Ok(identifier.map(|n| utf16_range(&text, n.span().unwrap().range())))
     } else {
         Ok(None)
     }

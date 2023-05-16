@@ -577,17 +577,17 @@ impl<'a, T: Core> Relation<'a, T> {
 
 impl<'a, T: Core> Variable<'a, T> {
     pub fn ident(&self) -> atom::Ident {
-        Identifier::cast(self.node().last())
-            .expect("expected an identifier")
-            .ident()
+        self.identifier().ident()
     }
 
-    pub fn qualifier(&self) -> Option<atom::Ident> {
+    pub fn identifier(&self) -> Identifier<'a, T> {
+        Identifier::cast(self.node().last()).expect("expected an identifier")
+    }
+
+    pub fn qualifier(&self) -> Option<Identifier<'a, T>> {
         if self.node().children().count() > 1 {
-            let ident = Identifier::cast(self.node().first())
-                .expect("expected an identifier")
-                .ident();
-            Some(ident)
+            let i = Identifier::cast(self.node().first()).expect("expected an identifier");
+            Some(i)
         } else {
             None
         }
