@@ -1,17 +1,78 @@
 use crate::errors::{Error, Kind, Result};
 use crate::inference::tag::Tag;
 use crate::module::ModuleSet;
-use crate::tree::{get_tag, Core};
+use crate::tree::{Core, NRef};
 use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;
 
+struct TagWrap(Tag);
+
+impl TagWrap {
+    fn is_variable(&self) -> bool {
+        matches!(self.0, Tag::Var(_))
+    }
+
+    fn is_schema(&self) -> bool {
+        matches!(
+            self.0,
+            Tag::Primitive
+                | Tag::Relation
+                | Tag::Object
+                | Tag::Array
+                | Tag::Uri
+                | Tag::Any
+                | Tag::Var(_)
+        )
+    }
+
+    fn is_schema_like(&self) -> bool {
+        self.is_schema() || self.0 == Tag::Content
+    }
+
+    fn is_status_like(&self) -> bool {
+        matches!(self.0, Tag::Status | Tag::Number | Tag::Var(_))
+    }
+
+    fn is_relation_like(&self) -> bool {
+        matches!(self.0, Tag::Relation | Tag::Uri | Tag::Var(_))
+    }
+
+    fn is_object(&self) -> bool {
+        matches!(self.0, Tag::Object | Tag::Var(_))
+    }
+
+    fn is_property(&self) -> bool {
+        matches!(self.0, Tag::Property(_) | Tag::Var(_))
+    }
+
+    fn is_primitive_property(&self) -> bool {
+        self.is_variable() || matches!(&self.0, Tag::Property(t) if *t.as_ref() == Tag::Primitive)
+    }
+
+    fn is_text(&self) -> bool {
+        matches!(self.0, Tag::Text | Tag::Var(_))
+    }
+
+    fn is_uri(&self) -> bool {
+        matches!(self.0, Tag::Uri | Tag::Var(_))
+    }
+
+    fn is_transfer(&self) -> bool {
+        matches!(self.0, Tag::Transfer | Tag::Var(_))
+    }
+}
+
+fn get_tag(n: NRef) -> TagWrap {
+    TagWrap(crate::tree::get_tag(n))
+}
+
 fn check_variadic_operation(op: syn::VariadicOp<Core>) -> Result<()> {
     match op.operator() {
         atom::VariadicOperator::Join => {
-            if !op.operands().all(|o| get_tag(o) == Tag::Object) {
+            if !op.operands().all(|o| get_tag(o).is_object()) {
                 return Err(Error::new(Kind::InvalidType, "ill-formed join").with(&op));
             }
         }
@@ -32,7 +93,7 @@ fn check_variadic_operation(op: syn::VariadicOp<Core>) -> Result<()> {
 fn check_unary_operation(op: syn::UnaryOp<Core>) -> Result<()> {
     match op.operator() {
         atom::UnaryOperator::Optional | atom::UnaryOperator::Required => {
-            if !matches!(get_tag(op.operand()), Tag::Property(_)) {
+            if !get_tag(op.operand()).is_property() {
                 return Err(Error::new(Kind::InvalidType, "ill-formed optionality").with(&op));
             }
         }
@@ -44,7 +105,7 @@ fn check_content(content: syn::Content<Core>) -> Result<()> {
     for meta in content.meta().into_iter().flatten() {
         match meta.tag() {
             lex::Content::Media => {
-                if get_tag(meta.rhs()) != Tag::Text {
+                if !get_tag(meta.rhs()).is_text() {
                     return Err(Error::new(Kind::InvalidType, "ill-formed media").with(&meta));
                 }
             }
@@ -81,10 +142,10 @@ fn check_transfer(xfer: syn::Transfer<Core>) -> Result<()> {
 }
 
 fn check_relation(relation: syn::Relation<Core>) -> Result<()> {
-    if get_tag(relation.uri().inner()) != Tag::Uri {
+    if !get_tag(relation.uri().inner()).is_uri() {
         return Err(Error::new(Kind::InvalidType, "ill-formed uri").with(&relation.uri()));
     }
-    if !relation.transfers().all(|t| get_tag(t) == Tag::Transfer) {
+    if !relation.transfers().all(|t| get_tag(t).is_transfer()) {
         return Err(Error::new(Kind::InvalidType, "ill-formed transfers").with(&relation));
     }
     Ok(())
@@ -93,9 +154,7 @@ fn check_relation(relation: syn::Relation<Core>) -> Result<()> {
 fn check_uri(uri: syn::UriTemplate<Core>) -> Result<()> {
     if !uri.segments().all(|s| match s {
         syn::UriSegment::Element(_) => true,
-        syn::UriSegment::Variable(v) => {
-            matches!(get_tag(v.inner()), Tag::Property(t) if *t == Tag::Primitive)
-        }
+        syn::UriSegment::Variable(v) => get_tag(v.inner()).is_primitive_property(),
     }) {
         return Err(Error::new(Kind::InvalidType, "ill-formed uri").with(&uri));
     }
@@ -117,10 +176,7 @@ fn check_property(prop: syn::Property<Core>) -> Result<()> {
 }
 
 fn check_object(object: syn::Object<Core>) -> Result<()> {
-    if !object
-        .properties()
-        .all(|p| matches!(get_tag(p), Tag::Property(_)))
-    {
+    if !object.properties().all(|p| get_tag(p).is_property()) {
         return Err(Error::new(Kind::InvalidType, "ill-formed object").with(&object));
     }
     Ok(())

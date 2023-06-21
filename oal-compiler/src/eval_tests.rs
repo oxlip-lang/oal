@@ -6,7 +6,7 @@ use crate::tests::mods_from;
 use crate::typecheck::type_check;
 use oal_syntax::atom::{HttpStatus, Method, VariadicOperator};
 
-fn eval(code: &str) -> anyhow::Result<Spec> {
+fn eval(code: &str, check: bool) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
     let loc = mods.base();
     resolve(&mods, loc)?;
@@ -14,7 +14,9 @@ fn eval(code: &str) -> anyhow::Result<Spec> {
     let eqs = constrain(&mods, loc)?;
     let set = eqs.unify()?;
     substitute(&mods, loc, &set)?;
-    check_complete(&mods, loc)?;
+    if check {
+        check_complete(&mods, loc)?;
+    }
     type_check(&mods, loc)?;
 
     // Uncomment for debugging purpose:
@@ -24,9 +26,17 @@ fn eval(code: &str) -> anyhow::Result<Spec> {
     Ok(spec)
 }
 
+fn eval_check(code: &str) -> anyhow::Result<Spec> {
+    eval(code, true)
+}
+
+fn eval_nocheck(code: &str) -> anyhow::Result<Spec> {
+    eval(code, false)
+}
+
 #[test]
 fn eval_annotation() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         # description: "some record"
         let r = {};
@@ -64,7 +74,7 @@ fn eval_annotation() -> anyhow::Result<()> {
 
 #[test]
 fn eval_composed_annotation() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         # description: "a number"
         # title: "a number"
@@ -109,7 +119,7 @@ fn eval_invalid_annotation() -> anyhow::Result<()> {
     "#;
 
     assert!(matches!(
-        eval(code)
+        eval_check(code)
             .expect_err(format!("expected error evaluating: {}", code).as_str())
             .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
@@ -122,7 +132,7 @@ fn eval_invalid_annotation() -> anyhow::Result<()> {
 
 #[test]
 fn eval_content() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let r = {};
         res / on put : r -> <r>;
@@ -144,7 +154,7 @@ fn eval_content() -> anyhow::Result<()> {
 
 #[test]
 fn eval_ranges() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         res / on get -> <status=200, {}>
                      :: <status=500, media="text/plain", headers={ 'h str }, {}>;
@@ -197,7 +207,7 @@ fn eval_ranges() -> anyhow::Result<()> {
 
 #[test]
 fn eval_ranges_combined() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let r = <status=200> :: <status=202>;
         res / on get -> r :: <status=204>;
@@ -219,7 +229,7 @@ fn eval_invalid_status() -> anyhow::Result<()> {
     "#;
 
     assert!(matches!(
-        eval(code)
+        eval_check(code)
             .expect_err(format!("expected error evaluating: {}", code).as_str())
             .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
@@ -232,7 +242,7 @@ fn eval_invalid_status() -> anyhow::Result<()> {
 
 #[test]
 fn eval_content_schema() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let r = {
             'a num,
@@ -262,7 +272,7 @@ fn eval_content_schema() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_any() -> anyhow::Result<()> {
-    let s = eval(r#"res / on get -> < { 'b [bool], 'c / } ~ num ~ uri >;"#)?;
+    let s = eval_check(r#"res / on get -> < { 'b [bool], 'c / } ~ num ~ uri >;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -297,7 +307,7 @@ fn eval_operation_any() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_sum() -> anyhow::Result<()> {
-    let s = eval(r#"res / on get -> < num | str >;"#)?;
+    let s = eval_check(r#"res / on get -> < num | str >;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -321,7 +331,7 @@ fn eval_operation_sum() -> anyhow::Result<()> {
 
 #[test]
 fn eval_operation_required() -> anyhow::Result<()> {
-    let s = eval(r#"res / on get -> <{ ('a! str) ? }>;"#)?;
+    let s = eval_check(r#"res / on get -> <{ ('a! str) ? }>;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -342,7 +352,7 @@ fn eval_operation_required() -> anyhow::Result<()> {
 
 #[test]
 fn eval_uri() -> anyhow::Result<()> {
-    let s = eval(r#"res /a/{ 'id num }/b?{ 'c str } on get -> <>;"#)?;
+    let s = eval_check(r#"res /a/{ 'id num }/b?{ 'c str } on get -> <>;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -364,7 +374,7 @@ fn eval_uri() -> anyhow::Result<()> {
 
 #[test]
 fn eval_uri_params() -> anyhow::Result<()> {
-    let s = eval(r#"res / on patch, put { 'n num } : {} -> <>;"#)?;
+    let s = eval_check(r#"res / on patch, put { 'n num } : {} -> <>;"#)?;
 
     assert_eq!(s.rels.len(), 1);
 
@@ -386,7 +396,7 @@ fn eval_uri_params() -> anyhow::Result<()> {
 
 #[test]
 fn eval_reference() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let @a = {};
         res /one on get -> @a;
@@ -417,7 +427,7 @@ fn eval_reference() -> anyhow::Result<()> {
 
 #[test]
 fn eval_reference_fallback() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let @a = /;
         res @a on get -> <>;
@@ -441,7 +451,7 @@ fn eval_reference_fallback() -> anyhow::Result<()> {
 
 #[test]
 fn eval_reference_lambda() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let @a x = x;
         res (@a /) on get -> <>;
@@ -469,7 +479,7 @@ fn eval_identifier_duplicate() -> anyhow::Result<()> {
     "#;
 
     assert!(matches!(
-        eval(code)
+        eval_check(code)
             .expect_err(format!("expected error evaluating: {}", code).as_str())
             .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
@@ -482,7 +492,7 @@ fn eval_identifier_duplicate() -> anyhow::Result<()> {
 
 #[test]
 fn eval_application() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let g x = x | bool;
         let f x = { 'p g int, 'q x };
@@ -521,7 +531,7 @@ fn eval_application() -> anyhow::Result<()> {
 
 #[test]
 fn eval_subexpr() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let s = {} & ( {} | {} );
         res / on get -> s;
@@ -550,7 +560,7 @@ fn eval_subexpr() -> anyhow::Result<()> {
 
 #[test]
 fn eval_lambda_variable() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let f x = x;
         let g = f;
@@ -568,7 +578,7 @@ fn eval_lambda_variable() -> anyhow::Result<()> {
 
 #[test]
 fn eval_lambda_binding() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         let f x = x;
         let g y = y /;
@@ -585,8 +595,22 @@ fn eval_lambda_binding() -> anyhow::Result<()> {
 }
 
 #[test]
+fn eval_lambda_free() -> anyhow::Result<()> {
+    let s = eval_nocheck(
+        r#"
+        let f x = <x>;
+        res /;
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    Ok(())
+}
+
+#[test]
 fn eval_internal() -> anyhow::Result<()> {
-    let s = eval(
+    let s = eval_check(
         r#"
         res concat (/a) (/b);
     "#,

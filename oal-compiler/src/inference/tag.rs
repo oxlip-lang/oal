@@ -40,31 +40,6 @@ pub enum Tag {
     Var(TagId),
 }
 
-impl Tag {
-    pub fn is_variable(&self) -> bool {
-        matches!(self, Tag::Var(_))
-    }
-
-    pub fn is_schema(&self) -> bool {
-        matches!(
-            self,
-            Tag::Primitive | Tag::Relation | Tag::Object | Tag::Array | Tag::Uri | Tag::Any
-        )
-    }
-
-    pub fn is_schema_like(&self) -> bool {
-        *self == Tag::Content || self.is_schema()
-    }
-
-    pub fn is_status_like(&self) -> bool {
-        matches!(self, Tag::Status | Tag::Number)
-    }
-
-    pub fn is_relation_like(&self) -> bool {
-        matches!(self, Tag::Relation | Tag::Uri)
-    }
-}
-
 impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

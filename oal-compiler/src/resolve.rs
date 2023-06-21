@@ -68,7 +68,7 @@ fn close_declaration(
     let ext = External::new(current, decl.node());
     let defn = Definition::External(ext);
     let entry = Entry::from(decl.ident());
-    if let Some(_) = env.declare(entry, defn) {
+    if env.declare(entry, defn).is_some() {
         let span = decl.identifier().node().span();
         Err(Error::new(Kind::InvalidIdentifier, "identifier already exists").at(span))
     } else {

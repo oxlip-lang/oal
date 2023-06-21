@@ -4,7 +4,7 @@ use crate::errors::{Error, Kind, Result};
 use oal_model::span::Span;
 
 fn occurs(a: &Tag, b: &Tag) -> bool {
-    assert!(a.is_variable());
+    assert!(matches!(a, Tag::Var(_)));
     if a == b {
         true
     } else if let Tag::Func(FuncTag { bindings, range }) = b {
