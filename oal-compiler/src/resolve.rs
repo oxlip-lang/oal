@@ -40,7 +40,12 @@ fn declare_import(
     Ok(())
 }
 
-fn open_declaration(env: &mut Env, mods: &ModuleSet, loc: &Locator, decl: Declaration<'_, Core>) {
+fn open_declaration(
+    env: &mut Env,
+    mods: &ModuleSet,
+    loc: &Locator,
+    decl: Declaration<'_, Core>,
+) -> Result<()> {
     env.open();
     let current = mods.get(loc).unwrap();
     for binding in decl.bindings() {
@@ -49,20 +54,31 @@ fn open_declaration(env: &mut Env, mods: &ModuleSet, loc: &Locator, decl: Declar
         let entry = Entry::from(binding.ident());
         env.declare(entry, defn);
     }
+    Ok(())
 }
 
-fn close_declaration(env: &mut Env, mods: &ModuleSet, loc: &Locator, decl: Declaration<'_, Core>) {
+fn close_declaration(
+    env: &mut Env,
+    mods: &ModuleSet,
+    loc: &Locator,
+    decl: Declaration<'_, Core>,
+) -> Result<()> {
     env.close();
     let current = mods.get(loc).unwrap();
     let ext = External::new(current, decl.node());
     let defn = Definition::External(ext);
     let entry = Entry::from(decl.ident());
-    env.declare(entry, defn);
+    if let Some(_) = env.declare(entry, defn) {
+        let span = decl.identifier().node().span();
+        Err(Error::new(Kind::InvalidIdentifier, "identifier already exists").at(span))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let env = &mut Env::new();
-    stdlib::import(env);
+    stdlib::import(env)?;
     let tree = mods.get(loc).unwrap();
     for cursor in tree.root().traverse() {
         match cursor {
@@ -70,14 +86,14 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                 if let Some(import) = Import::cast(node) {
                     declare_import(env, mods, loc, import)?;
                 } else if let Some(decl) = Declaration::cast(node) {
-                    open_declaration(env, mods, loc, decl);
+                    open_declaration(env, mods, loc, decl)?;
                 } else if let Some(var) = Variable::cast(node) {
                     define_variable(env, var)?;
                 }
             }
             NodeCursor::End(node) => {
                 if let Some(decl) = Declaration::cast(node) {
-                    close_declaration(env, mods, loc, decl);
+                    close_declaration(env, mods, loc, decl)?;
                 }
             }
         }

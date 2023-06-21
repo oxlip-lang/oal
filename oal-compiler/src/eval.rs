@@ -394,16 +394,9 @@ pub fn eval_declaration<'a>(
         let ident = decl.ident();
         if ident.is_reference() {
             let value = (expr, next_ann.clone());
-            if let indexmap::map::Entry::Vacant(e) = ctx.refs.entry(ident.clone()) {
-                e.insert(value.clone());
-                let expr = Expr::Reference(ident, value.into());
-                Ok((expr, next_ann))
-            } else {
-                Err(
-                    Error::new(Kind::InvalidReference, "reference name already exists")
-                        .at(decl.identifier().node().span()),
-                )
-            }
+            ctx.refs.insert(ident.clone(), value.clone());
+            let expr = Expr::Reference(ident, value.into());
+            Ok((expr, next_ann))
         } else {
             Ok((expr, next_ann))
         }

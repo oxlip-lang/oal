@@ -33,8 +33,8 @@ impl Env {
         Env(vec![Scope::new()])
     }
 
-    pub fn declare(&mut self, e: Entry, defn: Definition) {
-        self.0.last_mut().unwrap().insert(e, defn);
+    pub fn declare(&mut self, e: Entry, defn: Definition) -> Option<Definition> {
+        self.0.last_mut().unwrap().insert(e, defn)
     }
 
     pub fn lookup(&self, e: &Entry) -> Option<&Definition> {

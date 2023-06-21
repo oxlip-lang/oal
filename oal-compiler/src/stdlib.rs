@@ -42,10 +42,11 @@ impl Internal for Concat {
 }
 
 /// Imports the standard library into the given environment.
-pub fn import(env: &mut Env) {
+pub fn import(env: &mut Env) -> Result<()> {
     let internals = [("concat", Rc::new(Concat {}))];
     for i in internals.into_iter() {
         let entry = Ident::from(i.0).into();
-        env.declare(entry, Definition::Internal(i.1))
+        env.declare(entry, Definition::Internal(i.1));
     }
+    Ok(())
 }

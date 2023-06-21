@@ -389,11 +389,12 @@ fn eval_reference() -> anyhow::Result<()> {
     let s = eval(
         r#"
         let @a = {};
-        res / on get -> @a;
+        res /one on get -> @a;
+        res /two on get -> @a;
     "#,
     )?;
 
-    assert_eq!(s.rels.len(), 1);
+    assert_eq!(s.rels.len(), 2);
 
     let r = s.rels.values().next().unwrap();
 
@@ -459,12 +460,12 @@ fn eval_reference_lambda() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eval_reference_duplicate() -> anyhow::Result<()> {
+fn eval_identifier_duplicate() -> anyhow::Result<()> {
     let code = r#"
-        let @a = {};
-        res /one on get -> @a;
-        let @a = {};
-        res /two on get -> @a;
+        let a = {};
+        res /one on get -> a;
+        let a = {};
+        res /two on get -> a;
     "#;
 
     assert!(matches!(
@@ -473,7 +474,7 @@ fn eval_reference_duplicate() -> anyhow::Result<()> {
             .downcast_ref::<errors::Error>()
             .expect("expected compiler error")
             .kind,
-        errors::Kind::InvalidReference
+        errors::Kind::InvalidIdentifier
     ));
 
     Ok(())
