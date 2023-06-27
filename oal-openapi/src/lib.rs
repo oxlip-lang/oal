@@ -550,9 +550,9 @@ impl Builder {
         let paths = if let Some(spec) = &self.spec {
             spec.rels
                 .iter()
-                .map(|(pattern, rel)| {
+                .map(|rel| {
                     (
-                        pattern.clone(),
+                        rel.uri.pattern(),
                         ReferenceOr::Item(self.relation_path_item(rel)),
                     )
                 })

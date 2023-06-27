@@ -209,7 +209,7 @@ pub enum Reference {
 }
 
 pub type PathPattern = String;
-pub type Relations = IndexMap<PathPattern, Relation>;
+pub type Relations = Vec<Relation>;
 pub type References = IndexMap<atom::Ident, Reference>;
 
 #[derive(Clone, Debug, PartialEq, Default)]

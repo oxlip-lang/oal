@@ -46,9 +46,8 @@ fn eval_annotation() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (i, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
 
-    assert_eq!(i, "/");
     assert_eq!(p.uri.path.len(), 1);
     assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
@@ -87,7 +86,7 @@ fn eval_composed_annotation() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -140,7 +139,7 @@ fn eval_content() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Put]
         .as_ref()
         .expect("expected transfer on HTTP PUT");
@@ -162,7 +161,7 @@ fn eval_ranges() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -214,7 +213,7 @@ fn eval_ranges_combined() -> anyhow::Result<()> {
     "#,
     )?;
     assert_eq!(s.rels.len(), 1);
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -253,7 +252,7 @@ fn eval_content_schema() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -276,7 +275,7 @@ fn eval_operation_any() -> anyhow::Result<()> {
 
     assert_eq!(s.rels.len(), 1);
 
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -311,7 +310,7 @@ fn eval_operation_sum() -> anyhow::Result<()> {
 
     assert_eq!(s.rels.len(), 1);
 
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -335,7 +334,7 @@ fn eval_operation_required() -> anyhow::Result<()> {
 
     assert_eq!(s.rels.len(), 1);
 
-    let (_, p) = s.rels.iter().next().unwrap();
+    let p = s.rels.iter().next().unwrap();
     let x = p.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -356,7 +355,7 @@ fn eval_uri() -> anyhow::Result<()> {
 
     assert_eq!(s.rels.len(), 1);
 
-    let (_, r) = s.rels.iter().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
 
     assert!(matches!(r.uri.path[0], UriSegment::Literal(_)));
     let UriSegment::Variable(v) = &r.uri.path[1] else { panic!("expected uri variable") };
@@ -378,7 +377,7 @@ fn eval_uri_params() -> anyhow::Result<()> {
 
     assert_eq!(s.rels.len(), 1);
 
-    let (_, r) = s.rels.iter().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
 
     assert!(r.xfers[Method::Put].is_some());
     let x = r.xfers[Method::Patch]
@@ -406,7 +405,7 @@ fn eval_reference() -> anyhow::Result<()> {
 
     assert_eq!(s.rels.len(), 2);
 
-    let r = s.rels.values().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
 
     let x = r.xfers[Method::Get]
         .as_ref()
@@ -435,8 +434,7 @@ fn eval_reference_fallback() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (i, p) = s.rels.iter().next().unwrap();
-    assert_eq!(i, "/");
+    let p = s.rels.iter().next().unwrap();
     assert_eq!(p.uri.path.len(), 1);
     assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
@@ -459,8 +457,7 @@ fn eval_reference_lambda() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let (i, p) = s.rels.iter().next().unwrap();
-    assert_eq!(i, "/");
+    let p = s.rels.iter().next().unwrap();
     assert_eq!(p.uri.path.len(), 1);
     assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
@@ -501,7 +498,7 @@ fn eval_application() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let r = s.rels.values().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
     let x = r.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -539,7 +536,7 @@ fn eval_subexpr() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let r = s.rels.values().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
     let x = r.xfers[Method::Get]
         .as_ref()
         .expect("expected transfer on HTTP GET");
@@ -569,7 +566,7 @@ fn eval_lambda_variable() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let r = s.rels.values().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
     assert_eq!(r.uri.path.len(), 1);
     assert_eq!(*r.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
@@ -587,7 +584,7 @@ fn eval_lambda_binding() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let r = s.rels.values().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
     assert_eq!(r.uri.path.len(), 1);
     assert_eq!(*r.uri.path.first().unwrap(), UriSegment::Literal("".into()));
 
@@ -617,7 +614,7 @@ fn eval_internal() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
-    let r = s.rels.values().next().unwrap();
+    let r = s.rels.iter().next().unwrap();
     assert_eq!(r.uri.path.len(), 2);
     assert_eq!(r.uri.path[0], UriSegment::Literal("a".into()));
     assert_eq!(r.uri.path[1], UriSegment::Literal("b".into()));

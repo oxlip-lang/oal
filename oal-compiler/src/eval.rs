@@ -317,10 +317,10 @@ pub fn eval_program<'a>(
     program: syn::Program<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let mut rels = IndexMap::new();
+    let mut rels = Vec::new();
     for res in program.resources() {
         let rel = cast_relation(eval_any(ctx, res.relation(), AnnRef::default())?);
-        rels.insert(rel.uri.pattern(), rel);
+        rels.push(rel);
     }
 
     let refs = ctx
