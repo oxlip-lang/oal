@@ -208,7 +208,6 @@ pub enum Reference {
     Schema(Schema),
 }
 
-pub type PathPattern = String;
 pub type Relations = Vec<Relation>;
 pub type References = IndexMap<atom::Ident, Reference>;
 
