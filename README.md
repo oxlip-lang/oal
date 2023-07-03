@@ -6,12 +6,24 @@ OAL is a high-level functional programming language for designing
 OpenAPI definitions.
 As an [Interface Description Language](https://en.wikipedia.org/wiki/Interface_description_language), it is not general purpose and not Turing-complete, by design.
 The motivation is to experiment with algebraic language abstractions over REST concepts,
-not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/).
-The ambition of the author is to consider OpenAPI as the assembly language of REST API design.
+not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/),
+and to consider OpenAPI as the assembly language of REST API design.
 
 The language is strongly typed with global type inference.
 The CLI generates OpenAPI 3.0.3 definitions in YAML format from the resources defined
 in the source program.
+
+## Capabilities
+
+To address the challenges of handwriting OpenAPI definitions at scale, OAL offers three main capabilities:
+
+- modular: project structure can be organized freely into folders and modules.
+- composable: REST concepts are mapped to types and operations, enabling the composition of low-level values (e.g. JSON properties) into higher-level entities (e.g. HTTP end-points) as language expressions.
+- functional: behavior can be encapsulated in functions and reused at will.
+
+## Hello World
+
+![Hello](images/hello.png)
 
 ## Installation
 This step requires a [local Rust and Cargo installation](https://doc.rust-lang.org/cargo/getting-started/installation.html).
@@ -186,5 +198,7 @@ It does not directly model the composition of REST entities as a service interfa
 OAL takes a different approach by defining an algebra and a functional evaluation strategy
 dedicated to the composition of low-level REST concepts into modular OpenAPI definitions.
 One can argue that extensible languages like Dhall could achieve similar objectives.
-The opinion of the author of OAL is that a specialized language would provide a more compact syntax,
+As a specialized language, OAL has the potential to provide a more compact syntax,
 easier to learn, to read and to manage at scale.
+
+- [ResponsibleAPI](https://github.com/responsibleapi/responsible)
