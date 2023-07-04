@@ -527,6 +527,21 @@ fn eval_application() -> anyhow::Result<()> {
 }
 
 #[test]
+fn eval_application_eager_evaluation() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let g x = x;
+        let f y = g y;
+        res / on get -> <f str>;
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+
+    Ok(())
+}
+
+#[test]
 fn eval_subexpr() -> anyhow::Result<()> {
     let s = eval_check(
         r#"

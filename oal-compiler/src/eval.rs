@@ -83,7 +83,7 @@ impl<'a> Expr<'a> {
 pub struct Context<'a> {
     mods: &'a ModuleSet,
     refs: IndexMap<atom::Ident, Value<'a>>,
-    scopes: Vec<HashMap<atom::Ident, syn::Terminal<'a, Core>>>,
+    scopes: Vec<HashMap<atom::Ident, Value<'a>>>,
 }
 
 impl<'a> Context<'a> {
@@ -408,12 +408,12 @@ pub fn eval_binding<'a>(
     binding: syn::Binding<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let scope = ctx.scopes.last().expect("scope is missing");
-    let term = scope
-        .get(&binding.ident())
-        .expect("binding is undefined")
-        .clone();
-    eval_terminal(ctx, term, ann)
+    let scope = ctx.scopes.last().expect("scope should exist");
+    let Some((expr, prev_ann)) = scope.get(&binding.ident())
+        else { panic!("binding '{}' should exist", binding.ident()) };
+    let mut next_ann = prev_ann.as_ref().clone();
+    next_ann.extend(ann.as_ref().clone());
+    Ok((expr.clone(), AnnRef::new(next_ann)))
 }
 
 pub fn eval_variable<'a>(
@@ -661,7 +661,8 @@ pub fn eval_application<'a>(
         Lambda::External(decl) => {
             let mut scope = HashMap::new();
             for (binding, argument) in decl.bindings().zip(app.arguments()) {
-                scope.insert(binding.ident(), argument);
+                let value = eval_terminal(ctx, argument, AnnRef::default())?;
+                scope.insert(binding.ident(), value);
             }
 
             let mut app_ann = compose_annotations(decl.annotations())?;
