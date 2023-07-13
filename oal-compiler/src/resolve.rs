@@ -6,7 +6,7 @@ use crate::stdlib;
 use crate::tree::Core;
 use oal_model::grammar::{AbstractSyntaxNode, NodeCursor};
 use oal_model::locator::Locator;
-use oal_syntax::parser::{Declaration, Import, Program, Variable};
+use oal_syntax::parser::{Declaration, Import, Program, Recursion, Variable};
 
 fn define_variable(env: &mut Env, var: Variable<'_, Core>) -> Result<()> {
     let qualifier = var.qualifier().map(|q| q.ident());
@@ -76,6 +76,27 @@ fn close_declaration(
     }
 }
 
+fn open_recursion(
+    env: &mut Env,
+    mods: &ModuleSet,
+    loc: &Locator,
+    rec: Recursion<'_, Core>,
+) -> Result<()> {
+    env.open();
+    let current = mods.get(loc).unwrap();
+    let binding = rec.binding();
+    let ext = External::new(current, binding.node());
+    let defn = Definition::External(ext);
+    let entry = Entry::from(binding.ident());
+    env.declare(entry, defn);
+    Ok(())
+}
+
+fn close_recursion(env: &mut Env) -> Result<()> {
+    env.close();
+    Ok(())
+}
+
 pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let env = &mut Env::new();
     stdlib::import(env)?;
@@ -89,11 +110,15 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
                     open_declaration(env, mods, loc, decl)?;
                 } else if let Some(var) = Variable::cast(node) {
                     define_variable(env, var)?;
+                } else if let Some(rec) = Recursion::cast(node) {
+                    open_recursion(env, mods, loc, rec)?;
                 }
             }
             NodeCursor::End(node) => {
                 if let Some(decl) = Declaration::cast(node) {
                     close_declaration(env, mods, loc, decl)?;
+                } else if Recursion::cast(node).is_some() {
+                    close_recursion(env)?;
                 }
             }
         }

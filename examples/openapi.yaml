@@ -195,6 +195,17 @@ components:
             type: integer
             minimum: 0
             maximum: 999
+    rec-176-0:
+      type: object
+      properties:
+        name:
+          example: sarah
+          type: string
+          pattern: ^[a-z]+$
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/rec-176-0'
     obj3:
       description: some other stuff
       allOf:
@@ -216,3 +227,4 @@ components:
               - example: /some/path/_id_number_/template
                 type: string
                 format: uri-reference
+              - $ref: '#/components/schemas/rec-176-0'

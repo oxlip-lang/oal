@@ -1,10 +1,10 @@
 use super::lexer as lex;
 use super::parser::{
     Application, Array, Content, Declaration, Gram, Literal, Object, PathElement, Primitive,
-    Program, Property, Relation, Terminal, Transfer, UriSegment, UriTemplate, Variable, VariadicOp,
+    Program, Property, Recursion, Relation, Terminal, Transfer, UnaryOp, UriSegment, UriTemplate,
+    Variable, VariadicOp,
 };
 use crate::atom;
-use crate::parser::UnaryOp;
 use oal_model::grammar::{AbstractSyntaxNode, NodeRef};
 use oal_model::locator::Locator;
 
@@ -519,6 +519,15 @@ let r = {};
             assert!(anns.next().is_none(), "expected no more annotation");
         },
     )
+}
+
+#[test]
+fn parse_recursion() {
+    parse("let a = rec x [x];", |p: Prog| {
+        let rec = Recursion::cast(assert_decl(p, "a").rhs()).expect("should be a recursion");
+        assert_eq!(rec.binding().ident(), "x");
+        Array::cast(assert_term(rec.rhs())).expect("should be an array");
+    })
 }
 
 #[test]

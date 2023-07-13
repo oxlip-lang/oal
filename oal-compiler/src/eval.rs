@@ -46,6 +46,7 @@ pub enum Expr<'a> {
     Number(u64),
     HttpStatus(atom::HttpStatus),
     Lambda(Lambda<'a>),
+    Recursion(atom::Ident),
 }
 
 #[derive(Clone, Debug)]
@@ -127,6 +128,7 @@ pub fn cast_schema(from: (Expr, AnnRef)) -> Schema {
         Expr::VariadicOp(o) => SchemaExpr::Op(*o),
         Expr::Reference(r, _) => SchemaExpr::Ref(r),
         Expr::Relation(r) => SchemaExpr::Rel(r),
+        Expr::Recursion(r) => SchemaExpr::Ref(r),
         e => panic!("not a schema: {e:?}"),
     };
 
@@ -323,17 +325,14 @@ pub fn eval_program<'a>(
         rels.push(rel);
     }
 
-    let refs = ctx
-        .refs
-        .drain(..)
-        .filter_map(|(ident, (expr, ann))| {
-            if expr.is_schema_like() {
-                Some((ident, Reference::Schema(cast_schema((expr, ann)))))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let mut refs = IndexMap::new();
+    for (ident, (expr, ann)) in ctx.refs.iter() {
+        // The type checker already asserts that all references are valid schemas.
+        refs.insert(
+            ident.clone(),
+            Reference::Schema(cast_schema((expr.clone(), ann.clone()))),
+        );
+    }
 
     let spec = Spec { rels, refs };
 
@@ -686,6 +685,25 @@ pub fn eval_subexpression<'a>(
     eval_any(ctx, expr.inner(), ann)
 }
 
+pub fn eval_recursion<'a>(
+    ctx: &mut Context<'a>,
+    rec: syn::Recursion<'a, Core>,
+    ann: AnnRef,
+) -> Result<(Expr<'a>, AnnRef)> {
+    let ident = atom::Ident::from(format!("rec-{}", rec.node().hash_code()));
+
+    let mut scope = HashMap::new();
+    let recursion = (Expr::Recursion(ident.clone()), AnnRef::default());
+    scope.insert(rec.binding().ident(), recursion);
+    ctx.scopes.push(scope);
+    let rhs = eval_any(ctx, rec.rhs(), AnnRef::default())?;
+    ctx.scopes.pop();
+
+    ctx.refs.insert(ident.clone(), rhs.clone());
+    let expr = Expr::Reference(ident, rhs.into());
+    Ok((expr, ann))
+}
+
 pub fn eval_any<'a>(
     ctx: &mut Context<'a>,
     node: NRef<'a>,
@@ -727,6 +745,8 @@ pub fn eval_any<'a>(
         eval_declaration(ctx, decl, ann)
     } else if let Some(binding) = syn::Binding::cast(node) {
         eval_binding(ctx, binding, ann)
+    } else if let Some(rec) = syn::Recursion::cast(node) {
+        eval_recursion(ctx, rec, ann)
     } else {
         panic!("unexpected node: {node:#?}")
     }

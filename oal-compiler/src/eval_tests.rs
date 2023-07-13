@@ -20,7 +20,7 @@ fn eval(code: &str, check: bool) -> anyhow::Result<Spec> {
     type_check(&mods, loc)?;
 
     // Uncomment for debugging purpose:
-    // println!("{:#?}", mods.main().tree().root());
+    // println!("{:#?}", mods.main().root());
 
     let spec = crate::eval::eval(&mods, mods.base())?;
     Ok(spec)
@@ -616,6 +616,46 @@ fn eval_lambda_free() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(s.rels.len(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn eval_recursion() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let r = rec x [x];
+        res / on get -> { 'a r, 'b r };
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let rel = s.rels.iter().next().unwrap();
+    let xfer = rel.xfers[Method::Get]
+        .as_ref()
+        .expect("should be an HTTP GET");
+
+    let range = xfer
+        .ranges
+        .values()
+        .next()
+        .unwrap()
+        .schema
+        .as_ref()
+        .unwrap();
+    let SchemaExpr::Object(obj) = &range.expr else { panic!("range should be an object") };
+    let (p1, p2) = (&obj.props[0], &obj.props[1]);
+    assert_eq!(p1.name, "a");
+    assert_eq!(p2.name, "b");
+    let SchemaExpr::Ref(id1) = &p1.schema.expr else { panic!("schema should be a reference") };
+    let SchemaExpr::Ref(id2) = &p2.schema.expr else { panic!("schema should be a reference") };
+    assert_eq!(*id1, "rec-7-0");
+    assert_eq!(id1, id2);
+    let recursion = s.refs.get(id1).expect("reference should exist");
+    let Reference::Schema(schema) = recursion;
+    let SchemaExpr::Array(_) = &schema.expr else {
+        panic!("schema should be an array")
+    };
 
     Ok(())
 }

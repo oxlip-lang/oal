@@ -27,6 +27,9 @@ let uri1 = /some/path/{ prop1 }/template;
 // Undefined URIs
 let uri2 = uri;
 
+// Recursive schema
+let person = rec x { 'name name, 'children [x] };
+
 // Contents
 # description: "some content"
 # examples: { default: "examples/stuff.json" }
@@ -49,7 +52,7 @@ let @obj2 = @obj1 & { prop3 };
 let id2 = id1 | str;
 
 // Untyped schema alternative
-let any1 = id2 ~ @obj2 ~ uri1;
+let any1 = id2 ~ @obj2 ~ uri1 ~ person;
 
 // Function declaration
 let f x y = @obj2 & ( x | y );

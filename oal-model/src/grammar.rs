@@ -300,6 +300,20 @@ impl<'a, T: Core, G: Grammar> Clone for NodeRef<'a, T, G> {
 
 impl<'a, T: Core, G: Grammar> Copy for NodeRef<'a, T, G> {}
 
+impl<'a, T: Core, G: Grammar> PartialEq for NodeRef<'a, T, G> {
+    fn eq(&self, other: &Self) -> bool {
+        self.idx == other.idx
+    }
+}
+
+impl<'a, T: Core, G: Grammar> Eq for NodeRef<'a, T, G> {}
+
+impl<'a, T: Core, G: Grammar> std::hash::Hash for NodeRef<'a, T, G> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+    }
+}
+
 #[derive(Debug)]
 pub enum NodeCursor<'a, T: Core, G: Grammar> {
     Start(NodeRef<'a, T, G>),
@@ -415,6 +429,13 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
 
     pub fn as_str(&self) -> &'a str {
         self.token().value().as_str(self.tree)
+    }
+
+    /// Returns a node hash code guaranteed to be unique within the syntax tree.
+    pub fn hash_code(&self) -> String {
+        let arena_index = generational_arena::Index::from(self.index());
+        let (index, generation) = arena_index.into_raw_parts();
+        format!("{}-{}", index, generation)
     }
 }
 

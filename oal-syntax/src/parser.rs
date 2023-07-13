@@ -175,6 +175,7 @@ syntax_nodes!(
     Resource,
     XferList,
     Relation,
+    Recursion,
     Program,
     Error
 );
@@ -320,6 +321,19 @@ impl<'a, T: Core> UriVariable<'a, T> {
 
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
         self.node().nth(Self::INNER_POS)
+    }
+}
+
+impl<'a, T: Core> Recursion<'a, T> {
+    const BINDING_POS: usize = 1;
+    const RHS_POS: usize = 2;
+
+    pub fn binding(&self) -> Binding<'a, T> {
+        Binding::cast(self.node().nth(Self::BINDING_POS)).expect("should be a binding")
+    }
+
+    pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
+        self.node().nth(Self::RHS_POS)
     }
 }
 
@@ -654,6 +668,11 @@ pub fn parser<'a>(
         )
     };
 
+    let binding = tree_one(
+        just_token(TokenKind::Identifier(lex::Identifier::Value)),
+        SyntaxKind::Binding,
+    );
+
     let expr_kind = recursive(|expr| {
         let property_list = tree_many(
             expr.clone()
@@ -844,7 +863,7 @@ pub fn parser<'a>(
         let xfer_list = tree_many(
             expr.clone().chain(
                 just_token(TokenKind::Control(lex::Control::Comma))
-                    .chain(expr)
+                    .chain(expr.clone())
                     .repeated()
                     .flatten(),
             ),
@@ -858,13 +877,17 @@ pub fn parser<'a>(
             SyntaxKind::Relation,
         );
 
-        relation.or(xfer_kind)
-    });
+        let relation_kind = relation.or(xfer_kind);
 
-    let binding = tree_one(
-        just_token(TokenKind::Identifier(lex::Identifier::Value)),
-        SyntaxKind::Binding,
-    );
+        let recursion = tree_many(
+            just_token(TokenKind::Keyword(lex::Keyword::Rec))
+                .chain(binding.clone())
+                .chain(expr),
+            SyntaxKind::Recursion,
+        );
+
+        recursion.or(relation_kind)
+    });
 
     let bindings = tree_many(binding.repeated(), SyntaxKind::Bindings);
 

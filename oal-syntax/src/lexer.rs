@@ -27,6 +27,7 @@ pub enum Keyword {
     Let,
     Res,
     Use,
+    Rec,
     On,
     As,
 }
@@ -197,6 +198,7 @@ pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = ParserError> 
             "let" => Ok(Keyword::Let),
             "res" => Ok(Keyword::Res),
             "use" => Ok(Keyword::Use),
+            "rec" => Ok(Keyword::Rec),
             "on" => Ok(Keyword::On),
             "as" => Ok(Keyword::As),
             "num" => Ok(Keyword::Primitive(Primitive::Num)),

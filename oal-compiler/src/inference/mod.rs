@@ -85,6 +85,7 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
             || syn::Terminal::cast(node).is_some()
             || syn::SubExpression::cast(node).is_some()
             || syn::Declaration::cast(node).is_some()
+            || syn::Recursion::cast(node).is_some()
         {
             set_tag(node, Tag::Var(seq.next()));
         }
@@ -167,6 +168,9 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
             set.push(get_tag(node), get_tag(term.inner()), node.span());
         } else if let Some(expr) = syn::SubExpression::cast(node) {
             set.push(get_tag(node), get_tag(expr.inner()), node.span());
+        } else if let Some(expr) = syn::Recursion::cast(node) {
+            set.push(get_tag(node), get_tag(expr.binding().node()), node.span());
+            set.push(get_tag(node), get_tag(expr.rhs()), node.span());
         }
     }
 

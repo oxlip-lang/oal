@@ -70,6 +70,12 @@ impl From<&str> for Ident {
     }
 }
 
+impl From<String> for Ident {
+    fn from(s: String) -> Self {
+        Ident(s.into())
+    }
+}
+
 impl AsRef<str> for Ident {
     fn as_ref(&self) -> &str {
         self.0.as_ref()

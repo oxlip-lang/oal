@@ -4,7 +4,7 @@
 # An OpenAPI Language
 OAL is a high-level functional programming language for designing
 OpenAPI definitions.
-As an [Interface Description Language](https://en.wikipedia.org/wiki/Interface_description_language), it is not general purpose and not Turing-complete, by design.
+As an [Interface Description Language](https://en.wikipedia.org/wiki/Interface_description_language), it is not general purpose.
 The motivation is to experiment with algebraic language abstractions over REST concepts,
 not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/),
 and to consider OpenAPI as the assembly language of REST API design.
@@ -90,6 +90,10 @@ let uri1 = /some/path/{ prop1 }/template;
 let uri2 = uri;
 ```
 ```
+// Recursive schema
+let person = rec x { 'name name, 'children [x] };
+```
+```
 // Contents
 # description: "some content"
 # examples: { default: "examples/stuff.json" }
@@ -117,7 +121,7 @@ let id2 = id1 | str;
 ```
 ```
 // Untyped schema alternative
-let any1 = id2 ~ @obj2 ~ uri1;
+let any1 = id2 ~ @obj2 ~ uri1 ~ person;
 ```
 ```
 // Function declaration
