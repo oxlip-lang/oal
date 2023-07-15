@@ -1,0 +1,16 @@
+{
+	"name": "OpenAPI Lang",
+	"image": "mcr.microsoft.com/devcontainers/rust:1-1-bullseye",
+	"containerUser": "vscode",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"oal.serverPath": "/usr/local/cargo/bin/oal-lsp"
+			},
+			"extensions": [
+				"emmanuel-bastien.openapi-lang"
+			]
+		}
+	},
+	"postCreateCommand": "cargo install --path oal-client"
+}
