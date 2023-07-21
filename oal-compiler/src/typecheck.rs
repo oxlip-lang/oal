@@ -8,9 +8,13 @@ use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;
 
-struct TagWrap(Tag);
+struct TagWrap(Tag, bool);
 
 impl TagWrap {
+    fn is_recursive(&self) -> bool {
+        self.1
+    }
+
     fn is_variable(&self) -> bool {
         matches!(self.0, Tag::Var(_))
     }
@@ -66,7 +70,7 @@ impl TagWrap {
 }
 
 fn get_tag(n: NRef) -> TagWrap {
-    TagWrap(crate::tree::get_tag(n))
+    TagWrap(crate::tree::get_tag(n), n.syntax().core_ref().is_recursive)
 }
 
 fn check_variadic_operation(op: syn::VariadicOp<Core>) -> Result<()> {
@@ -183,8 +187,21 @@ fn check_object(object: syn::Object<Core>) -> Result<()> {
 }
 
 fn check_declaration(decl: syn::Declaration<Core>) -> Result<()> {
-    if decl.ident().is_reference() && !get_tag(decl.rhs()).is_schema() {
-        return Err(Error::new(Kind::InvalidType, "ill-formed reference").with(&decl));
+    let rhs = get_tag(decl.rhs());
+    if decl.ident().is_reference() && !rhs.is_schema() {
+        return Err(
+            Error::new(Kind::InvalidType, "ill-formed reference, not a schema").with(&decl),
+        );
+    }
+    if get_tag(decl.node()).is_recursive() {
+        if !rhs.is_schema() {
+            return Err(
+                Error::new(Kind::InvalidType, "ill-formed recursion, not a schema").with(&decl),
+            );
+        }
+        if decl.has_bindings() {
+            return Err(Error::new(Kind::InvalidType, "ill-formed lambda, recursive").with(&decl));
+        }
     }
     Ok(())
 }
@@ -192,6 +209,13 @@ fn check_declaration(decl: syn::Declaration<Core>) -> Result<()> {
 fn check_resource(res: syn::Resource<Core>) -> Result<()> {
     if !get_tag(res.relation()).is_relation_like() {
         return Err(Error::new(Kind::InvalidType, "ill-formed resource").with(&res));
+    }
+    Ok(())
+}
+
+fn check_recursion(rec: syn::Recursion<Core>) -> Result<()> {
+    if !get_tag(rec.node()).is_schema_like() {
+        return Err(Error::new(Kind::InvalidType, "ill-formed recursion").with(&rec));
     }
     Ok(())
 }
@@ -223,6 +247,8 @@ pub fn type_check(mods: &ModuleSet, loc: &Locator) -> Result<()> {
             check_declaration(decl)
         } else if let Some(res) = syn::Resource::cast(node) {
             check_resource(res)
+        } else if let Some(rec) = syn::Recursion::cast(node) {
+            check_recursion(rec)
         } else {
             Ok(())
         }

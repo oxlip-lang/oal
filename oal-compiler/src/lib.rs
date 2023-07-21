@@ -1,5 +1,6 @@
 mod annotation;
 pub mod compile;
+mod defgraph;
 pub mod definition;
 mod env;
 pub mod errors;

@@ -37,6 +37,13 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
     let module = mods.get(loc).expect("module not found");
     let seq = &mut Seq::new(loc.clone());
 
+    // Type variables must first be assigned to declarations to
+    // allow variable use before declaration.
+    let prog = syn::Program::cast(module.root()).expect("root should be a program");
+    for decl in prog.declarations() {
+        set_tag(decl.node(), Tag::Var(seq.next()));
+    }
+
     for node in module.root().descendants() {
         if syn::Literal::cast(node).is_some() {
             set_tag(node, literal_tag(node.token().value()));
@@ -84,7 +91,6 @@ pub fn tag(mods: &ModuleSet, loc: &Locator) -> Result<usize> {
             || syn::Binding::cast(node).is_some()
             || syn::Terminal::cast(node).is_some()
             || syn::SubExpression::cast(node).is_some()
-            || syn::Declaration::cast(node).is_some()
             || syn::Recursion::cast(node).is_some()
         {
             set_tag(node, Tag::Var(seq.next()));
@@ -182,9 +188,11 @@ pub fn substitute(mods: &ModuleSet, loc: &Locator, sets: &union::UnionFind) -> R
     let module = mods.get(loc).expect("module not found");
 
     for node in module.root().descendants() {
-        let mut core = node.syntax().core_mut();
-        if let Some(tag) = core.tag().map(|t| union::reduce(sets, t)) {
-            core.set_tag(tag);
+        if node.syntax().has_core() {
+            let mut core = node.syntax().core_mut();
+            if let Some(tag) = core.tag().map(|t| union::reduce(sets, t)) {
+                core.set_tag(tag);
+            }
         }
     }
 
@@ -207,11 +215,13 @@ pub fn check_complete(mods: &ModuleSet, loc: &Locator) -> Result<()> {
     let module = mods.get(loc).expect("module not found");
 
     for node in module.root().descendants() {
-        if let Some(tag) = node.syntax().core_ref().tag() {
-            if has_variable(tag) {
-                return Err(Error::new(Kind::InvalidType, "incomplete type inference")
-                    .with(&node)
-                    .at(node.span()));
+        if node.syntax().has_core() {
+            if let Some(tag) = node.syntax().core_ref().tag() {
+                if has_variable(tag) {
+                    return Err(Error::new(Kind::InvalidType, "incomplete type inference")
+                        .with(&node)
+                        .at(node.span()));
+                }
             }
         }
     }

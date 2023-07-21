@@ -1,3 +1,4 @@
+use crate::defgraph::DefGraph;
 use crate::definition::{Definition, External};
 use crate::env::{Entry, Env};
 use crate::errors::{Error, Kind, Result};
@@ -8,11 +9,15 @@ use oal_model::grammar::{AbstractSyntaxNode, NodeCursor};
 use oal_model::locator::Locator;
 use oal_syntax::parser::{Declaration, Import, Program, Recursion, Variable};
 
-fn define_variable(env: &mut Env, var: Variable<'_, Core>) -> Result<()> {
+fn define_variable(env: &mut Env, defg: &mut DefGraph, var: Variable<'_, Core>) -> Result<()> {
     let qualifier = var.qualifier().map(|q| q.ident());
     let entry = Entry::new(var.ident(), qualifier);
-    if let Some(ext) = env.lookup(&entry) {
-        var.node().syntax().core_mut().define(ext.clone());
+    if let Some(definition) = env.lookup(&entry) {
+        var.node().syntax().core_mut().define(definition.clone());
+        // Track dependencies among external definitions.
+        if let Definition::External(to) = definition {
+            defg.connect(to.clone());
+        }
         Ok(())
     } else {
         Err(Error::new(Kind::NotInScope, "variable is not defined")
@@ -40,30 +45,12 @@ fn declare_import(
     Ok(())
 }
 
-fn open_declaration(
+fn declare_variable(
     env: &mut Env,
     mods: &ModuleSet,
     loc: &Locator,
     decl: Declaration<'_, Core>,
 ) -> Result<()> {
-    env.open();
-    let current = mods.get(loc).unwrap();
-    for binding in decl.bindings() {
-        let ext = External::new(current, binding.node());
-        let defn = Definition::External(ext);
-        let entry = Entry::from(binding.ident());
-        env.declare(entry, defn);
-    }
-    Ok(())
-}
-
-fn close_declaration(
-    env: &mut Env,
-    mods: &ModuleSet,
-    loc: &Locator,
-    decl: Declaration<'_, Core>,
-) -> Result<()> {
-    env.close();
     let current = mods.get(loc).unwrap();
     let ext = External::new(current, decl.node());
     let defn = Definition::External(ext);
@@ -74,6 +61,31 @@ fn close_declaration(
     } else {
         Ok(())
     }
+}
+
+fn open_declaration(
+    env: &mut Env,
+    mods: &ModuleSet,
+    loc: &Locator,
+    defg: &mut DefGraph,
+    decl: Declaration<'_, Core>,
+) -> Result<()> {
+    env.open();
+    let current = mods.get(loc).unwrap();
+    defg.open(External::new(current, decl.node()));
+    for binding in decl.bindings() {
+        let ext = External::new(current, binding.node());
+        let defn = Definition::External(ext);
+        let entry = Entry::from(binding.ident());
+        env.declare(entry, defn);
+    }
+    Ok(())
+}
+
+fn close_declaration(env: &mut Env, defg: &mut DefGraph) -> Result<()> {
+    defg.close();
+    env.close();
+    Ok(())
 }
 
 fn open_recursion(
@@ -98,31 +110,42 @@ fn close_recursion(env: &mut Env) -> Result<()> {
 }
 
 pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
+    let defg = &mut DefGraph::default();
+
     let env = &mut Env::new();
     stdlib::import(env)?;
+
     let tree = mods.get(loc).unwrap();
+    let prog = Program::cast(tree.root()).expect("root should be a program");
+    for import in prog.imports() {
+        declare_import(env, mods, loc, import)?;
+    }
+    for decl in prog.declarations() {
+        declare_variable(env, mods, loc, decl)?;
+    }
+
     for cursor in tree.root().traverse() {
         match cursor {
             NodeCursor::Start(node) => {
-                if let Some(import) = Import::cast(node) {
-                    declare_import(env, mods, loc, import)?;
-                } else if let Some(decl) = Declaration::cast(node) {
-                    open_declaration(env, mods, loc, decl)?;
+                if let Some(decl) = Declaration::cast(node) {
+                    open_declaration(env, mods, loc, defg, decl)?;
                 } else if let Some(var) = Variable::cast(node) {
-                    define_variable(env, var)?;
+                    define_variable(env, defg, var)?;
                 } else if let Some(rec) = Recursion::cast(node) {
                     open_recursion(env, mods, loc, rec)?;
                 }
             }
             NodeCursor::End(node) => {
-                if let Some(decl) = Declaration::cast(node) {
-                    close_declaration(env, mods, loc, decl)?;
+                if Declaration::cast(node).is_some() {
+                    close_declaration(env, defg)?;
                 } else if Recursion::cast(node).is_some() {
                     close_recursion(env)?;
                 }
             }
         }
     }
+
+    defg.identify_recursion(mods);
 
     Ok(())
 }

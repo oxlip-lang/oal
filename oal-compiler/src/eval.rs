@@ -10,7 +10,7 @@ use crate::spec::{
 use crate::tree::{Core, NRef};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
-use oal_model::grammar::AbstractSyntaxNode;
+use oal_model::grammar::{AbstractSyntaxNode, GlobalNodeId};
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
@@ -69,6 +69,7 @@ impl<'a> Expr<'a> {
                 | Expr::VariadicOp(_)
                 | Expr::Reference(_, _)
                 | Expr::Relation(_)
+                | Expr::Recursion(_)
         )
     }
 
@@ -83,7 +84,7 @@ impl<'a> Expr<'a> {
 
 pub struct Context<'a> {
     mods: &'a ModuleSet,
-    refs: IndexMap<atom::Ident, Value<'a>>,
+    refs: IndexMap<atom::Ident, Option<Value<'a>>>,
     scopes: Vec<HashMap<atom::Ident, Value<'a>>>,
 }
 
@@ -95,6 +96,10 @@ impl<'a> Context<'a> {
             scopes: Vec::new(),
         }
     }
+}
+
+fn recursive_node_id(node: NRef) -> atom::Ident {
+    atom::Ident::from(format!("rec-{:x}", GlobalNodeId::from(node)))
 }
 
 fn compose_annotations<'a, I>(anns: I) -> Result<Annotation>
@@ -326,12 +331,14 @@ pub fn eval_program<'a>(
     }
 
     let mut refs = IndexMap::new();
-    for (ident, (expr, ann)) in ctx.refs.iter() {
-        // The type checker already asserts that all references are valid schemas.
-        refs.insert(
-            ident.clone(),
-            Reference::Schema(cast_schema((expr.clone(), ann.clone()))),
-        );
+    for (ident, value) in ctx.refs.iter() {
+        if let Some((expr, ann)) = value {
+            // The type checker already asserts that all references are valid schemas.
+            refs.insert(
+                ident.clone(),
+                Reference::Schema(cast_schema((expr.clone(), ann.clone()))),
+            );
+        }
     }
 
     let spec = Spec { rels, refs };
@@ -389,15 +396,34 @@ pub fn eval_declaration<'a>(
         let mut rhs_ann = compose_annotations(decl.annotations())?;
         rhs_ann.extend(ann.as_ref().clone());
         let rhs_ann = AnnRef::new(rhs_ann);
-        let (expr, next_ann) = eval_any(ctx, decl.rhs(), rhs_ann)?;
-        let ident = decl.ident();
-        if ident.is_reference() {
-            let value = (expr, next_ann.clone());
-            ctx.refs.insert(ident.clone(), value.clone());
-            let expr = Expr::Reference(ident, value.into());
-            Ok((expr, next_ann))
+
+        let mut ident = decl.ident();
+
+        if ident.is_reference() || decl.node().syntax().core_ref().is_recursive {
+            if !ident.is_reference() {
+                ident = recursive_node_id(decl.node());
+            }
+            // Make sure we evaluate the reference or recursive declaration only once.
+            let expr = if !ctx.refs.contains_key(&ident) {
+                // Insert an empty reference to signal recursion
+                // before evaluating the right-hand side.
+                ctx.refs.insert(ident.clone(), None);
+                let value = eval_any(ctx, decl.rhs(), rhs_ann.clone())?;
+                // Overwrite the reference with the actual value.
+                ctx.refs.insert(ident.clone(), Some(value.clone()));
+                Expr::Reference(ident, value.into())
+            } else {
+                match ctx.refs.get(&ident).unwrap().clone() {
+                    // Return a reference with associated value.
+                    Some(value) => Expr::Reference(ident, value.into()),
+                    // Break recursive evaluation signaled by an empty reference.
+                    None => Expr::Recursion(ident),
+                }
+            };
+            Ok((expr, rhs_ann))
         } else {
-            Ok((expr, next_ann))
+            // Non-reference and non-recursive declarations are inlined.
+            eval_any(ctx, decl.rhs(), rhs_ann)
         }
     }
 }
@@ -690,7 +716,7 @@ pub fn eval_recursion<'a>(
     rec: syn::Recursion<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let ident = atom::Ident::from(format!("rec-{}", rec.node().hash_code()));
+    let ident = recursive_node_id(rec.node());
 
     let mut scope = HashMap::new();
     let recursion = (Expr::Recursion(ident.clone()), AnnRef::default());
@@ -699,7 +725,7 @@ pub fn eval_recursion<'a>(
     let rhs = eval_any(ctx, rec.rhs(), AnnRef::default())?;
     ctx.scopes.pop();
 
-    ctx.refs.insert(ident.clone(), rhs.clone());
+    ctx.refs.insert(ident.clone(), Some(rhs.clone()));
     let expr = Expr::Reference(ident, rhs.into());
     Ok((expr, ann))
 }

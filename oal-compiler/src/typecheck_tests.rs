@@ -34,11 +34,11 @@ fn typecheck_ok() {
         "res / on delete -> <>;",
         "let a = ('prop str) !;",
         "let a = (<> :: <>) :: <>;",
+        "res (rec x (/ on get -> { 'self x }));",
     ];
 
     for c in cases {
-        let mods = compile(c).expect(format!("error evaluating: {}", c).as_str());
-        eprintln!("{:#?}", mods.main());
+        compile(c).expect(format!("error evaluating: {}", c).as_str());
     }
 }
 
@@ -56,6 +56,7 @@ fn typecheck_error() {
         "let a = uri on get -> str;",
         "res num;",
         "let a = str !;",
+        "res / on (rec x (get -> { 'self uri }));",
     ];
 
     for c in cases {

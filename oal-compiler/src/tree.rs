@@ -8,6 +8,7 @@ use oal_syntax::parser::Gram;
 pub struct Core {
     defn: Option<Definition>,
     tag: Option<Tag>,
+    pub is_recursive: bool,
 }
 
 impl Core {

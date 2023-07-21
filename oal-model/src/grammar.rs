@@ -5,8 +5,10 @@ use crate::locator::Locator;
 use crate::span::Span;
 use chumsky::prelude::*;
 use generational_indextree::NodeEdge;
+use sha2::{Digest, Sha256};
 use std::cell::{Ref, RefCell, RefMut};
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Formatter, LowerHex};
+use url::Url;
 
 pub type NodeIdx = generational_indextree::NodeId;
 
@@ -103,7 +105,9 @@ impl<T: Core, G: Grammar> SyntaxNode<T, G> {
     }
 
     pub fn core_ref(&self) -> Ref<T> {
-        Ref::map(self.1.borrow(), |r| r.as_ref().unwrap().as_ref())
+        Ref::map(self.1.borrow(), |r| {
+            r.as_ref().expect("core should exist").as_ref()
+        })
     }
 
     pub fn core_mut(&self) -> RefMut<T> {
@@ -300,24 +304,34 @@ impl<'a, T: Core, G: Grammar> Clone for NodeRef<'a, T, G> {
 
 impl<'a, T: Core, G: Grammar> Copy for NodeRef<'a, T, G> {}
 
-impl<'a, T: Core, G: Grammar> PartialEq for NodeRef<'a, T, G> {
-    fn eq(&self, other: &Self) -> bool {
-        self.idx == other.idx
-    }
-}
-
-impl<'a, T: Core, G: Grammar> Eq for NodeRef<'a, T, G> {}
-
-impl<'a, T: Core, G: Grammar> std::hash::Hash for NodeRef<'a, T, G> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.idx.hash(state);
-    }
-}
-
 #[derive(Debug)]
 pub enum NodeCursor<'a, T: Core, G: Grammar> {
     Start(NodeRef<'a, T, G>),
     End(NodeRef<'a, T, G>),
+}
+
+/// A global node identifier is guaranteed to be unique across all compilation units.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct GlobalNodeId(Url, usize, u64);
+
+impl<'a, T: Core, G: Grammar> From<NodeRef<'a, T, G>> for GlobalNodeId {
+    fn from(node: NodeRef<'a, T, G>) -> Self {
+        let arena_index = generational_arena::Index::from(node.index());
+        let (index, generation) = arena_index.into_raw_parts();
+        let url = node.tree().locator().url().clone();
+        GlobalNodeId(url, index, generation)
+    }
+}
+
+impl LowerHex for GlobalNodeId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let hash = Sha256::new()
+            .chain_update(self.0.as_str().as_bytes())
+            .chain_update(self.1.to_be_bytes())
+            .chain_update(self.2.to_be_bytes())
+            .finalize();
+        write!(f, "{:x}", hash)
+    }
 }
 
 impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
@@ -429,13 +443,6 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
 
     pub fn as_str(&self) -> &'a str {
         self.token().value().as_str(self.tree)
-    }
-
-    /// Returns a node hash code guaranteed to be unique within the syntax tree.
-    pub fn hash_code(&self) -> String {
-        let arena_index = generational_arena::Index::from(self.index());
-        let (index, generation) = arena_index.into_raw_parts();
-        format!("{}-{}", index, generation)
     }
 }
 

@@ -27,7 +27,7 @@ impl Eq for dyn Internal {}
 pub type InternalRef = Rc<dyn Internal>;
 
 /// External identifier definition.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct External {
     loc: Locator,
     index: NodeIdx,

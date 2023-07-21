@@ -621,7 +621,7 @@ fn eval_lambda_free() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eval_recursion() -> anyhow::Result<()> {
+fn eval_single_recursion() -> anyhow::Result<()> {
     let s = eval_check(
         r#"
         let r = rec x [x];
@@ -649,13 +649,128 @@ fn eval_recursion() -> anyhow::Result<()> {
     assert_eq!(p2.name, "b");
     let SchemaExpr::Ref(id1) = &p1.schema.expr else { panic!("schema should be a reference") };
     let SchemaExpr::Ref(id2) = &p2.schema.expr else { panic!("schema should be a reference") };
-    assert_eq!(*id1, "rec-7-0");
+    assert_eq!(
+        *id1,
+        "rec-391bcd6e36ef57ef4f3c9db65d1fd777ca5bc8138c2b6add09cc52d46863b54f"
+    );
     assert_eq!(id1, id2);
     let recursion = s.refs.get(id1).expect("reference should exist");
     let Reference::Schema(schema) = recursion;
     let SchemaExpr::Array(_) = &schema.expr else {
         panic!("schema should be an array")
     };
+
+    Ok(())
+}
+
+#[test]
+fn eval_mutual_recursion() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        res / on get -> a;
+        let a = { 'b b };
+        let b = { 'a a };
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let rel = s.rels.iter().next().unwrap();
+    let xfer = rel.xfers[Method::Get]
+        .as_ref()
+        .expect("should be an HTTP GET");
+
+    let range = xfer
+        .ranges
+        .values()
+        .next()
+        .unwrap()
+        .schema
+        .as_ref()
+        .unwrap();
+
+    let SchemaExpr::Ref(id_a) = &range.expr else { panic!("range should be a reference") };
+    let ref_a = s.refs.get(id_a).expect("reference should exist");
+    let Reference::Schema(schema) = ref_a;
+    let SchemaExpr::Object(obj) = &schema.expr else {
+        panic!("schema should be an object")
+    };
+
+    let prop = &obj.props[0];
+    assert_eq!(prop.name, "b");
+    let SchemaExpr::Ref(id_b) = &prop.schema.expr else { panic!("schema should be a reference") };
+    let ref_b = s.refs.get(id_b).expect("reference should exist");
+    let Reference::Schema(schema) = ref_b;
+    let SchemaExpr::Object(obj) = &schema.expr else {
+        panic!("schema should be an object")
+    };
+
+    let prop = &obj.props[0];
+    assert_eq!(prop.name, "a");
+    let SchemaExpr::Ref(id) = &prop.schema.expr else { panic!("schema should be a reference") };
+    assert_eq!(id, id_a);
+
+    Ok(())
+}
+
+#[test]
+fn eval_recursive_reference() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let @a = /?{ 'b @b };
+        let @b = /?{ 'a @a };
+        res @a on get -> <>;
+    "#,
+    )?;
+
+    assert_eq!(s.rels.len(), 1);
+    let rel = s.rels.iter().next().unwrap();
+
+    let params_rel = rel.uri.params.as_ref().expect("should have params");
+    let prop_rel = &params_rel.props[0];
+    assert_eq!(prop_rel.name, "b");
+    let SchemaExpr::Ref(id_rel) = &prop_rel.schema.expr else { panic!("schema should be a reference") };
+    let ref_b = s.refs.get(id_rel).expect("reference should exist");
+    let Reference::Schema(schema_b) = ref_b;
+    let SchemaExpr::Uri(uri_b) = &schema_b.expr else {
+        panic!("schema should be a URI")
+    };
+
+    let params_b = uri_b.params.as_ref().expect("should have params");
+    let prop_b = &params_b.props[0];
+    assert_eq!(prop_b.name, "a");
+    let SchemaExpr::Ref(id_b) = &prop_b.schema.expr else { panic!("schema should be a reference") };
+    let ref_a = s.refs.get(id_b).expect("reference should exist");
+    let Reference::Schema(schema_a) = ref_a;
+    let SchemaExpr::Uri(uri_a) = &schema_a.expr else {
+        panic!("schema should be a URI")
+    };
+
+    let params_a = uri_a.params.as_ref().expect("should have params");
+    let prop_a = &params_a.props[0];
+    assert_eq!(prop_a.name, "b");
+    let SchemaExpr::Ref(id_a) = &prop_a.schema.expr else { panic!("schema should be a reference") };
+
+    assert_eq!(id_rel, id_a);
+
+    Ok(())
+}
+
+#[test]
+fn eval_recursive_lambda() -> anyhow::Result<()> {
+    let code = r#"
+        let f x = { 'g (g x) };
+        let g x = { 'f (f x) };
+        res / on get -> <f str>;
+    "#;
+
+    assert!(matches!(
+        eval_check(code)
+            .expect_err(format!("expected error evaluating: {}", code).as_str())
+            .downcast_ref::<errors::Error>()
+            .expect("expected compiler error")
+            .kind,
+        errors::Kind::InvalidType
+    ));
 
     Ok(())
 }
