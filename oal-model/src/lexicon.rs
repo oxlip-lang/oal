@@ -1,6 +1,6 @@
 use crate::locator::Locator;
 use crate::span::Span;
-use chumsky::{prelude::*, Stream};
+use chumsky::Stream;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use string_interner::{DefaultSymbol, StringInterner};
@@ -25,7 +25,6 @@ pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug {
     fn kind(&self) -> Self::Kind;
     fn value(&self) -> &Self::Value;
     fn is_trivia(&self) -> bool;
-    fn internalize<I: Interner>(self, i: &mut I) -> Self;
 }
 
 pub type TokenIdx = generational_token_list::ItemToken;
@@ -57,7 +56,7 @@ impl<L: Lexeme> Display for TokenAlias<L> {
     }
 }
 
-type ListArena<L> = generational_token_list::GenerationalTokenList<(L, Span)>;
+type ListArena<L> = generational_token_list::GenerationalTokenList<TokenSpan<L>>;
 
 #[derive(Debug)]
 pub struct TokenList<L: Lexeme> {
@@ -101,7 +100,7 @@ where
     }
 
     pub fn len(&self) -> usize {
-        self.list.tail().map_or(0, |(_, r)| r.end() + 1)
+        self.list.tail().map_or(0, |(_, r)| r.end())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -129,40 +128,23 @@ where
 }
 
 /// The tokenizer error type.
-pub type ParserError = Simple<char, Span>;
+#[derive(Debug)]
+pub struct ParserError(Span);
 
-/// Parse a string of characters, yielding a list of tokens.
-pub fn tokenize<L, I, P>(
-    loc: Locator,
-    input: I,
-    lexer: P,
-) -> (Option<TokenList<L>>, Vec<ParserError>)
-where
-    L: Lexeme,
-    I: AsRef<str>,
-    P: Parser<char, Vec<TokenSpan<L>>, Error = ParserError>,
-{
-    let len = input.as_ref().len();
-    let iter = input
-        .as_ref()
-        .chars()
-        .enumerate()
-        .map(|(i, c)| (c, Span::new(loc.clone(), i..i + 1)));
-    let stream = Stream::from_iter(Span::new(loc.clone(), len..len + 1), iter);
+impl ParserError {
+    pub fn new(span: Span) -> Self {
+        ParserError(span)
+    }
 
-    let (tokens, errs) = lexer.parse_recovery(stream);
-
-    let token_list = tokens.map(|tokens| {
-        // Note: Chumsky does not support stateful combinators at the moment.
-        // Therefore we need a second pass over the vector of tokens to
-        // internalize the strings and build the index list.
-        let mut token_list = TokenList::<L>::new(loc.clone());
-        for (token, span) in tokens {
-            let intern_token = token.internalize(&mut token_list);
-            token_list.push((intern_token, span));
-        }
-        token_list
-    });
-
-    (token_list, errs)
+    pub fn span(&self) -> Span {
+        self.0.clone()
+    }
 }
+
+impl Display for ParserError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error at {:?}", self.0)
+    }
+}
+
+impl std::error::Error for ParserError {}

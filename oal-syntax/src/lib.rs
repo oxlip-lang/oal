@@ -9,15 +9,14 @@ mod tests;
 use crate::errors::Error;
 use crate::parser::Gram;
 use oal_model::grammar::{analyze, Core, SyntaxTree};
-use oal_model::lexicon::tokenize;
 use oal_model::locator::Locator;
 
-/// Perform lexical and syntax analysis, yielding a concrete syntax tree.
+/// Performs lexical and syntax analysis, yields a concrete syntax tree.
 pub fn parse<I: AsRef<str>, T: Core>(
     loc: Locator,
     input: I,
 ) -> (Option<SyntaxTree<T, Gram>>, Vec<Error>) {
-    let (tokens, lex_errs) = tokenize(loc, input, lexer::lexer());
+    let (tokens, lex_errs) = crate::lexer::tokenize(loc, input.as_ref());
     let errs = lex_errs.into_iter().map(Error::from);
     if let Some(tokens) = tokens {
         let (tree, syn_errs) = analyze::<_, _, T>(tokens, parser::parser());

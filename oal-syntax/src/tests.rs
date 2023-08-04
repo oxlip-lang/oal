@@ -5,6 +5,7 @@ use super::parser::{
     Variable, VariadicOp,
 };
 use crate::atom;
+use crate::parser::{ContentTagKind, LiteralKind, PrimitiveKind};
 use oal_model::grammar::{AbstractSyntaxNode, NodeRef};
 use oal_model::locator::Locator;
 
@@ -38,9 +39,9 @@ fn assert_term(n: NRef) -> NRef {
     term.inner()
 }
 
-fn assert_prim(n: NRef, kind: lex::Primitive) -> Primitive<()> {
+fn assert_prim(n: NRef, kind: PrimitiveKind) -> Primitive<()> {
     let prim = Primitive::cast(n).expect("expected a primitive");
-    assert_eq!(prim.primitive(), kind, "expected a type {:#?}", kind);
+    assert_eq!(prim.kind(), kind, "expected a type {:#?}", kind);
     prim
 }
 
@@ -73,7 +74,7 @@ fn assert_lit(n: NRef) -> Literal<()> {
 fn parse_decl_primitive() {
     parse("let a = num;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
-        assert_prim(rhs, lex::Primitive::Num);
+        assert_prim(rhs, PrimitiveKind::Num);
     })
 }
 
@@ -98,7 +99,7 @@ fn parse_decl_array() {
     parse("let a = [str];", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
         let arr = Array::cast(rhs).expect("expected an array");
-        assert_prim(assert_term(arr.inner()), lex::Primitive::Str);
+        assert_prim(assert_term(arr.inner()), PrimitiveKind::Str);
     })
 }
 
@@ -129,7 +130,7 @@ fn parse_decl_uri() {
 
         let prop = assert_next_path_var(segs);
         assert_eq!(prop.name(), "y");
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Str);
 
         assert_eq!(assert_next_path_elem(segs).as_str(), "z");
 
@@ -138,11 +139,11 @@ fn parse_decl_uri() {
 
         let prop = assert_next_prop(props);
         assert_eq!(prop.name(), "q");
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Str);
 
         let prop = assert_next_prop(props);
         assert_eq!(prop.name(), "n");
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Num);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Num);
     })
 }
 
@@ -169,7 +170,7 @@ fn parse_decl_transfer() {
 
         let prop = assert_next_prop(props);
         assert_eq!(prop.name(), "q");
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Str);
 
         assert!(xfer.domain().is_some(), "expected a domain");
         assert_term(xfer.range());
@@ -195,21 +196,21 @@ fn parse_decl_property() {
             Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
         assert_eq!(prop.name(), "q");
         assert_eq!(prop.required(), None);
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Str);
     });
     parse("let a = 'q? str;", |p: Prog| {
         let prop =
             Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
         assert_eq!(prop.name(), "q");
         assert_eq!(prop.required(), Some(false));
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Str);
     });
     parse("let a = 'q! str;", |p: Prog| {
         let prop =
             Property::cast(assert_term(assert_decl(p, "a").rhs())).expect("expected a property");
         assert_eq!(prop.name(), "q");
         assert_eq!(prop.required(), Some(true));
-        assert_prim(assert_term(prop.rhs()), lex::Primitive::Str);
+        assert_prim(assert_term(prop.rhs()), PrimitiveKind::Str);
     })
 }
 
@@ -217,13 +218,13 @@ fn parse_decl_property() {
 fn parse_decl_number() {
     parse("let a = 404;", |p: Prog| {
         let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
-        assert_eq!(lit.kind(), lex::Literal::Number);
+        assert_eq!(lit.kind(), LiteralKind::Number);
         let lex::TokenValue::Number(num) = lit.value() else { panic!("expected a number") };
         assert_eq!(*num, 404);
     });
     parse("let a = 4XX;", |p: Prog| {
         let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
-        assert_eq!(lit.kind(), lex::Literal::HttpStatus);
+        assert_eq!(lit.kind(), LiteralKind::HttpStatus);
         let lex::TokenValue::HttpStatus(status) = lit.value() else { panic!("expected a status") };
         assert_eq!(
             *status,
@@ -236,7 +237,7 @@ fn parse_decl_number() {
 fn parse_decl_string() {
     parse(r#"let a = "application/json";"#, |p: Prog| {
         let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
-        assert_eq!(lit.kind(), lex::Literal::String);
+        assert_eq!(lit.kind(), LiteralKind::String);
         assert_eq!(lit.as_str(), "application/json");
     })
 }
@@ -311,16 +312,16 @@ fn parse_decl_content() {
             let metas = &mut cnt.meta().expect("expected meta list");
 
             let meta = metas.next().expect("expected meta");
-            assert_eq!(meta.tag(), lex::Content::Media);
+            assert_eq!(meta.kind(), ContentTagKind::Media);
             assert_eq!(assert_term(meta.rhs()).as_str(), "application/json");
 
             let meta = metas.next().expect("expected meta");
-            assert_eq!(meta.tag(), lex::Content::Status);
+            assert_eq!(meta.kind(), ContentTagKind::Status);
             let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
             assert_eq!(*num, 200);
 
             let meta = metas.next().expect("expected meta");
-            assert_eq!(meta.tag(), lex::Content::Headers);
+            assert_eq!(meta.kind(), ContentTagKind::Headers);
             Object::cast(assert_term(meta.rhs())).expect("expected an object");
 
             assert!(metas.next().is_none());
@@ -334,7 +335,7 @@ fn parse_decl_content() {
 
         let metas = &mut cnt.meta().expect("expected meta list");
         let meta = metas.next().expect("expected meta");
-        assert_eq!(meta.tag(), lex::Content::Status);
+        assert_eq!(meta.kind(), ContentTagKind::Status);
         let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
         assert_eq!(*num, 204);
 
@@ -364,7 +365,7 @@ fn parse_decl_lambda() {
         let decl = assert_decl(p, "f");
         let bindings: Vec<_> = decl.bindings().map(|b| b.ident()).collect();
         assert_eq!(bindings, vec!["x", "y", "z"]);
-        assert_prim(assert_term(decl.rhs()), lex::Primitive::Num);
+        assert_prim(assert_term(decl.rhs()), PrimitiveKind::Num);
     })
 }
 
@@ -379,13 +380,13 @@ fn parse_decl_application() {
         let arguments = &mut app.arguments();
         assert_prim(
             arguments.next().expect("expected an argument").inner(),
-            lex::Primitive::Num,
+            PrimitiveKind::Num,
         );
         Object::cast(arguments.next().expect("expected an argument").inner())
             .expect("expected an object");
         assert_prim(
             arguments.next().expect("expected an argument").inner(),
-            lex::Primitive::Uri,
+            PrimitiveKind::Uri,
         );
         assert!(arguments.next().is_none(), "expected no more argument");
     })
@@ -403,11 +404,11 @@ fn parse_decl_variadic_op() {
         Object::cast(assert_term(opds.next().expect("expected operand"))).expect("expected object");
         assert_prim(
             assert_term(opds.next().expect("expected operand")),
-            lex::Primitive::Uri,
+            PrimitiveKind::Uri,
         );
         assert_prim(
             assert_term(opds.next().expect("expected operand")),
-            lex::Primitive::Bool,
+            PrimitiveKind::Bool,
         );
         assert!(opds.next().is_none(), "expected no more operand");
     })
@@ -554,7 +555,7 @@ fn parse_grammar_error() {
 #[test]
 fn parse_lexicon_error() {
     let loc = Locator::try_from("file:///test.oal").unwrap();
-    let (_tree, mut errs) = crate::parse::<_, ()>(loc, "*** / ( get -> );");
+    let (_tree, mut errs) = crate::parse::<_, ()>(loc, "* / ( get -> );");
     assert_eq!(errs.len(), 2, "expected two errors");
     assert!(
         matches!(errs.pop().unwrap(), crate::errors::Error::Grammar(_)),

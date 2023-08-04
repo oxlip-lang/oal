@@ -1,108 +1,225 @@
+use logos::Logos;
+use oal_model::lexicon::{Intern, Interner, Lexeme, ParserError, Symbol, TokenList};
+use oal_model::locator::Locator;
+use oal_model::span::Span;
+
 use crate::atom;
-use chumsky::prelude::*;
-use oal_model::lexicon::*;
-use std::fmt::Debug;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Primitive {
-    Num,
-    Str,
-    Uri,
-    Bool,
-    Int,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Content {
-    Media,
-    Headers,
-    Status,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Keyword {
-    Method(atom::Method),
-    Primitive(Primitive),
-    Content(Content),
-    Let,
-    Res,
-    Use,
-    Rec,
-    On,
-    As,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Control {
-    BraceLeft,
-    BraceRight,
-    ParenLeft,
-    ParenRight,
-    BracketLeft,
-    BracketRight,
-    ChevronLeft,
-    ChevronRight,
-    Semicolon,
-    Comma,
-    FullStop,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Operator {
-    Equal,
-    Colon,
-    DoubleColon,
-    QuestionMark,
-    ExclamationMark,
-    Arrow,
-    Ampersand,
-    Tilde,
-    VerticalBar,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum PathElement {
-    Root,
-    Segment,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Literal {
-    HttpStatus,
-    Number,
-    String,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Comment {
-    Line,
-    Block,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Annotation {
-    Line,
-    Inline,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Identifier {
-    Value,
-    Reference,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Logos, Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[logos(subpattern ident = r"[0-9a-zA-Z$_-]")]
 pub enum TokenKind {
+    #[regex(r"[ \t\r\n]+")]
     Space,
+    #[regex(r"//[^\r\n]*[\r\n]*")]
+    CommentLine,
+    #[regex(r"/\*([^*]|\*[^/])*\*/")]
+    CommentBlock,
+    #[token("num")]
+    PrimitiveNum,
+    #[token("str")]
+    PrimitiveStr,
+    #[token("uri")]
+    PrimitiveUri,
+    #[token("bool")]
+    PrimitiveBool,
+    #[token("int")]
+    PrimitiveInt,
+    #[token("/")]
+    PathElementRoot,
+    #[regex("/[0-9a-zA-Z%~_.-]+")]
+    PathElementSegment,
+    #[token("get")]
+    MethodGet,
+    #[token("put")]
+    MethodPut,
+    #[token("post")]
+    MethodPost,
+    #[token("patch")]
+    MethodPatch,
+    #[token("delete")]
+    MethodDelete,
+    #[token("options")]
+    MethodOptions,
+    #[token("head")]
+    MethodHead,
+    #[token("media")]
+    ContentMedia,
+    #[token("headers")]
+    ContentHeaders,
+    #[token("status")]
+    ContentStatus,
+    #[token("let")]
+    KeywordLet,
+    #[token("res")]
+    KeywordRes,
+    #[token("use")]
+    KeywordUse,
+    #[token("as")]
+    KeywordAs,
+    #[token("on")]
+    KeywordOn,
+    #[token("rec")]
+    KeywordRec,
+    #[regex("[a-zA-Z_](?&ident)*")]
+    IdentifierValue,
+    #[regex("@(?&ident)+")]
+    IdentifierReference,
+    #[regex("[0-9]+")]
+    LiteralNumber,
+    #[regex("\"[^\"]*\"")]
+    LiteralString,
+    #[regex("[1-5]XX")]
+    LiteralHttpStatus,
+    #[regex("'[0-9a-zA-Z$@_-]+")]
     Property,
-    PathElement(PathElement),
-    Comment(Comment),
-    Annotation(Annotation),
-    Identifier(Identifier),
-    Keyword(Keyword),
-    Literal(Literal),
-    Control(Control),
-    Operator(Operator),
+    #[token("{")]
+    ControlBraceLeft,
+    #[token("}")]
+    ControlBraceRight,
+    #[token("(")]
+    ControlParenLeft,
+    #[token(")")]
+    ControlParenRight,
+    #[token("[")]
+    ControlBracketLeft,
+    #[token("]")]
+    ControlBracketRight,
+    #[token("<")]
+    ControlChevronLeft,
+    #[token(">")]
+    ControlChevronRight,
+    #[token(";")]
+    ControlSemicolon,
+    #[token(".")]
+    ControlFullStop,
+    #[token(",")]
+    ControlComma,
+    #[token("!")]
+    OperatorExclamationMark,
+    #[token("?")]
+    OperatorQuestionMark,
+    #[token("&")]
+    OperatorAmpersand,
+    #[token("~")]
+    OperatorTilde,
+    #[token("|")]
+    OperatorVerticalBar,
+    #[token("=")]
+    OperatorEqual,
+    #[token(":")]
+    OperatorColon,
+    #[token("::")]
+    OperatorDoubleColon,
+    #[token("->")]
+    OperatorArrow,
+    #[regex(r"#[^\r\n]*[\r\n]*")]
+    AnnotationLine,
+    #[regex("`[^`]*`")]
+    AnnotationInline,
+}
+
+#[test]
+fn test_lexer() {
+    let cases = [
+        ("// comment", TokenKind::CommentLine),
+        ("/* comment */", TokenKind::CommentBlock),
+        ("\"string\"", TokenKind::LiteralString),
+        ("499", TokenKind::LiteralNumber),
+        ("4XX", TokenKind::LiteralHttpStatus),
+        ("'prop", TokenKind::Property),
+        ("@ref", TokenKind::IdentifierReference),
+        ("val", TokenKind::IdentifierValue),
+        (" \t\r\n", TokenKind::Space),
+        ("`annotation`", TokenKind::AnnotationInline),
+        ("# annotation", TokenKind::AnnotationLine),
+        ("/", TokenKind::PathElementRoot),
+        ("/abc", TokenKind::PathElementSegment),
+    ];
+
+    for (input, token) in cases {
+        let mut lex = TokenKind::lexer(input);
+        let t = lex
+            .next()
+            .expect("should return a result")
+            .expect("should match a token");
+        assert_eq!(t, token);
+        assert_eq!(
+            lex.slice().len(),
+            input.len(),
+            "input not fully matched: {:?}",
+            input
+        );
+    }
+}
+
+// TODO: check if we need those predicates
+impl TokenKind {
+    pub fn is_comment(&self) -> bool {
+        matches!(self, TokenKind::CommentLine | TokenKind::CommentBlock)
+    }
+    pub fn is_trivia(&self) -> bool {
+        self.is_comment() || *self == TokenKind::Space
+    }
+    pub fn is_identifier(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::IdentifierReference | TokenKind::IdentifierValue
+        )
+    }
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::PrimitiveBool
+                | TokenKind::PrimitiveInt
+                | TokenKind::PrimitiveNum
+                | TokenKind::PrimitiveStr
+                | TokenKind::PrimitiveUri
+        )
+    }
+    pub fn is_path_element(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::PathElementRoot | TokenKind::PathElementSegment
+        )
+    }
+    pub fn is_method(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::MethodGet
+                | TokenKind::MethodPut
+                | TokenKind::MethodPost
+                | TokenKind::MethodPatch
+                | TokenKind::MethodDelete
+                | TokenKind::MethodOptions
+                | TokenKind::MethodHead
+        )
+    }
+    pub fn is_literal(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::LiteralHttpStatus | TokenKind::LiteralNumber | TokenKind::LiteralString
+        )
+    }
+    pub fn is_content(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::ContentHeaders | TokenKind::ContentMedia | TokenKind::ContentStatus
+        )
+    }
+    pub fn is_operator(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::OperatorExclamationMark
+                | TokenKind::OperatorQuestionMark
+                | TokenKind::OperatorAmpersand
+                | TokenKind::OperatorTilde
+                | TokenKind::OperatorVerticalBar
+                | TokenKind::OperatorEqual
+                | TokenKind::OperatorColon
+                | TokenKind::OperatorDoubleColon
+                | TokenKind::OperatorArrow
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -110,7 +227,6 @@ pub enum TokenValue {
     None,
     HttpStatus(atom::HttpStatus),
     Number(u64),
-    String(String),
     Symbol(Symbol),
 }
 
@@ -118,21 +234,20 @@ impl Intern for TokenValue {
     fn copy<I: Interner>(&self, from: &I, to: &mut I) -> Self {
         match self {
             TokenValue::Symbol(sym) => TokenValue::Symbol(to.register(from.resolve(*sym))),
-            TokenValue::String(s) => TokenValue::String(s.clone()),
-            TokenValue::Number(n) => TokenValue::Number(*n),
-            TokenValue::HttpStatus(s) => TokenValue::HttpStatus(*s),
-            TokenValue::None => TokenValue::None,
+            v => v.clone(),
         }
     }
 
     fn as_str<'a, I: Interner>(&'a self, from: &'a I) -> &'a str {
         match self {
-            TokenValue::String(str) => str.as_str(),
             TokenValue::Symbol(sym) => from.resolve(*sym),
             _ => panic!("not a string"),
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct TokenIdx;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Token(TokenKind, TokenValue);
@@ -154,228 +269,113 @@ impl Lexeme for Token {
     }
 
     fn is_trivia(&self) -> bool {
-        matches!(self.0, TokenKind::Space | TokenKind::Comment(_))
-    }
-
-    fn internalize<I: Interner>(self, i: &mut I) -> Self {
-        let value = match self.1 {
-            TokenValue::String(s) => TokenValue::Symbol(i.register(s)),
-            v => v,
-        };
-        Self::new(self.0, value)
+        self.0.is_trivia()
     }
 }
 
-pub fn lexer() -> impl Parser<char, Vec<TokenSpan<Token>>, Error = ParserError> {
-    let ident_chars =
-        filter(|c: &char| c.is_ascii_alphanumeric() || *c == '$' || *c == '-' || *c == '_')
-            .repeated();
+pub type TokenAlias = (TokenKind, TokenIdx);
 
-    let val_ident = filter(|c: &char| c.is_ascii_alphabetic() || *c == '_')
-        .chain(ident_chars)
-        .collect::<String>()
-        .map(|i| {
-            Token::new(
-                TokenKind::Identifier(Identifier::Value),
-                TokenValue::String(i),
-            )
-        });
+fn parse_http_status(input: &str) -> atom::HttpStatus {
+    let r = match input.chars().next().expect("should not be empty") {
+        '1' => atom::HttpStatusRange::Info,
+        '2' => atom::HttpStatusRange::Success,
+        '3' => atom::HttpStatusRange::Redirect,
+        '4' => atom::HttpStatusRange::ClientError,
+        '5' => atom::HttpStatusRange::ServerError,
+        _ => unreachable!("should be a valid http range"),
+    };
+    atom::HttpStatus::Range(r)
+}
 
-    let ref_ident = just('@')
-        .chain(ident_chars.at_least(1))
-        .collect::<String>()
-        .map(|i| {
-            Token::new(
-                TokenKind::Identifier(Identifier::Reference),
-                TokenValue::String(i),
-            )
-        });
+#[test]
+fn test_parse_http_status() {
+    assert_eq!(
+        parse_http_status("4XX"),
+        atom::HttpStatus::Range(atom::HttpStatusRange::ClientError)
+    );
+}
 
-    let ident = val_ident.or(ref_ident);
+fn parse_number(input: &str) -> u64 {
+    input.parse().expect("should be an unsigned integer")
+}
 
-    let keyword = text::ident()
-        .try_map(|k: String, span| match k.as_str() {
-            "let" => Ok(Keyword::Let),
-            "res" => Ok(Keyword::Res),
-            "use" => Ok(Keyword::Use),
-            "rec" => Ok(Keyword::Rec),
-            "on" => Ok(Keyword::On),
-            "as" => Ok(Keyword::As),
-            "num" => Ok(Keyword::Primitive(Primitive::Num)),
-            "str" => Ok(Keyword::Primitive(Primitive::Str)),
-            "uri" => Ok(Keyword::Primitive(Primitive::Uri)),
-            "bool" => Ok(Keyword::Primitive(Primitive::Bool)),
-            "int" => Ok(Keyword::Primitive(Primitive::Int)),
-            "get" => Ok(Keyword::Method(atom::Method::Get)),
-            "put" => Ok(Keyword::Method(atom::Method::Put)),
-            "post" => Ok(Keyword::Method(atom::Method::Post)),
-            "patch" => Ok(Keyword::Method(atom::Method::Patch)),
-            "delete" => Ok(Keyword::Method(atom::Method::Delete)),
-            "options" => Ok(Keyword::Method(atom::Method::Options)),
-            "head" => Ok(Keyword::Method(atom::Method::Head)),
-            "media" => Ok(Keyword::Content(Content::Media)),
-            "headers" => Ok(Keyword::Content(Content::Headers)),
-            "status" => Ok(Keyword::Content(Content::Status)),
-            _ => Err(Simple::custom(span, "not a keyword")),
-        })
-        .map(|k| Token::new(TokenKind::Keyword(k), TokenValue::None));
+fn parse_quoted_string(input: &str) -> &str {
+    let len = input.len();
+    assert!(len >= 2, "should be a quoted string");
+    &input[1..len - 1]
+}
 
-    let property = just('\'')
-        .ignore_then(
-            filter(|c: &char| {
-                c.is_ascii_alphanumeric() || *c == '$' || *c == '-' || *c == '_' || *c == '@'
-            })
-            .repeated()
-            .at_least(1),
-        )
-        .collect::<String>()
-        .map(|p| Token::new(TokenKind::Property, TokenValue::String(p)));
+#[test]
+fn test_parse_quoted_string() {
+    assert_eq!(parse_quoted_string("\"string\""), "string");
+    assert_eq!(parse_quoted_string("`string`"), "string");
+}
 
-    let http_status_range = one_of("12345")
-        .then_ignore(just("XX"))
-        .map(|c| match c {
-            '1' => atom::HttpStatusRange::Info,
-            '2' => atom::HttpStatusRange::Success,
-            '3' => atom::HttpStatusRange::Redirect,
-            '4' => atom::HttpStatusRange::ClientError,
-            '5' => atom::HttpStatusRange::ServerError,
-            _ => unreachable!(),
-        })
-        .map(|r| {
-            Token::new(
-                TokenKind::Literal(Literal::HttpStatus),
-                TokenValue::HttpStatus(atom::HttpStatus::Range(r)),
-            )
-        });
+fn parse_prefixed_string(input: &str) -> &str {
+    assert!(!input.is_empty(), "should be a prefixed string");
+    &input[1..]
+}
 
-    let literal_number = text::int(10).map(|n: String| {
-        Token::new(
-            TokenKind::Literal(Literal::Number),
-            TokenValue::Number(n.parse().unwrap()),
-        )
-    });
+#[test]
+fn test_prefixed_string() {
+    assert_eq!(parse_prefixed_string("# annotation"), " annotation");
+    assert_eq!(parse_prefixed_string("/segment"), "segment");
+    assert_eq!(parse_prefixed_string("'prop"), "prop");
+}
 
-    let literal_string = just('"')
-        .ignore_then(filter(|c| *c != '"').repeated())
-        .then_ignore(just('"'))
-        .collect()
-        .map(|s| Token::new(TokenKind::Literal(Literal::String), TokenValue::String(s)));
+/// Parses a string of characters, yields a list of tokens and/or errors.
+pub fn tokenize(loc: Locator, input: &str) -> (Option<TokenList<Token>>, Vec<ParserError>) {
+    let lexer = TokenKind::lexer(input).spanned();
+    let mut list = TokenList::new(loc.clone());
+    let mut errors = Vec::new();
 
-    let path_element = just('/')
-        .ignore_then(
-            filter(|c: &char| {
-                c.is_ascii_alphanumeric()
-                    || *c == '-'
-                    || *c == '.'
-                    || *c == '_'
-                    || *c == '~'
-                    || *c == '%'
-            })
-            .repeated(),
-        )
-        .collect::<String>()
-        .map(|p| {
-            if p.is_empty() {
-                Token::new(TokenKind::PathElement(PathElement::Root), TokenValue::None)
-            } else {
-                Token::new(
-                    TokenKind::PathElement(PathElement::Segment),
-                    TokenValue::String(p),
-                )
+    for (result, range) in lexer {
+        let span = Span::new(loc.clone(), range.clone());
+        match result {
+            Ok(kind) => {
+                let slice = &input[range];
+                let value = match kind {
+                    TokenKind::LiteralNumber => TokenValue::Number(parse_number(slice)),
+                    TokenKind::LiteralString => {
+                        TokenValue::Symbol(list.register(parse_quoted_string(slice)))
+                    }
+                    TokenKind::LiteralHttpStatus => {
+                        TokenValue::HttpStatus(parse_http_status(slice))
+                    }
+                    TokenKind::AnnotationLine => {
+                        TokenValue::Symbol(list.register(parse_prefixed_string(slice)))
+                    }
+                    TokenKind::AnnotationInline => {
+                        TokenValue::Symbol(list.register(parse_quoted_string(slice)))
+                    }
+                    TokenKind::IdentifierReference => TokenValue::Symbol(list.register(slice)),
+                    TokenKind::IdentifierValue => TokenValue::Symbol(list.register(slice)),
+                    TokenKind::PathElementSegment => {
+                        TokenValue::Symbol(list.register(parse_prefixed_string(slice)))
+                    }
+                    TokenKind::Property => {
+                        TokenValue::Symbol(list.register(parse_prefixed_string(slice)))
+                    }
+                    TokenKind::Space => TokenValue::Symbol(list.register(slice)),
+                    _ => TokenValue::None,
+                };
+                let token = Token(kind, value);
+                list.push((token, span));
             }
-        });
-
-    let literal = literal_string.or(http_status_range).or(literal_number);
-
-    let operator = just("->")
-        .to(Operator::Arrow)
-        .or(just("::").to(Operator::DoubleColon))
-        .or(just('?').to(Operator::QuestionMark))
-        .or(just('!').to(Operator::ExclamationMark))
-        .or(just(':').to(Operator::Colon))
-        .or(just('=').to(Operator::Equal))
-        .or(just('&').to(Operator::Ampersand))
-        .or(just('~').to(Operator::Tilde))
-        .or(just('|').to(Operator::VerticalBar))
-        .map(|p| Token::new(TokenKind::Operator(p), TokenValue::None));
-
-    let control = select! {
-        '{' => Control::BraceLeft,
-        '}' => Control::BraceRight,
-        '(' => Control::ParenLeft,
-        ')' => Control::ParenRight,
-        '[' => Control::BracketLeft,
-        ']' => Control::BracketRight,
-        '<' => Control::ChevronLeft,
-        '>' => Control::ChevronRight,
-        ';' => Control::Semicolon,
-        ',' => Control::Comma,
-        '.' => Control::FullStop,
+            Err(_) => errors.push(ParserError::new(span)),
+        }
     }
-    .map(|c| Token::new(TokenKind::Control(c), TokenValue::None));
 
-    let space = filter(|c: &char| c.is_whitespace())
-        .repeated()
-        .at_least(1)
-        .collect::<String>()
-        .map(|s| Token::new(TokenKind::Space, TokenValue::String(s)));
+    (Some(list), errors)
+}
 
-    let newline = one_of("\r\n").repeated().at_least(1);
+#[test]
+fn test_tokenize() {
+    let loc = Locator::try_from("file:///example.oal").unwrap();
+    let input = "let @var = { 'p 100, 'p { 'p { 'p { 'p { 'p \"string\" ! }}}}};";
 
-    let line_comment = just("//")
-        .ignore_then(take_until(newline.clone()))
-        .map(|(c, n)| {
-            Token::new(
-                TokenKind::Comment(Comment::Line),
-                TokenValue::String(c.into_iter().chain(n.into_iter()).collect()),
-            )
-        });
+    let (Some(list), errors) = tokenize(loc, input) else { panic!() };
 
-    let block_comment = just("/*")
-        .ignore_then(take_until(just("*/")))
-        .map(|(c, _)| {
-            Token::new(
-                TokenKind::Comment(Comment::Block),
-                TokenValue::String(c.into_iter().collect()),
-            )
-        });
-
-    let comment = line_comment.or(block_comment);
-
-    let line_annotation = just('#').ignore_then(take_until(newline)).map(|(c, n)| {
-        Token::new(
-            TokenKind::Annotation(Annotation::Line),
-            TokenValue::String(c.into_iter().chain(n.into_iter()).collect()),
-        )
-    });
-
-    let inline_annotation = just('`')
-        .ignore_then(filter(|c| *c != '`').repeated())
-        .then_ignore(just('`'))
-        .collect()
-        .map(|a| {
-            Token::new(
-                TokenKind::Annotation(Annotation::Inline),
-                TokenValue::String(a),
-            )
-        });
-
-    let annotation = line_annotation.or(inline_annotation);
-
-    let token = space
-        .or(comment)
-        .or(annotation)
-        .or(control)
-        .or(operator)
-        .or(property)
-        .or(literal)
-        .or(path_element)
-        .or(keyword)
-        .or(ident)
-        .recover_with(skip_then_retry_until([]));
-
-    token
-        .map_with_span(|t, s| (t, s))
-        .repeated()
-        .then_ignore(end())
+    assert!(errors.is_empty());
+    assert_eq!(list.len(), input.len());
 }

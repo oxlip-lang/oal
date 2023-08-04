@@ -5,7 +5,7 @@ use crate::resolve::resolve;
 use crate::tests::mods_from;
 use crate::tree::NRef;
 use oal_model::grammar::AbstractSyntaxNode;
-use oal_syntax::lexer as lex;
+use oal_syntax::parser as syn;
 use oal_syntax::parser::{
     Application, Binding, Declaration, Primitive, Program, Terminal, Variable,
 };
@@ -50,8 +50,8 @@ fn resolve_variable() -> anyhow::Result<()> {
                 .inner()
         )
         .expect("expected a primitive")
-        .primitive(),
-        lex::Primitive::Num
+        .kind(),
+        syn::PrimitiveKind::Num
     );
 
     Ok(())

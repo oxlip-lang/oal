@@ -5,7 +5,6 @@ use crate::tree::{Core, NRef};
 use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_syntax::atom;
-use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;
 
 struct TagWrap(Tag, bool);
@@ -107,18 +106,18 @@ fn check_unary_operation(op: syn::UnaryOp<Core>) -> Result<()> {
 
 fn check_content(content: syn::Content<Core>) -> Result<()> {
     for meta in content.meta().into_iter().flatten() {
-        match meta.tag() {
-            lex::Content::Media => {
+        match meta.kind() {
+            syn::ContentTagKind::Media => {
                 if !get_tag(meta.rhs()).is_text() {
                     return Err(Error::new(Kind::InvalidType, "ill-formed media").with(&meta));
                 }
             }
-            lex::Content::Headers => {
+            syn::ContentTagKind::Headers => {
                 if !get_tag(meta.rhs()).is_schema() {
                     return Err(Error::new(Kind::InvalidType, "ill-formed headers").with(&meta));
                 }
             }
-            lex::Content::Status => {
+            syn::ContentTagKind::Status => {
                 if !get_tag(meta.rhs()).is_status_like() {
                     return Err(Error::new(Kind::InvalidType, "ill-formed status").with(&meta));
                 }

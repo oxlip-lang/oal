@@ -486,10 +486,10 @@ pub fn eval_content<'a>(
     let mut headers = None;
     for meta in content.meta().into_iter().flatten() {
         let rhs = eval_any(ctx, meta.rhs(), AnnRef::default())?;
-        match meta.tag() {
-            lex::Content::Media => media = Some(cast_string(rhs)),
-            lex::Content::Headers => headers = Some(cast_object(rhs)),
-            lex::Content::Status => {
+        match meta.kind() {
+            syn::ContentTagKind::Media => media = Some(cast_string(rhs)),
+            syn::ContentTagKind::Headers => headers = Some(cast_object(rhs)),
+            syn::ContentTagKind::Status => {
                 let s = cast_http_status(rhs).map_err(|_| {
                     Error::new(Kind::InvalidLiteral, "not a valid HTTP status")
                         .at(meta.rhs().span())
@@ -571,17 +571,17 @@ pub fn eval_literal<'a>(
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
     let expr = match literal.kind() {
-        lex::Literal::HttpStatus => {
+        syn::LiteralKind::HttpStatus => {
             let lex::TokenValue::HttpStatus(status) = literal.value()
                 else { panic!("expected an HTTP status") };
             Expr::HttpStatus(*status)
         }
-        lex::Literal::Number => {
+        syn::LiteralKind::Number => {
             let lex::TokenValue::Number(number) = literal.value()
                 else { panic!("expected a number") };
             Expr::Number(*number)
         }
-        lex::Literal::String => {
+        syn::LiteralKind::String => {
             let string = literal.as_str().to_owned();
             Expr::String(string)
         }
@@ -616,9 +616,9 @@ pub fn eval_primitive<'a>(
     primitive: syn::Primitive<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let expr = match primitive.primitive() {
-        lex::Primitive::Bool => Expr::PrimBoolean(Box::new(PrimBoolean {})),
-        lex::Primitive::Int => {
+    let expr = match primitive.kind() {
+        syn::PrimitiveKind::Bool => Expr::PrimBoolean(Box::new(PrimBoolean {})),
+        syn::PrimitiveKind::Int => {
             let p = PrimInteger {
                 minimum: ann.get_int("minimum"),
                 maximum: ann.get_int("maximum"),
@@ -627,7 +627,7 @@ pub fn eval_primitive<'a>(
             };
             Expr::PrimInteger(Box::new(p))
         }
-        lex::Primitive::Num => {
+        syn::PrimitiveKind::Num => {
             let p = PrimNumber {
                 minimum: ann.get_num("minimum"),
                 maximum: ann.get_num("maximum"),
@@ -636,7 +636,7 @@ pub fn eval_primitive<'a>(
             };
             Expr::PrimNumber(Box::new(p))
         }
-        lex::Primitive::Str => {
+        syn::PrimitiveKind::Str => {
             let p = PrimString {
                 pattern: ann.get_string("pattern"),
                 enumeration: ann.get_enum("enum").unwrap_or_default(),
@@ -647,7 +647,7 @@ pub fn eval_primitive<'a>(
             };
             Expr::PrimString(Box::new(p))
         }
-        lex::Primitive::Uri => {
+        syn::PrimitiveKind::Uri => {
             let p = Uri {
                 path: Vec::new(),
                 params: None,

@@ -1,5 +1,4 @@
 use crate::atom;
-use crate::lexer as lex;
 use crate::lexer::{Token, TokenKind, TokenValue};
 use chumsky::prelude::*;
 use oal_model::grammar::*;
@@ -15,7 +14,7 @@ impl Grammar for Gram {
     type Kind = SyntaxKind;
 }
 
-terminal_node!(Gram, Identifier, TokenKind::Identifier(_));
+terminal_node!(Gram, Identifier, k if k.is_identifier());
 
 impl<'a, T: Core> Identifier<'a, T> {
     pub fn ident(&self) -> atom::Ident {
@@ -23,27 +22,38 @@ impl<'a, T: Core> Identifier<'a, T> {
     }
 }
 
-terminal_node!(
-    Gram,
-    Primitive,
-    TokenKind::Keyword(lex::Keyword::Primitive(_))
-);
+terminal_node!(Gram, Primitive, k if k.is_primitive());
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum PrimitiveKind {
+    Num,
+    Str,
+    Uri,
+    Bool,
+    Int,
+}
 
 impl<'a, T: Core> Primitive<'a, T> {
-    pub fn primitive(&self) -> lex::Primitive {
-        let TokenKind::Keyword(lex::Keyword::Primitive(p)) = self.node().token().kind() else { unreachable!() };
-        p
+    pub fn kind(&self) -> PrimitiveKind {
+        match self.node().token().kind() {
+            TokenKind::PrimitiveNum => PrimitiveKind::Num,
+            TokenKind::PrimitiveStr => PrimitiveKind::Str,
+            TokenKind::PrimitiveUri => PrimitiveKind::Uri,
+            TokenKind::PrimitiveBool => PrimitiveKind::Bool,
+            TokenKind::PrimitiveInt => PrimitiveKind::Int,
+            k => unreachable!("not a literal {:?}", k),
+        }
     }
 }
 
-terminal_node!(Gram, PathElement, TokenKind::PathElement(_));
+terminal_node!(Gram, PathElement, k if k.is_path_element());
 
 impl<'a, T: Core> PathElement<'a, T> {
     pub fn as_str(&self) -> &'a str {
         match self.node().token().kind() {
             // Note that path separators are omitted from the string representation.
-            TokenKind::PathElement(lex::PathElement::Root) => "",
-            TokenKind::PathElement(lex::PathElement::Segment) => self.node().as_str(),
+            TokenKind::PathElementRoot => "",
+            TokenKind::PathElementSegment => self.node().as_str(),
             _ => unreachable!(),
         }
     }
@@ -57,21 +67,40 @@ impl<'a, T: Core> PropertyName<'a, T> {
     }
 }
 
-terminal_node!(Gram, Method, TokenKind::Keyword(lex::Keyword::Method(_)));
+terminal_node!(Gram, Method, k if k.is_method());
 
 impl<'a, T: Core> Method<'a, T> {
     pub fn method(&self) -> atom::Method {
-        let TokenKind::Keyword(lex::Keyword::Method(m)) = self.node().token().kind() else { unreachable!() };
-        m
+        match self.node().token().kind() {
+            TokenKind::MethodGet => atom::Method::Get,
+            TokenKind::MethodPut => atom::Method::Put,
+            TokenKind::MethodPost => atom::Method::Post,
+            TokenKind::MethodPatch => atom::Method::Patch,
+            TokenKind::MethodDelete => atom::Method::Delete,
+            TokenKind::MethodOptions => atom::Method::Options,
+            TokenKind::MethodHead => atom::Method::Head,
+            _ => unreachable!(),
+        }
     }
 }
 
-terminal_node!(Gram, Literal, TokenKind::Literal(_));
+terminal_node!(Gram, Literal, k if k.is_literal());
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LiteralKind {
+    HttpStatus,
+    Number,
+    String,
+}
 
 impl<'a, T: Core> Literal<'a, T> {
-    pub fn kind(&self) -> lex::Literal {
-        let TokenKind::Literal(l) = self.node().token().kind() else { unreachable!() };
-        l
+    pub fn kind(&self) -> LiteralKind {
+        match self.node().token().kind() {
+            TokenKind::LiteralHttpStatus => LiteralKind::HttpStatus,
+            TokenKind::LiteralNumber => LiteralKind::Number,
+            TokenKind::LiteralString => LiteralKind::String,
+            k => unreachable!("not a literal {:?}", k),
+        }
     }
 
     pub fn value(&self) -> &'a TokenValue {
@@ -83,57 +112,69 @@ impl<'a, T: Core> Literal<'a, T> {
     }
 }
 
-terminal_node!(
-    Gram,
-    ContentTag,
-    TokenKind::Keyword(lex::Keyword::Content(_))
-);
+terminal_node!(Gram, ContentTag, k if k.is_content());
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ContentTagKind {
+    Media,
+    Headers,
+    Status,
+}
 
 impl<'a, T: Core> ContentTag<'a, T> {
-    pub fn tag(&self) -> lex::Content {
-        let TokenKind::Keyword(lex::Keyword::Content(t)) = self.node().token().kind() else { unreachable!() };
-        t
+    pub fn kind(&self) -> ContentTagKind {
+        match self.node().token().kind() {
+            TokenKind::ContentHeaders => ContentTagKind::Headers,
+            TokenKind::ContentMedia => ContentTagKind::Media,
+            TokenKind::ContentStatus => ContentTagKind::Status,
+            k => unreachable!("not a content tag {:?}", k),
+        }
     }
 }
 
-terminal_node!(Gram, Operator, TokenKind::Operator(_));
+terminal_node!(Gram, Operator, k if k.is_operator());
 
 impl<'a, T: Core> Operator<'a, T> {
     pub fn variadic(&self) -> atom::VariadicOperator {
-        let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
-        match op {
-            lex::Operator::DoubleColon => atom::VariadicOperator::Range,
-            lex::Operator::Ampersand => atom::VariadicOperator::Join,
-            lex::Operator::Tilde => atom::VariadicOperator::Any,
-            lex::Operator::VerticalBar => atom::VariadicOperator::Sum,
-            _ => unreachable!("not a variadic operator {:?}", op),
+        match self.node().token().kind() {
+            TokenKind::OperatorDoubleColon => atom::VariadicOperator::Range,
+            TokenKind::OperatorAmpersand => atom::VariadicOperator::Join,
+            TokenKind::OperatorTilde => atom::VariadicOperator::Any,
+            TokenKind::OperatorVerticalBar => atom::VariadicOperator::Sum,
+            op => unreachable!("not a variadic operator {:?}", op),
         }
     }
 
     pub fn unary(&self) -> atom::UnaryOperator {
-        let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
-        match op {
-            lex::Operator::ExclamationMark => atom::UnaryOperator::Required,
-            lex::Operator::QuestionMark => atom::UnaryOperator::Optional,
-            _ => unreachable!("not an unary operator {:?}", op),
+        match self.node().token().kind() {
+            TokenKind::OperatorExclamationMark => atom::UnaryOperator::Required,
+            TokenKind::OperatorQuestionMark => atom::UnaryOperator::Optional,
+            op => unreachable!("not an unary operator {:?}", op),
         }
     }
 }
 
-terminal_node!(Gram, OptionMark, TokenKind::Operator(_));
+terminal_node!(
+    Gram,
+    OptionMark,
+    TokenKind::OperatorExclamationMark | TokenKind::OperatorQuestionMark
+);
 
 impl<'a, T: Core> OptionMark<'a, T> {
     pub fn required(&self) -> bool {
-        let TokenKind::Operator(op) = self.node().token().kind() else { unreachable!() };
-        match op {
-            lex::Operator::ExclamationMark => true,
-            lex::Operator::QuestionMark => false,
-            _ => unreachable!("not an option mark {:?}", op),
+        match self.node().token().kind() {
+            TokenKind::OperatorExclamationMark => true,
+            TokenKind::OperatorQuestionMark => false,
+            op => unreachable!("not an option mark {:?}", op),
         }
     }
 }
 
-terminal_node!(Gram, Annotation, TokenKind::Annotation(_));
+terminal_node!(
+    Gram,
+    Annotation,
+    TokenKind::AnnotationLine | TokenKind::AnnotationInline
+);
 
 impl<'a, T: Core> Annotation<'a, T> {
     pub fn as_str(&self) -> &'a str {
@@ -519,10 +560,10 @@ impl<'a, T: Core> ContentMeta<'a, T> {
     const TAG_POS: usize = 0;
     const RHS_POS: usize = 2;
 
-    pub fn tag(&self) -> lex::Content {
+    pub fn kind(&self) -> ContentTagKind {
         ContentTag::cast(self.node().nth(Self::TAG_POS))
             .expect("expected content tag")
-            .tag()
+            .kind()
     }
 
     pub fn rhs(&self) -> NodeRef<'a, T, Gram> {
@@ -617,7 +658,7 @@ impl<'a, T: Core> SubExpression<'a, T> {
 }
 
 fn variadic_op<'a, P, E>(
-    op: lex::Operator,
+    op: TokenKind,
     p: P,
 ) -> impl Parser<TokenAlias<Token>, ParseNode<Gram>, Error = E> + Clone + 'a
 where
@@ -625,33 +666,39 @@ where
     E: chumsky::Error<TokenAlias<Token>> + 'a,
 {
     tree_skip(
-        p.clone().chain(
-            just_token(TokenKind::Operator(op))
-                .chain(p)
-                .repeated()
-                .flatten(),
-        ),
+        p.clone()
+            .chain(just_token(op).chain(p).repeated().flatten()),
         SyntaxKind::VariadicOp,
     )
 }
 
 pub fn parser<'a>(
 ) -> impl Parser<TokenAlias<Token>, ParseNode<Gram>, Error = ParserError<Token>> + 'a {
-    let identifier = match_token! { TokenKind::Identifier(_) };
+    let identifier = match_token! { TokenKind::IdentifierReference | TokenKind::IdentifierValue };
 
-    let literal = match_token! { TokenKind::Literal(_) };
+    let literal = match_token! { TokenKind::LiteralHttpStatus | TokenKind::LiteralNumber | TokenKind::LiteralString };
 
-    let primitive = match_token! { TokenKind::Keyword(lex::Keyword::Primitive(_)) };
+    let primitive = match_token! { TokenKind::PrimitiveBool
+    | TokenKind::PrimitiveInt
+    | TokenKind::PrimitiveNum
+    | TokenKind::PrimitiveStr
+    | TokenKind::PrimitiveUri };
 
-    let uri_root = just_token(TokenKind::PathElement(lex::PathElement::Root));
+    let uri_root = just_token(TokenKind::PathElementRoot);
 
-    let uri_segment = just_token(TokenKind::PathElement(lex::PathElement::Segment));
+    let uri_segment = just_token(TokenKind::PathElementSegment);
 
-    let method = match_token! { TokenKind::Keyword(lex::Keyword::Method(_)) };
+    let method = match_token! { TokenKind::MethodGet
+    | TokenKind::MethodPut
+    | TokenKind::MethodPost
+    | TokenKind::MethodPatch
+    | TokenKind::MethodDelete
+    | TokenKind::MethodOptions
+    | TokenKind::MethodHead };
 
     let xfer_methods = tree_many(
         method.chain(
-            just_token(TokenKind::Control(lex::Control::Comma))
+            just_token(TokenKind::ControlComma)
                 .chain(method)
                 .repeated()
                 .flatten(),
@@ -659,25 +706,22 @@ pub fn parser<'a>(
         SyntaxKind::XferMethods,
     );
 
-    let inline_annotation = just_token(TokenKind::Annotation(lex::Annotation::Inline));
+    let inline_annotation = just_token(TokenKind::AnnotationInline);
 
     let line_annotations = || {
         tree_many(
-            just_token(TokenKind::Annotation(lex::Annotation::Line)).repeated(),
+            just_token(TokenKind::AnnotationLine).repeated(),
             SyntaxKind::Annotations,
         )
     };
 
-    let binding = tree_one(
-        just_token(TokenKind::Identifier(lex::Identifier::Value)),
-        SyntaxKind::Binding,
-    );
+    let binding = tree_one(just_token(TokenKind::IdentifierValue), SyntaxKind::Binding);
 
     let expr_kind = recursive(|expr| {
         let property_list = tree_many(
             expr.clone()
                 .chain(
-                    just_token(TokenKind::Control(lex::Control::Comma))
+                    just_token(TokenKind::ControlComma)
                         .chain(expr.clone())
                         .repeated()
                         .flatten(),
@@ -688,16 +732,16 @@ pub fn parser<'a>(
         );
 
         let object = tree_many(
-            just_token(TokenKind::Control(lex::Control::BraceLeft))
+            just_token(TokenKind::ControlBraceLeft)
                 .chain(property_list)
-                .chain(just_token(TokenKind::Control(lex::Control::BraceRight))),
+                .chain(just_token(TokenKind::ControlBraceRight)),
             SyntaxKind::Object,
         );
 
         let uri_var = tree_many(
-            just_token(TokenKind::Control(lex::Control::BraceLeft))
+            just_token(TokenKind::ControlBraceLeft)
                 .chain(expr.clone())
-                .chain(just_token(TokenKind::Control(lex::Control::BraceRight))),
+                .chain(just_token(TokenKind::ControlBraceRight)),
             SyntaxKind::UriVariable,
         );
 
@@ -712,29 +756,26 @@ pub fn parser<'a>(
         );
 
         let uri_params = tree_many(
-            just_token(TokenKind::Operator(lex::Operator::QuestionMark)).chain(object.clone()),
+            just_token(TokenKind::OperatorQuestionMark).chain(object.clone()),
             SyntaxKind::UriParams,
         );
 
         let uri_template = tree_many(uri_path.chain(uri_params.or_not()), SyntaxKind::UriTemplate);
 
-        let uri_kind = just_token(TokenKind::Keyword(lex::Keyword::Primitive(
-            lex::Primitive::Uri,
-        )))
-        .or(uri_template);
+        let uri_kind = just_token(TokenKind::PrimitiveUri).or(uri_template);
 
         let array = tree_many(
-            just_token(TokenKind::Control(lex::Control::BracketLeft))
+            just_token(TokenKind::ControlBracketLeft)
                 .chain(expr.clone())
-                .chain(just_token(TokenKind::Control(lex::Control::BracketRight))),
+                .chain(just_token(TokenKind::ControlBracketRight)),
             SyntaxKind::Array,
         );
 
         let property = tree_many(
             just_token(TokenKind::Property)
                 .chain(
-                    just_token(TokenKind::Operator(lex::Operator::ExclamationMark))
-                        .or(just_token(TokenKind::Operator(lex::Operator::QuestionMark)))
+                    just_token(TokenKind::OperatorExclamationMark)
+                        .or(just_token(TokenKind::OperatorQuestionMark))
                         .or_not(),
                 )
                 .chain(expr.clone()),
@@ -742,15 +783,15 @@ pub fn parser<'a>(
         );
 
         let content_meta = tree_many(
-            match_token! { TokenKind::Keyword(lex::Keyword::Content(_)) }
-                .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
+            match_token! { TokenKind::ContentHeaders | TokenKind::ContentMedia | TokenKind::ContentStatus }
+                .chain(just_token(TokenKind::OperatorEqual))
                 .chain(expr.clone()),
             SyntaxKind::ContentMeta,
         );
 
         let content_meta_list = tree_many(
             content_meta.clone().chain(
-                just_token(TokenKind::Control(lex::Control::Comma))
+                just_token(TokenKind::ControlComma)
                     .chain(content_meta)
                     .repeated()
                     .flatten(),
@@ -761,31 +802,31 @@ pub fn parser<'a>(
         let content_body = tree_one(expr.clone(), SyntaxKind::ContentBody);
 
         let content = tree_many(
-            just_token(TokenKind::Control(lex::Control::ChevronLeft))
+            just_token(TokenKind::ControlChevronLeft)
                 .chain(
                     content_meta_list
                         .clone()
-                        .chain(just_token(TokenKind::Control(lex::Control::Comma)))
+                        .chain(just_token(TokenKind::ControlComma))
                         .chain(content_body.clone())
                         .or(content_meta_list.map(move |n| vec![n]))
                         .or(content_body.map(move |n| vec![n]))
                         .or_not()
                         .flatten(),
                 )
-                .chain(just_token(TokenKind::Control(lex::Control::ChevronRight))),
+                .chain(just_token(TokenKind::ControlChevronRight)),
             SyntaxKind::Content,
         );
 
         let subexpr = tree_many(
-            just_token(TokenKind::Control(lex::Control::ParenLeft))
+            just_token(TokenKind::ControlParenLeft)
                 .chain(expr.clone())
-                .chain(just_token(TokenKind::Control(lex::Control::ParenRight))),
+                .chain(just_token(TokenKind::ControlParenRight)),
             SyntaxKind::SubExpression,
         );
 
         let variable = tree_many(
             identifier
-                .chain(just_token(TokenKind::Control(lex::Control::FullStop)))
+                .chain(just_token(TokenKind::ControlFullStop))
                 .chain(identifier)
                 .or(identifier.map(move |n| vec![n])),
             SyntaxKind::Variable,
@@ -809,16 +850,16 @@ pub fn parser<'a>(
         );
 
         let required_kind = tree_many(
-            term_kind.clone().chain(just_token(TokenKind::Operator(
-                lex::Operator::ExclamationMark,
-            ))),
+            term_kind
+                .clone()
+                .chain(just_token(TokenKind::OperatorExclamationMark)),
             SyntaxKind::UnaryOp,
         );
 
         let optional_kind = tree_many(
             term_kind
                 .clone()
-                .chain(just_token(TokenKind::Operator(lex::Operator::QuestionMark))),
+                .chain(just_token(TokenKind::OperatorQuestionMark)),
             SyntaxKind::UnaryOp,
         );
 
@@ -831,18 +872,18 @@ pub fn parser<'a>(
 
         let apply_kind = application.or(unary_kind);
 
-        let range_kind = variadic_op(lex::Operator::DoubleColon, apply_kind);
+        let range_kind = variadic_op(TokenKind::OperatorDoubleColon, apply_kind);
 
-        let join_kind = variadic_op(lex::Operator::Ampersand, range_kind.clone());
+        let join_kind = variadic_op(TokenKind::OperatorAmpersand, range_kind.clone());
 
-        let any_kind = variadic_op(lex::Operator::Tilde, join_kind);
+        let any_kind = variadic_op(TokenKind::OperatorTilde, join_kind);
 
-        let sum_kind = variadic_op(lex::Operator::VerticalBar, any_kind);
+        let sum_kind = variadic_op(TokenKind::OperatorVerticalBar, any_kind);
 
         let xfer_params = tree_maybe(object.or_not(), SyntaxKind::XferParams);
 
         let xfer_domain = tree_many(
-            just_token(TokenKind::Operator(lex::Operator::Colon))
+            just_token(TokenKind::OperatorColon)
                 .chain(term_kind.clone())
                 .or_not()
                 .flatten(),
@@ -853,7 +894,7 @@ pub fn parser<'a>(
             xfer_methods
                 .chain(xfer_params)
                 .chain(xfer_domain)
-                .chain(just_token(TokenKind::Operator(lex::Operator::Arrow)))
+                .chain(just_token(TokenKind::OperatorArrow))
                 .chain(range_kind),
             SyntaxKind::Transfer,
         );
@@ -862,7 +903,7 @@ pub fn parser<'a>(
 
         let xfer_list = tree_many(
             expr.clone().chain(
-                just_token(TokenKind::Control(lex::Control::Comma))
+                just_token(TokenKind::ControlComma)
                     .chain(expr.clone())
                     .repeated()
                     .flatten(),
@@ -872,7 +913,7 @@ pub fn parser<'a>(
 
         let relation = tree_many(
             term_kind
-                .chain(just_token(TokenKind::Keyword(lex::Keyword::On)))
+                .chain(just_token(TokenKind::KeywordOn))
                 .chain(xfer_list),
             SyntaxKind::Relation,
         );
@@ -880,7 +921,7 @@ pub fn parser<'a>(
         let relation_kind = relation.or(xfer_kind);
 
         let recursion = tree_many(
-            just_token(TokenKind::Keyword(lex::Keyword::Rec))
+            just_token(TokenKind::KeywordRec)
                 .chain(binding.clone())
                 .chain(expr),
             SyntaxKind::Recursion,
@@ -893,24 +934,24 @@ pub fn parser<'a>(
 
     let declaration = tree_many(
         line_annotations()
-            .chain(just_token(TokenKind::Keyword(lex::Keyword::Let)))
+            .chain(just_token(TokenKind::KeywordLet))
             .chain(identifier)
             .chain(bindings)
-            .chain(just_token(TokenKind::Operator(lex::Operator::Equal)))
+            .chain(just_token(TokenKind::OperatorEqual))
             .chain(expr_kind.clone())
-            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+            .chain(just_token(TokenKind::ControlSemicolon)),
         SyntaxKind::Declaration,
     );
 
     let resource = tree_many(
-        just_token(TokenKind::Keyword(lex::Keyword::Res))
+        just_token(TokenKind::KeywordRes)
             .chain(expr_kind)
-            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+            .chain(just_token(TokenKind::ControlSemicolon)),
         SyntaxKind::Resource,
     );
 
     let qualifier = tree_many(
-        just_token(TokenKind::Keyword(lex::Keyword::As))
+        just_token(TokenKind::KeywordAs)
             .chain(identifier)
             .or_not()
             .flatten(),
@@ -918,17 +959,17 @@ pub fn parser<'a>(
     );
 
     let import = tree_many(
-        just_token(TokenKind::Keyword(lex::Keyword::Use))
-            .chain(just_token(TokenKind::Literal(lex::Literal::String)))
+        just_token(TokenKind::KeywordUse)
+            .chain(just_token(TokenKind::LiteralString))
             .chain(qualifier)
-            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+            .chain(just_token(TokenKind::ControlSemicolon)),
         SyntaxKind::Import,
     );
 
     let error = tree_many(
-        but_token(TokenKind::Control(lex::Control::Semicolon))
+        but_token(TokenKind::ControlSemicolon)
             .repeated()
-            .chain(just_token(TokenKind::Control(lex::Control::Semicolon))),
+            .chain(just_token(TokenKind::ControlSemicolon)),
         SyntaxKind::Error,
     );
 

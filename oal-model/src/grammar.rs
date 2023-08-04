@@ -503,7 +503,7 @@ macro_rules! syntax_nodes {
 
 #[macro_export]
 macro_rules! terminal_node {
-    ( $grammar:ident, $node:ident, $pat:pat  ) => {
+    ( $grammar:ident, $node:ident, $(|)? $( $pattern:pat_param )|+ $( if $guard:expr )? $(,)?  ) => {
         #[allow(dead_code)]
         #[derive(Debug)]
         pub struct $node<'a, T: Core>(NodeRef<'a, T, $grammar>);
@@ -512,7 +512,7 @@ macro_rules! terminal_node {
         impl<'a, T: Core> AbstractSyntaxNode<'a, T, $grammar> for $node<'a, T> {
             fn cast(node: NodeRef<'a, T, $grammar>) -> Option<Self> {
                 match node.syntax().trunk() {
-                    SyntaxTrunk::Leaf(t) if matches!(t.kind(), $pat) => Some(Self(node)),
+                    SyntaxTrunk::Leaf(t) if matches!(t.kind(), $( $pattern )|+ $( if $guard )?) => Some(Self(node)),
                     _ => None,
                 }
             }
