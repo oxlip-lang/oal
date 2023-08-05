@@ -15,7 +15,6 @@ categories = ["compilers"]
 oal-model = { path = "../oal-model" }
 enum-map = "2.6"
 enum-map-derive = "0.12"
-chumsky = "0.9"
 string-interner = "0.14"
 generational_token_list = "0.1"
 generational-indextree = "1.1"

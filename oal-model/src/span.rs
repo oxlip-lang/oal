@@ -36,28 +36,6 @@ impl Span {
     }
 }
 
-impl chumsky::Span for Span {
-    type Context = Locator;
-
-    type Offset = usize;
-
-    fn new(loc: Locator, range: Range<Self::Offset>) -> Self {
-        Span::new(loc, range)
-    }
-
-    fn context(&self) -> Self::Context {
-        self.loc.clone()
-    }
-
-    fn start(&self) -> Self::Offset {
-        self.start()
-    }
-
-    fn end(&self) -> Self::Offset {
-        self.end()
-    }
-}
-
 impl ariadne::Span for Span {
     type SourceId = Locator;
 

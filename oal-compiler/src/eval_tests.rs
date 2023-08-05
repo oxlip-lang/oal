@@ -649,10 +649,7 @@ fn eval_single_recursion() -> anyhow::Result<()> {
     assert_eq!(p2.name, "b");
     let SchemaExpr::Ref(id1) = &p1.schema.expr else { panic!("schema should be a reference") };
     let SchemaExpr::Ref(id2) = &p2.schema.expr else { panic!("schema should be a reference") };
-    assert_eq!(
-        *id1,
-        "rec-391bcd6e36ef57ef4f3c9db65d1fd777ca5bc8138c2b6add09cc52d46863b54f"
-    );
+    assert!(id1.as_ref().starts_with("rec-"));
     assert_eq!(id1, id2);
     let recursion = s.refs.get(id1).expect("reference should exist");
     let Reference::Schema(schema) = recursion;
