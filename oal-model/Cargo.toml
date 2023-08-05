@@ -12,7 +12,6 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
-chumsky = "0.9"
 string-interner = "0.14"
 generational_token_list = "0.1"
 generational-indextree = "1.1"

@@ -83,7 +83,7 @@ impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
             self.0.report(span, &err)?;
             Err(anyhow!("parsing failed"))
         } else {
-            Ok(tree.unwrap())
+            tree.ok_or_else(|| anyhow!("parsing failed"))
         }
     }
 

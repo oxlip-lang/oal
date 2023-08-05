@@ -151,7 +151,6 @@ fn test_lexer() {
     }
 }
 
-// TODO: check if we need those predicates
 impl TokenKind {
     pub fn is_comment(&self) -> bool {
         matches!(self, TokenKind::CommentLine | TokenKind::CommentBlock)
@@ -267,8 +266,8 @@ impl Lexeme for Token {
         &self.1
     }
 
-    fn is_trivia(&self) -> bool {
-        self.0.is_trivia()
+    fn is_trivia(kind: TokenKind) -> bool {
+        kind.is_trivia()
     }
 }
 
@@ -376,5 +375,5 @@ fn test_tokenize() {
     let (Some(list), errors) = tokenize(loc, input) else { panic!() };
 
     assert!(errors.is_empty());
-    assert_eq!(list.len(), input.len());
+    assert_eq!(list.end(), input.len());
 }

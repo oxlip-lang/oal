@@ -1,10 +1,14 @@
 use crate::atom;
 use crate::lexer::{Token, TokenKind, TokenValue};
-use chumsky::prelude::*;
 use oal_model::grammar::*;
-use oal_model::lexicon::TokenAlias;
-use oal_model::{match_token, syntax_nodes, terminal_node};
+use oal_model::lexicon::Cursor;
+use oal_model::{syntax_nodes, terminal_node};
 use std::fmt::Debug;
+
+#[cfg(test)]
+use oal_model::lexicon::{Lexeme, TokenList};
+#[cfg(test)]
+use oal_model::locator::Locator;
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Gram;
@@ -12,6 +16,13 @@ pub struct Gram;
 impl Grammar for Gram {
     type Lex = Token;
     type Kind = SyntaxKind;
+    type Tag = ParserTag;
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum ParserTag {
+    Term,
+    Expression,
 }
 
 terminal_node!(Gram, Identifier, k if k.is_identifier());
@@ -358,7 +369,7 @@ impl<'a, T: Core> Array<'a, T> {
 }
 
 impl<'a, T: Core> UriVariable<'a, T> {
-    const INNER_POS: usize = 1;
+    const INNER_POS: usize = 2;
 
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
         self.node().nth(Self::INNER_POS)
@@ -657,326 +668,552 @@ impl<'a, T: Core> SubExpression<'a, T> {
     }
 }
 
-fn variadic_op<'a, P, E>(
-    op: TokenKind,
-    p: P,
-) -> impl Parser<TokenAlias<Token>, ParseNode<Gram>, Error = E> + Clone + 'a
-where
-    P: Parser<TokenAlias<Token>, ParseNode<Gram>, Error = E> + Clone + 'a,
-    E: chumsky::Error<TokenAlias<Token>> + 'a,
-{
-    tree_skip(
-        p.clone()
-            .chain(just_token(op).chain(p).repeated().flatten()),
-        SyntaxKind::VariadicOp,
-    )
+type Context<T> = oal_model::grammar::Context<T, Gram>;
+type ParserFn<T> = oal_model::grammar::ParserFn<T, Gram>;
+type ParserResult = oal_model::grammar::ParserResult<Gram>;
+type TokenOrNode = oal_model::grammar::ParserMatch<Gram>;
+
+pub fn parse_program<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let s = repeat(c, s, ns, &[parse_statement]);
+    Ok((s, c.compose(SyntaxKind::Program, ns)))
 }
 
-pub fn parser<'a>(
-) -> impl Parser<TokenAlias<Token>, ParseNode<Gram>, Error = ParserError<Token>> + 'a {
-    let identifier = match_token! { TokenKind::IdentifierReference | TokenKind::IdentifierValue };
+pub fn parse_statement<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_import(c, s)
+        .or_else(|_| parse_declaration(c, s))
+        .or_else(|_| parse_resource(c, s))
+}
 
-    let literal = match_token! { TokenKind::LiteralHttpStatus | TokenKind::LiteralNumber | TokenKind::LiteralString };
+pub fn parse_import<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::KeywordUse)?;
+    let (s, n1) = parse_token(c, s, TokenKind::LiteralString)?;
+    let (s, n2) =
+        parse_qualifier(c, s).unwrap_or_else(|_| (s, c.compose(SyntaxKind::Qualifier, &[])));
+    let (s, n3) = parse_token(c, s, TokenKind::ControlSemicolon)?;
+    Ok((s, c.compose(SyntaxKind::Import, &[n0, n1, n2, n3])))
+}
 
-    let primitive = match_token! { TokenKind::PrimitiveBool
-    | TokenKind::PrimitiveInt
-    | TokenKind::PrimitiveNum
-    | TokenKind::PrimitiveStr
-    | TokenKind::PrimitiveUri };
+pub fn parse_qualifier<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::KeywordAs)?;
+    let (s, n1) = parse_identifier(c, s)?;
+    Ok((s, c.compose(SyntaxKind::Qualifier, &[n0, n1])))
+}
 
-    let uri_root = just_token(TokenKind::PathElementRoot);
+pub fn parse_identifier<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token(c, s, TokenKind::IdentifierReference)
+        .or_else(|_| parse_token(c, s, TokenKind::IdentifierValue))
+}
 
-    let uri_segment = just_token(TokenKind::PathElementSegment);
+pub fn parse_line_annotations<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let p: ParserFn<T> = |c, s| parse_token(c, s, TokenKind::AnnotationLine);
+    let s = repeat(c, s, ns, &[p]);
+    Ok((s, c.compose(SyntaxKind::Annotations, ns)))
+}
 
-    let method = match_token! { TokenKind::MethodGet
-    | TokenKind::MethodPut
-    | TokenKind::MethodPost
-    | TokenKind::MethodPatch
-    | TokenKind::MethodDelete
-    | TokenKind::MethodOptions
-    | TokenKind::MethodHead };
+pub fn parse_binding<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n) = parse_token(c, s, TokenKind::IdentifierValue)?;
+    Ok((s, c.compose(SyntaxKind::Binding, &[n])))
+}
 
-    let xfer_methods = tree_many(
-        method.chain(
-            just_token(TokenKind::ControlComma)
-                .chain(method)
-                .repeated()
-                .flatten(),
-        ),
-        SyntaxKind::XferMethods,
-    );
+pub fn parse_bindings<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let s = repeat(c, s, ns, &[parse_binding]);
+    Ok((s, c.compose(SyntaxKind::Bindings, ns)))
+}
 
-    let inline_annotation = just_token(TokenKind::AnnotationInline);
+pub fn parse_recursion<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::KeywordRec)?;
+    let (s, n1) = parse_binding(c, s)?;
+    let (s, n2) = parse_expression(c, s)?;
+    Ok((s, c.compose(SyntaxKind::Recursion, &[n0, n1, n2])))
+}
 
-    let line_annotations = || {
-        tree_many(
-            just_token(TokenKind::AnnotationLine).repeated(),
-            SyntaxKind::Annotations,
-        )
+pub fn parse_xfer_list<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let s = intersperse(c, s, ns, parse_expression, |c, s| {
+        parse_token(c, s, TokenKind::ControlComma)
+    })?;
+    Ok((s, c.compose(SyntaxKind::XferList, ns)))
+}
+
+pub fn parse_relation<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_term_kind(c, s)?;
+    let (s, n1) = parse_token(c, s, TokenKind::KeywordOn)?;
+    let (s, n2) = parse_xfer_list(c, s)?;
+    Ok((s, c.compose(SyntaxKind::Relation, &[n0, n1, n2])))
+}
+
+pub fn parse_literal<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token_with(c, s, TokenKind::is_literal)
+}
+
+pub fn parse_primitive<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token_with(c, s, TokenKind::is_primitive)
+}
+
+pub fn parse_comma<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token(c, s, TokenKind::ControlComma)
+}
+
+pub fn parse_property_list<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let s = repeat(c, s, ns, &[parse_expression, parse_comma]);
+    Ok((s, c.compose(SyntaxKind::PropertyList, ns)))
+}
+
+pub fn parse_object<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::ControlBraceLeft)?;
+    let (s, n1) = parse_property_list(c, s)?;
+    let (s, n2) = parse_token(c, s, TokenKind::ControlBraceRight)?;
+    Ok((s, c.compose(SyntaxKind::Object, &[n0, n1, n2])))
+}
+
+pub fn parse_uri_root<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token(c, s, TokenKind::PathElementRoot)
+}
+
+pub fn parse_uri_var<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::PathElementRoot)?;
+    let (s, n1) = parse_token(c, s, TokenKind::ControlBraceLeft)?;
+    let (s, n2) = parse_expression(c, s)?;
+    let (s, n3) = parse_token(c, s, TokenKind::ControlBraceRight)?;
+    Ok((s, c.compose(SyntaxKind::UriVariable, &[n0, n1, n2, n3])))
+}
+
+pub fn parse_uri_segment<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token(c, s, TokenKind::PathElementSegment)
+        .or_else(|_| parse_uri_var(c, s))
+        .or_else(|_| parse_uri_root(c, s))
+}
+
+pub fn parse_uri_path<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n) = parse_uri_segment(c, s)?;
+    let ns = &mut vec![n];
+    let s = repeat(c, s, ns, &[parse_uri_segment]);
+    Ok((s, c.compose(SyntaxKind::UriPath, ns)))
+}
+
+pub fn parse_uri_params<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::OperatorQuestionMark)?;
+    let (s, n1) = parse_object(c, s)?;
+    Ok((s, c.compose(SyntaxKind::UriParams, &[n0, n1])))
+}
+
+pub fn parse_uri_template<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let (s, n) = parse_uri_path(c, s)?;
+    ns.push(n);
+    let s = if let Ok((s, n)) = parse_uri_params(c, s) {
+        ns.push(n);
+        s
+    } else {
+        s
     };
+    Ok((s, c.compose(SyntaxKind::UriTemplate, ns)))
+}
 
-    let binding = tree_one(just_token(TokenKind::IdentifierValue), SyntaxKind::Binding);
+pub fn parse_uri_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_token(c, s, TokenKind::PrimitiveUri).or_else(|_| parse_uri_template(c, s))
+}
 
-    let expr_kind = recursive(|expr| {
-        let property_list = tree_many(
-            expr.clone()
-                .chain(
-                    just_token(TokenKind::ControlComma)
-                        .chain(expr.clone())
-                        .repeated()
-                        .flatten(),
-                )
-                .or_not()
-                .flatten(),
-            SyntaxKind::PropertyList,
-        );
+pub fn parse_array<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::ControlBracketLeft)?;
+    let (s, n1) = parse_expression(c, s)?;
+    let (s, n2) = parse_token(c, s, TokenKind::ControlBracketRight)?;
+    Ok((s, c.compose(SyntaxKind::Array, &[n0, n1, n2])))
+}
 
-        let object = tree_many(
-            just_token(TokenKind::ControlBraceLeft)
-                .chain(property_list)
-                .chain(just_token(TokenKind::ControlBraceRight)),
-            SyntaxKind::Object,
-        );
+pub fn parse_property<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let (s, n) = parse_token(c, s, TokenKind::Property)?;
+    ns.push(n);
+    let s = if let Ok((s, n)) = parse_token(c, s, TokenKind::OperatorExclamationMark)
+        .or_else(|_| parse_token(c, s, TokenKind::OperatorQuestionMark))
+    {
+        ns.push(n);
+        s
+    } else {
+        s
+    };
+    let (s, n) = parse_expression(c, s)?;
+    ns.push(n);
+    Ok((s, c.compose(SyntaxKind::Property, ns)))
+}
 
-        let uri_var = tree_many(
-            just_token(TokenKind::ControlBraceLeft)
-                .chain(expr.clone())
-                .chain(just_token(TokenKind::ControlBraceRight)),
-            SyntaxKind::UriVariable,
-        );
+pub fn parse_content_meta<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token_with(c, s, TokenKind::is_content)?;
+    let (s, n1) = parse_token(c, s, TokenKind::OperatorEqual)?;
+    let (s, n2) = parse_expression(c, s)?;
+    Ok((s, c.compose(SyntaxKind::ContentMeta, &[n0, n1, n2])))
+}
 
-        let uri_path = tree_many(
-            uri_segment
-                .or(uri_root.clone().ignore_then(uri_var))
-                .or(uri_root)
-                .repeated()
-                .at_least(1)
-                .collect(),
-            SyntaxKind::UriPath,
-        );
+pub fn parse_content_meta_list<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let s = intersperse(c, s, ns, parse_content_meta, parse_comma)?;
+    Ok((s, c.compose(SyntaxKind::ContentMetaList, ns)))
+}
 
-        let uri_params = tree_many(
-            just_token(TokenKind::OperatorQuestionMark).chain(object.clone()),
-            SyntaxKind::UriParams,
-        );
+pub fn parse_content_body<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n) = parse_expression(c, s)?;
+    Ok((s, c.compose(SyntaxKind::ContentBody, &[n])))
+}
 
-        let uri_template = tree_many(uri_path.chain(uri_params.or_not()), SyntaxKind::UriTemplate);
+pub fn parse_content_1<T: Core>(
+    c: &mut Context<T>,
+    s: Cursor,
+    ns: &mut Vec<TokenOrNode>,
+) -> std::result::Result<Cursor, ParserError> {
+    let (s, n0) = parse_content_meta_list(c, s)?;
+    let (s, n1) = parse_comma(c, s)?;
+    let (s, n2) = parse_content_body(c, s)?;
+    ns.push(n0);
+    ns.push(n1);
+    ns.push(n2);
+    Ok(s)
+}
 
-        let uri_kind = just_token(TokenKind::PrimitiveUri).or(uri_template);
+pub fn parse_content_2<T: Core>(
+    c: &mut Context<T>,
+    s: Cursor,
+    ns: &mut Vec<TokenOrNode>,
+) -> std::result::Result<Cursor, ParserError> {
+    let (s, n) = parse_content_meta_list(c, s)?;
+    ns.push(n);
+    Ok(s)
+}
 
-        let array = tree_many(
-            just_token(TokenKind::ControlBracketLeft)
-                .chain(expr.clone())
-                .chain(just_token(TokenKind::ControlBracketRight)),
-            SyntaxKind::Array,
-        );
+pub fn parse_content_3<T: Core>(
+    c: &mut Context<T>,
+    s: Cursor,
+    ns: &mut Vec<TokenOrNode>,
+) -> std::result::Result<Cursor, ParserError> {
+    let (s, n) = parse_content_body(c, s)?;
+    ns.push(n);
+    Ok(s)
+}
 
-        let property = tree_many(
-            just_token(TokenKind::Property)
-                .chain(
-                    just_token(TokenKind::OperatorExclamationMark)
-                        .or(just_token(TokenKind::OperatorQuestionMark))
-                        .or_not(),
-                )
-                .chain(expr.clone()),
-            SyntaxKind::Property,
-        );
+pub fn parse_content<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let (s, n) = parse_token(c, s, TokenKind::ControlChevronLeft)?;
+    ns.push(n);
+    let s = parse_content_1(c, s, ns)
+        .or_else(|_| parse_content_2(c, s, ns))
+        .or_else(|_| parse_content_3(c, s, ns))
+        .unwrap_or(s);
+    let (s, n) = parse_token(c, s, TokenKind::ControlChevronRight)?;
+    ns.push(n);
+    Ok((s, c.compose(SyntaxKind::Content, ns)))
+}
 
-        let content_meta = tree_many(
-            match_token! { TokenKind::ContentHeaders | TokenKind::ContentMedia | TokenKind::ContentStatus }
-                .chain(just_token(TokenKind::OperatorEqual))
-                .chain(expr.clone()),
-            SyntaxKind::ContentMeta,
-        );
-
-        let content_meta_list = tree_many(
-            content_meta.clone().chain(
-                just_token(TokenKind::ControlComma)
-                    .chain(content_meta)
-                    .repeated()
-                    .flatten(),
-            ),
-            SyntaxKind::ContentMetaList,
-        );
-
-        let content_body = tree_one(expr.clone(), SyntaxKind::ContentBody);
-
-        let content = tree_many(
-            just_token(TokenKind::ControlChevronLeft)
-                .chain(
-                    content_meta_list
-                        .clone()
-                        .chain(just_token(TokenKind::ControlComma))
-                        .chain(content_body.clone())
-                        .or(content_meta_list.map(move |n| vec![n]))
-                        .or(content_body.map(move |n| vec![n]))
-                        .or_not()
-                        .flatten(),
-                )
-                .chain(just_token(TokenKind::ControlChevronRight)),
-            SyntaxKind::Content,
-        );
-
-        let subexpr = tree_many(
-            just_token(TokenKind::ControlParenLeft)
-                .chain(expr.clone())
-                .chain(just_token(TokenKind::ControlParenRight)),
-            SyntaxKind::SubExpression,
-        );
-
-        let variable = tree_many(
-            identifier
-                .chain(just_token(TokenKind::ControlFullStop))
-                .chain(identifier)
-                .or(identifier.map(move |n| vec![n])),
-            SyntaxKind::Variable,
-        );
-
-        let term_kind = tree_many(
-            line_annotations()
-                .chain(
-                    literal
-                        .or(primitive)
-                        .or(uri_kind)
-                        .or(array)
-                        .or(property)
-                        .or(object.clone())
-                        .or(content)
-                        .or(subexpr)
-                        .or(variable.clone()),
-                )
-                .chain(inline_annotation.or_not()),
-            SyntaxKind::Terminal,
-        );
-
-        let required_kind = tree_many(
-            term_kind
-                .clone()
-                .chain(just_token(TokenKind::OperatorExclamationMark)),
-            SyntaxKind::UnaryOp,
-        );
-
-        let optional_kind = tree_many(
-            term_kind
-                .clone()
-                .chain(just_token(TokenKind::OperatorQuestionMark)),
-            SyntaxKind::UnaryOp,
-        );
-
-        let unary_kind = optional_kind.or(required_kind).or(term_kind.clone());
-
-        let application = tree_many(
-            variable.chain(unary_kind.clone().repeated().at_least(1)),
-            SyntaxKind::Application,
-        );
-
-        let apply_kind = application.or(unary_kind);
-
-        let range_kind = variadic_op(TokenKind::OperatorDoubleColon, apply_kind);
-
-        let join_kind = variadic_op(TokenKind::OperatorAmpersand, range_kind.clone());
-
-        let any_kind = variadic_op(TokenKind::OperatorTilde, join_kind);
-
-        let sum_kind = variadic_op(TokenKind::OperatorVerticalBar, any_kind);
-
-        let xfer_params = tree_maybe(object.or_not(), SyntaxKind::XferParams);
-
-        let xfer_domain = tree_many(
-            just_token(TokenKind::OperatorColon)
-                .chain(term_kind.clone())
-                .or_not()
-                .flatten(),
-            SyntaxKind::XferDomain,
-        );
-
-        let transfer = tree_many(
-            xfer_methods
-                .chain(xfer_params)
-                .chain(xfer_domain)
-                .chain(just_token(TokenKind::OperatorArrow))
-                .chain(range_kind),
-            SyntaxKind::Transfer,
-        );
-
-        let xfer_kind = transfer.or(sum_kind);
-
-        let xfer_list = tree_many(
-            expr.clone().chain(
-                just_token(TokenKind::ControlComma)
-                    .chain(expr.clone())
-                    .repeated()
-                    .flatten(),
-            ),
-            SyntaxKind::XferList,
-        );
-
-        let relation = tree_many(
-            term_kind
-                .chain(just_token(TokenKind::KeywordOn))
-                .chain(xfer_list),
-            SyntaxKind::Relation,
-        );
-
-        let relation_kind = relation.or(xfer_kind);
-
-        let recursion = tree_many(
-            just_token(TokenKind::KeywordRec)
-                .chain(binding.clone())
-                .chain(expr),
-            SyntaxKind::Recursion,
-        );
-
-        recursion.or(relation_kind)
-    });
-
-    let bindings = tree_many(binding.repeated(), SyntaxKind::Bindings);
-
-    let declaration = tree_many(
-        line_annotations()
-            .chain(just_token(TokenKind::KeywordLet))
-            .chain(identifier)
-            .chain(bindings)
-            .chain(just_token(TokenKind::OperatorEqual))
-            .chain(expr_kind.clone())
-            .chain(just_token(TokenKind::ControlSemicolon)),
-        SyntaxKind::Declaration,
+#[test]
+fn test_parse_content() {
+    test_parser::<()>(
+        parse_content,
+        vec![
+            TokenKind::ControlChevronLeft,
+            TokenKind::ContentMedia,
+            TokenKind::OperatorEqual,
+            TokenKind::LiteralString,
+            TokenKind::ControlComma,
+            TokenKind::ContentStatus,
+            TokenKind::OperatorEqual,
+            TokenKind::LiteralNumber,
+            TokenKind::ControlComma,
+            TokenKind::ContentHeaders,
+            TokenKind::OperatorEqual,
+            TokenKind::ControlBraceLeft,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlComma,
+            TokenKind::ControlBraceLeft,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlChevronRight,
+        ],
     );
+}
 
-    let resource = tree_many(
-        just_token(TokenKind::KeywordRes)
-            .chain(expr_kind)
-            .chain(just_token(TokenKind::ControlSemicolon)),
-        SyntaxKind::Resource,
+pub fn parse_subexpr<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::ControlParenLeft)?;
+    let (s, n1) = parse_expression(c, s)?;
+    let (s, n2) = parse_token(c, s, TokenKind::ControlParenRight)?;
+    Ok((s, c.compose(SyntaxKind::SubExpression, &[n0, n1, n2])))
+}
+
+pub fn parse_term<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_line_annotations(c, s)?;
+    let (s, n1) = parse_literal(c, s)
+        .or_else(|_| parse_primitive(c, s))
+        .or_else(|_| parse_uri_kind(c, s))
+        .or_else(|_| parse_array(c, s))
+        .or_else(|_| parse_property(c, s))
+        .or_else(|_| parse_object(c, s))
+        .or_else(|_| parse_content(c, s))
+        .or_else(|_| parse_subexpr(c, s))
+        .or_else(|_| parse_variable(c, s))?;
+    let ns = &mut vec![n0, n1];
+    let s = if let Ok((s, n2)) = parse_token(c, s, TokenKind::AnnotationInline) {
+        ns.push(n2);
+        s
+    } else {
+        s
+    };
+    Ok((s, c.compose(SyntaxKind::Terminal, ns)))
+}
+
+pub fn parse_term_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    memoize(ParserTag::Term, c, s, parse_term)
+}
+
+pub fn parse_optional_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_term_kind(c, s)?;
+    let (s, n1) = parse_token(c, s, TokenKind::OperatorQuestionMark)?;
+    Ok((s, c.compose(SyntaxKind::UnaryOp, &[n0, n1])))
+}
+
+pub fn parse_required_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_term_kind(c, s)?;
+    let (s, n1) = parse_token(c, s, TokenKind::OperatorExclamationMark)?;
+    Ok((s, c.compose(SyntaxKind::UnaryOp, &[n0, n1])))
+}
+
+pub fn parse_unary_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_optional_kind(c, s)
+        .or_else(|_| parse_required_kind(c, s))
+        .or_else(|_| parse_term_kind(c, s))
+}
+
+pub fn parse_variable<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let (s, n0) = parse_identifier(c, s)?;
+    ns.push(n0);
+    let s = if let Ok((s, n1)) = parse_token(c, s, TokenKind::ControlFullStop) {
+        let (s, n2) = parse_identifier(c, s)?;
+        ns.push(n1);
+        ns.push(n2);
+        s
+    } else {
+        s
+    };
+    Ok((s, c.compose(SyntaxKind::Variable, ns)))
+}
+
+pub fn parse_application<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let (s, n0) = parse_variable(c, s)?;
+    ns.push(n0);
+    let (s, n1) = parse_unary_kind(c, s)?;
+    ns.push(n1);
+    let s = repeat(c, s, ns, &[parse_unary_kind]);
+    Ok((s, c.compose(SyntaxKind::Application, ns)))
+}
+
+pub fn parse_apply_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_application(c, s).or_else(|_| parse_unary_kind(c, s))
+}
+
+pub fn parse_variadic_op<T: Core>(
+    c: &mut Context<T>,
+    s: Cursor,
+    op: TokenKind,
+    p: ParserFn<T>,
+) -> ParserResult {
+    let ns = &mut Vec::new();
+    let s = intersperse(c, s, ns, p, |c, s| parse_token(c, s, op))?;
+    let n = if ns.len() == 1 {
+        ns.pop().unwrap()
+    } else {
+        c.compose(SyntaxKind::VariadicOp, ns)
+    };
+    Ok((s, n))
+}
+
+pub fn parse_range_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_variadic_op(c, s, TokenKind::OperatorDoubleColon, parse_apply_kind)
+}
+
+pub fn parse_join_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_variadic_op(c, s, TokenKind::OperatorAmpersand, parse_range_kind)
+}
+
+pub fn parse_any_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_variadic_op(c, s, TokenKind::OperatorTilde, parse_join_kind)
+}
+
+pub fn parse_sum_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_variadic_op(c, s, TokenKind::OperatorVerticalBar, parse_any_kind)
+}
+
+pub fn parse_xfer_domain<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::OperatorColon)?;
+    let (s, n1) = parse_term_kind(c, s)?;
+    Ok((s, c.compose(SyntaxKind::XferDomain, &[n0, n1])))
+}
+
+pub fn parse_xfer_params<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n) = parse_object(c, s)?;
+    Ok((s, c.compose(SyntaxKind::XferParams, &[n])))
+}
+
+pub fn parse_xfer_methods<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let ns = &mut Vec::new();
+    let method: ParserFn<T> = |c, s| parse_token_with(c, s, TokenKind::is_method);
+    let s = intersperse(c, s, ns, method, parse_comma)?;
+    Ok((s, c.compose(SyntaxKind::XferMethods, ns)))
+}
+
+#[test]
+fn test_parse_xfer_methods() {
+    test_parser::<()>(
+        parse_xfer_methods,
+        vec![
+            TokenKind::MethodGet,
+            TokenKind::ControlComma,
+            TokenKind::MethodPut,
+        ],
     );
+}
 
-    let qualifier = tree_many(
-        just_token(TokenKind::KeywordAs)
-            .chain(identifier)
-            .or_not()
-            .flatten(),
-        SyntaxKind::Qualifier,
+pub fn parse_transfer<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_xfer_methods(c, s)?;
+    let (s, n1) =
+        parse_xfer_params(c, s).unwrap_or_else(|_| (s, c.compose(SyntaxKind::XferParams, &[])));
+    let (s, n2) =
+        parse_xfer_domain(c, s).unwrap_or_else(|_| (s, c.compose(SyntaxKind::XferDomain, &[])));
+    let (s, n3) = parse_token(c, s, TokenKind::OperatorArrow)?;
+    let (s, n4) = parse_range_kind(c, s)?;
+    Ok((s, c.compose(SyntaxKind::Transfer, &[n0, n1, n2, n3, n4])))
+}
+
+#[test]
+fn test_parse_transfer() {
+    test_parser::<()>(
+        parse_transfer,
+        vec![
+            TokenKind::MethodGet,
+            TokenKind::ControlComma,
+            TokenKind::MethodPut,
+            TokenKind::OperatorArrow,
+            TokenKind::ControlChevronLeft,
+            TokenKind::ControlChevronRight,
+        ],
     );
+}
 
-    let import = tree_many(
-        just_token(TokenKind::KeywordUse)
-            .chain(just_token(TokenKind::LiteralString))
-            .chain(qualifier)
-            .chain(just_token(TokenKind::ControlSemicolon)),
-        SyntaxKind::Import,
-    );
+pub fn parse_xfer_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_transfer(c, s).or_else(|_| parse_sum_kind(c, s))
+}
 
-    let error = tree_many(
-        but_token(TokenKind::ControlSemicolon)
-            .repeated()
-            .chain(just_token(TokenKind::ControlSemicolon)),
-        SyntaxKind::Error,
-    );
+pub fn parse_relation_kind<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    parse_relation(c, s).or_else(|_| parse_xfer_kind(c, s))
+}
 
-    let statement = declaration
-        .or(resource)
-        .or(import)
-        .recover_with(skip_parser(error));
+pub fn parse_expression<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    memoize(ParserTag::Expression, c, s, |c, s| {
+        parse_recursion(c, s).or_else(|_| parse_relation_kind(c, s))
+    })
+}
 
-    tree_many(statement.repeated(), SyntaxKind::Program)
+pub fn parse_declaration<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_line_annotations(c, s)?;
+    let (s, n1) = parse_token(c, s, TokenKind::KeywordLet)?;
+    let (s, n2) = parse_identifier(c, s)?;
+    let (s, n3) = parse_bindings(c, s)?;
+    let (s, n4) = parse_token(c, s, TokenKind::OperatorEqual)?;
+    let (s, n5) = parse_expression(c, s)?;
+    let (s, n6) = parse_token(c, s, TokenKind::ControlSemicolon)?;
+    Ok((
+        s,
+        c.compose(SyntaxKind::Declaration, &[n0, n1, n2, n3, n4, n5, n6]),
+    ))
+}
+
+pub fn parse_resource<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    let (s, n0) = parse_token(c, s, TokenKind::KeywordRes)?;
+    let (s, n1) = parse_expression(c, s)?;
+    let (s, n2) = parse_token(c, s, TokenKind::ControlSemicolon)?;
+    Ok((s, c.compose(SyntaxKind::Resource, &[n0, n1, n2])))
+}
+
+#[cfg(test)]
+fn test_parser<T: Core>(parser: ParserFn<T>, tokens: Vec<TokenKind>) {
+    let loc = Locator::try_from("file:///example.oal").unwrap();
+    let mut l = TokenList::new(loc.clone());
+    for (i, k) in tokens.iter().enumerate() {
+        let t = Token::new(*k, TokenValue::None);
+        l.push(t, i..i + 1);
+    }
+    let mut ctx = Context::new(l);
+    let cursor = ctx.head();
+    let (end, root) = parser(&mut ctx, cursor).unwrap();
+    assert!(!end.is_valid(), "remaining input");
+    let ParserMatch::Node(root) = root else { panic!("root should be a node") };
+    println!("{:?}", ctx);
+    let count = ctx.count();
+    let tree = ctx.tree().finalize(root);
+    assert_eq!(tree.root().descendants().count(), count, "syntax tree leak");
+}
+
+#[test]
+fn test_misc() {
+    let cases = [
+        vec![
+            TokenKind::KeywordUse,
+            TokenKind::LiteralString,
+            TokenKind::KeywordAs,
+            TokenKind::IdentifierValue,
+            TokenKind::ControlSemicolon,
+        ],
+        vec![
+            TokenKind::KeywordLet,
+            TokenKind::IdentifierValue,
+            TokenKind::OperatorEqual,
+            TokenKind::PrimitiveNum,
+            TokenKind::ControlSemicolon,
+        ],
+        vec![
+            TokenKind::KeywordLet,
+            TokenKind::IdentifierReference,
+            TokenKind::OperatorEqual,
+            TokenKind::ControlBraceLeft,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlSemicolon,
+        ],
+        vec![
+            TokenKind::KeywordLet,
+            TokenKind::IdentifierReference,
+            TokenKind::OperatorEqual,
+            TokenKind::ControlBraceLeft,
+            TokenKind::Property,
+            TokenKind::ControlBraceLeft,
+            TokenKind::Property,
+            TokenKind::ControlBraceLeft,
+            TokenKind::Property,
+            TokenKind::ControlBraceLeft,
+            TokenKind::Property,
+            TokenKind::ControlBraceLeft,
+            TokenKind::Property,
+            TokenKind::PrimitiveNum,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlBraceRight,
+            TokenKind::ControlSemicolon,
+        ],
+        vec![
+            TokenKind::KeywordRes,
+            TokenKind::PathElementRoot,
+            TokenKind::KeywordOn,
+            TokenKind::MethodGet,
+            TokenKind::OperatorArrow,
+            TokenKind::ControlChevronLeft,
+            TokenKind::ControlChevronRight,
+            TokenKind::ControlSemicolon,
+        ],
+    ];
+
+    for tokens in cases {
+        test_parser::<()>(parse_program, tokens);
+    }
 }

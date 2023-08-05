@@ -1,6 +1,6 @@
 use crate::locator::Locator;
 use crate::span::Span;
-use chumsky::Stream;
+use generational_token_list::ItemToken;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::ops::Range;
@@ -23,29 +23,24 @@ pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug {
     type Value: Debug + Intern;
 
     fn new(kind: Self::Kind, value: Self::Value) -> Self;
+    fn is_trivia(kind: Self::Kind) -> bool;
     fn kind(&self) -> Self::Kind;
     fn value(&self) -> &Self::Value;
-    fn is_trivia(&self) -> bool;
 }
 
-pub type TokenIdx = generational_token_list::ItemToken;
-
+/// A cheap pointer to a token that retains the token kind.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct TokenAlias<L: Lexeme>(L::Kind, TokenIdx);
+pub struct TokenAlias<L: Lexeme>(L::Kind, ItemToken);
 
 impl<L: Lexeme> Copy for TokenAlias<L> {}
 
 impl<L: Lexeme> TokenAlias<L> {
-    pub fn new(kind: L::Kind, idx: TokenIdx) -> Self {
-        TokenAlias(kind, idx)
-    }
-
     pub fn kind(&self) -> L::Kind {
         self.0
     }
 
-    pub fn index(&self) -> TokenIdx {
-        self.1
+    pub fn cursor(&self) -> Cursor {
+        Cursor(Some(self.1))
     }
 }
 
@@ -57,9 +52,18 @@ impl<L: Lexeme> Display for TokenAlias<L> {
 
 type ListArena<L> = generational_token_list::GenerationalTokenList<(L, Range<usize>)>;
 
-#[derive(Debug)]
+/// A cursor in the stream of tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Cursor(Option<ItemToken>);
+
+impl Cursor {
+    pub fn is_valid(&self) -> bool {
+        self.0.is_some()
+    }
+}
+
 pub struct TokenList<L: Lexeme> {
-    list: ListArena<L>,
+    arena: ListArena<L>,
     dict: StringInterner,
     loc: Locator,
 }
@@ -80,7 +84,7 @@ where
 {
     pub fn new(loc: Locator) -> Self {
         TokenList {
-            list: ListArena::default(),
+            arena: ListArena::default(),
             dict: StringInterner::default(),
             loc,
         }
@@ -90,51 +94,95 @@ where
         &self.loc
     }
 
-    pub fn token(&self, id: TokenIdx) -> &L {
-        &self.list.get(id).unwrap().0
+    pub fn reference(&self, s: Cursor) -> TokenRef<L> {
+        TokenRef {
+            list: self,
+            token: s.0.expect("cursor should be valid"),
+        }
     }
 
-    pub fn span(&self, id: TokenIdx) -> Span {
-        Span::new(self.loc.clone(), self.list.get(id).unwrap().1.clone())
+    pub fn head(&self) -> Cursor {
+        Cursor(self.arena.head_token())
     }
 
-    pub fn token_span(&self, id: TokenIdx) -> (&L, Span) {
-        let (token, range) = self.list.get(id).unwrap();
+    pub fn advance(&self, s: Cursor) -> Cursor {
+        Cursor(s.0.and_then(|id| self.arena.next_token(id)))
+    }
+
+    pub fn kind(&self, s: Cursor) -> L::Kind {
+        let id = s.0.expect("cursor should be valid");
+        self.arena.get(id).unwrap().0.kind()
+    }
+
+    pub fn alias(&self, s: Cursor) -> TokenAlias<L> {
+        let id = s.0.expect("cursor should be valid");
+        TokenAlias(self.arena.get(id).unwrap().0.kind(), id)
+    }
+
+    pub fn token_span(&self, s: Cursor) -> (&L, Span) {
+        let id = s.0.expect("cursor should be valid");
+        let (token, range) = self.arena.get(id).unwrap();
         (token, Span::new(self.loc.clone(), range.clone()))
     }
 
-    pub fn push(&mut self, t: L, s: Range<usize>) -> TokenIdx {
-        self.list.push_back((t, s))
+    pub fn push(&mut self, token: L, range: Range<usize>) -> Cursor {
+        Cursor(Some(self.arena.push_back((token, range))))
+    }
+
+    pub fn end(&self) -> usize {
+        self.arena.tail().map_or(0, |(_, range)| range.end)
     }
 
     pub fn len(&self) -> usize {
-        self.list.tail().map_or(0, |(_, r)| r.end)
+        self.arena.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.arena.is_empty()
+    }
+}
+
+impl<L: Lexeme> Debug for TokenList<L> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut s = self.head();
+        while s.is_valid() {
+            let (token, span) = self.token_span(s);
+            writeln!(f, "{:?} at {:?}", token, span)?;
+            s = self.advance(s);
+        }
+        Ok(())
+    }
+}
+
+pub struct TokenRef<'a, L: Lexeme> {
+    list: &'a TokenList<L>,
+    token: ItemToken,
+}
+
+impl<'a, L: Lexeme> TokenRef<'a, L> {
+    pub fn token(&self) -> &'a L {
+        &self.list.arena.get(self.token).unwrap().0
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    pub fn stream<'a>(
-        &'a self,
-    ) -> Stream<TokenAlias<L>, Span, impl Iterator<Item = (TokenAlias<L>, Span)> + 'a> {
-        let len = self.len();
-        // Prepare the parser iterator by ignoring trivia tokens and replacing values with indices.
-        let iter = self
-            .list
-            .iter_with_tokens()
-            .filter_map(move |(index, (token, range))| {
-                if token.is_trivia() {
-                    None
-                } else {
-                    Some((
-                        TokenAlias::new(token.kind(), index),
-                        Span::new(self.loc.clone(), range.clone()),
-                    ))
-                }
-            });
-        Stream::from_iter(Span::new(self.loc.clone(), len..len + 1), iter)
+    pub fn span(&self) -> Span {
+        Span::new(
+            self.list.loc.clone(),
+            self.list.arena.get(self.token).unwrap().1.clone(),
+        )
+    }
+
+    pub fn value(&self) -> &'a L::Value {
+        self.token().value()
+    }
+
+    pub fn kind(&self) -> L::Kind {
+        self.token().kind()
+    }
+}
+
+impl<'a, L: Lexeme> Debug for TokenRef<'a, L> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} at {:?}", self.token(), self.span())
     }
 }
 
