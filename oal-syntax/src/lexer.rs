@@ -1,9 +1,8 @@
+use crate::atom;
 use logos::Logos;
 use oal_model::lexicon::{Intern, Interner, Lexeme, ParserError, Symbol, TokenList};
 use oal_model::locator::Locator;
 use oal_model::span::Span;
-
-use crate::atom;
 
 #[derive(Logos, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[logos(subpattern ident = r"[0-9a-zA-Z$_-]")]
@@ -273,8 +272,6 @@ impl Lexeme for Token {
     }
 }
 
-pub type TokenAlias = (TokenKind, TokenIdx);
-
 fn parse_http_status(input: &str) -> atom::HttpStatus {
     let r = match input.chars().next().expect("should not be empty") {
         '1' => atom::HttpStatusRange::Info,
@@ -330,10 +327,9 @@ pub fn tokenize(loc: Locator, input: &str) -> (Option<TokenList<Token>>, Vec<Par
     let mut errors = Vec::new();
 
     for (result, range) in lexer {
-        let span = Span::new(loc.clone(), range.clone());
         match result {
             Ok(kind) => {
-                let slice = &input[range];
+                let slice = &input[range.clone()];
                 let value = match kind {
                     TokenKind::LiteralNumber => TokenValue::Number(parse_number(slice)),
                     TokenKind::LiteralString => {
@@ -360,9 +356,12 @@ pub fn tokenize(loc: Locator, input: &str) -> (Option<TokenList<Token>>, Vec<Par
                     _ => TokenValue::None,
                 };
                 let token = Token(kind, value);
-                list.push((token, span));
+                list.push(token, range);
             }
-            Err(_) => errors.push(ParserError::new(span)),
+            Err(_) => {
+                let span = Span::new(loc.clone(), range);
+                errors.push(ParserError::new(span));
+            }
         }
     }
 

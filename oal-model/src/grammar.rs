@@ -1,6 +1,4 @@
-use crate::lexicon::{
-    Intern, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList, TokenSpan,
-};
+use crate::lexicon::{Intern, Interner, Lexeme, Symbol, TokenAlias, TokenIdx, TokenList};
 use crate::locator::Locator;
 use crate::span::Span;
 use chumsky::prelude::*;
@@ -185,13 +183,13 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
                             let kind = t.kind();
                             let index = t.index();
 
-                            let (token, span) = self.tokens.get(index);
+                            let (token, span) = self.tokens.token_span(index);
 
                             let new_value = token.value().copy(self, &mut tree);
 
                             let new_token = <<G as Grammar>::Lex as Lexeme>::new(kind, new_value);
 
-                            let new_index = tree.push((new_token, span.clone()));
+                            let new_index = tree.push(new_token, span);
 
                             SyntaxTrunk::Leaf(TokenAlias::new(kind, new_index))
                         }
@@ -218,8 +216,8 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
         tree
     }
 
-    pub fn token(&self, id: TokenIdx) -> &TokenSpan<G::Lex> {
-        self.tokens.get(id)
+    pub fn token_span(&self, id: TokenIdx) -> (&G::Lex, Span) {
+        self.tokens.token_span(id)
     }
 
     fn node(&self, id: NodeIdx) -> &SyntaxNode<T, G> {
@@ -246,8 +244,9 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
         id.traverse(&self.tree)
     }
 
-    fn push(&mut self, t: TokenSpan<G::Lex>) -> TokenIdx {
-        self.tokens.push(t)
+    fn push(&mut self, t: G::Lex, s: Span) -> TokenIdx {
+        assert_eq!(self.locator(), s.locator(), "locators do not match");
+        self.tokens.push(t, s.range())
     }
 
     fn new_node(&mut self, n: SyntaxNode<T, G>) -> NodeIdx {
@@ -271,11 +270,11 @@ impl<'a, G: Grammar> TokenRef<'a, G> {
     }
 
     fn token(&self) -> &'a <G as Grammar>::Lex {
-        &self.tokens.get(self.idx).0
+        self.tokens.token(self.idx)
     }
 
-    pub fn span(&self) -> &Span {
-        &self.tokens.get(self.idx).1
+    pub fn span(&self) -> Span {
+        self.tokens.span(self.idx)
     }
 
     pub fn value(&self) -> &'a <<G as Grammar>::Lex as Lexeme>::Value {

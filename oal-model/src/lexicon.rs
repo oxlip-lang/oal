@@ -3,6 +3,7 @@ use crate::span::Span;
 use chumsky::Stream;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use std::ops::Range;
 use string_interner::{DefaultSymbol, StringInterner};
 
 pub type Symbol = DefaultSymbol;
@@ -29,8 +30,6 @@ pub trait Lexeme: Clone + PartialEq + Eq + Hash + Debug {
 
 pub type TokenIdx = generational_token_list::ItemToken;
 
-pub type TokenSpan<L> = (L, Span);
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TokenAlias<L: Lexeme>(L::Kind, TokenIdx);
 
@@ -56,7 +55,7 @@ impl<L: Lexeme> Display for TokenAlias<L> {
     }
 }
 
-type ListArena<L> = generational_token_list::GenerationalTokenList<TokenSpan<L>>;
+type ListArena<L> = generational_token_list::GenerationalTokenList<(L, Range<usize>)>;
 
 #[derive(Debug)]
 pub struct TokenList<L: Lexeme> {
@@ -91,16 +90,25 @@ where
         &self.loc
     }
 
-    pub fn get(&self, id: TokenIdx) -> &TokenSpan<L> {
-        self.list.get(id).unwrap()
+    pub fn token(&self, id: TokenIdx) -> &L {
+        &self.list.get(id).unwrap().0
     }
 
-    pub fn push(&mut self, t: TokenSpan<L>) -> TokenIdx {
-        self.list.push_back(t)
+    pub fn span(&self, id: TokenIdx) -> Span {
+        Span::new(self.loc.clone(), self.list.get(id).unwrap().1.clone())
+    }
+
+    pub fn token_span(&self, id: TokenIdx) -> (&L, Span) {
+        let (token, range) = self.list.get(id).unwrap();
+        (token, Span::new(self.loc.clone(), range.clone()))
+    }
+
+    pub fn push(&mut self, t: L, s: Range<usize>) -> TokenIdx {
+        self.list.push_back((t, s))
     }
 
     pub fn len(&self) -> usize {
-        self.list.tail().map_or(0, |(_, r)| r.end())
+        self.list.tail().map_or(0, |(_, r)| r.end)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -116,11 +124,14 @@ where
         let iter = self
             .list
             .iter_with_tokens()
-            .filter_map(move |(index, (token, span))| {
+            .filter_map(move |(index, (token, range))| {
                 if token.is_trivia() {
                     None
                 } else {
-                    Some((TokenAlias::new(token.kind(), index), span.clone()))
+                    Some((
+                        TokenAlias::new(token.kind(), index),
+                        Span::new(self.loc.clone(), range.clone()),
+                    ))
                 }
             });
         Stream::from_iter(Span::new(self.loc.clone(), len..len + 1), iter)
