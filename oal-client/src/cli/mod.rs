@@ -23,16 +23,15 @@ impl Processor {
     pub fn report<M: ToString>(&self, span: Span, msg: M) -> io::Result<()> {
         let mut colors = ColorGenerator::new();
         let color = colors.next();
-        let loc = span.locator();
-        let input = DefaultFileSystem.read_file(loc)?;
-        let builder = Report::build(ReportKind::Error, loc.clone(), span.start()).with_message(msg);
-        let builder = if span.range().is_empty() {
-            builder
-        } else {
-            builder.with_label(Label::new(span.clone()).with_color(color))
-        };
-        let report = builder.finish();
-        report.eprint((loc.clone(), Source::from(input)))
+        let loc = span.locator().clone();
+        let input = DefaultFileSystem.read_file(&loc)?;
+        let mut builder =
+            Report::build(ReportKind::Error, loc.clone(), span.start()).with_message(msg);
+        if !span.range().is_empty() {
+            let s = crate::CharSpan::from(&input, span);
+            builder.add_label(Label::new(s).with_color(color))
+        }
+        builder.finish().eprint((loc, Source::from(input)))
     }
 
     pub fn load(&self, main: &Locator) -> anyhow::Result<ModuleSet> {

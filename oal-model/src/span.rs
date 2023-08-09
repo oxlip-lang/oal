@@ -2,7 +2,7 @@ use crate::locator::Locator;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
-/// The parsing span type, expressed as Unicode character indices.
+/// The parsing span type, expressed as UTF-8 indices.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     start: usize,
@@ -36,24 +36,8 @@ impl Span {
     }
 }
 
-impl ariadne::Span for Span {
-    type SourceId = Locator;
-
-    fn source(&self) -> &Self::SourceId {
-        self.locator()
-    }
-
-    fn start(&self) -> usize {
-        self.start()
-    }
-
-    fn end(&self) -> usize {
-        self.end()
-    }
-}
-
 impl Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}#{}..{}", self.locator(), self.start(), self.end())
+        write!(f, "{}#{}..{}", self.loc, self.start, self.end)
     }
 }
