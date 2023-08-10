@@ -1,6 +1,6 @@
 use super::state::GlobalState;
-use super::{utf16_range, Folder, Workspace};
-use crate::utf16::char_index;
+use super::unicode::position_to_utf8;
+use super::{utf8_range_to_position, Folder, Workspace};
 use lsp_types::{
     GotoDefinitionParams, GotoDefinitionResponse, Location, Position, Range, ReferenceParams,
     RenameParams, TextDocumentPositionParams, TextEdit, WorkspaceEdit,
@@ -13,22 +13,22 @@ use oal_syntax::parser::{Declaration, Gram, Identifier, Variable};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-/// Returns the abstract syntax node at the given position, if any.
-fn syntax_at<'a, N>(tree: &'a Tree, pos: usize) -> Option<N>
+/// Returns the abstract syntax node at the given UTF-8 index, if any.
+fn syntax_at<'a, N>(tree: &'a Tree, index: usize) -> Option<N>
 where
     N: AbstractSyntaxNode<'a, Core, Gram>,
 {
     tree.root()
         .descendants()
         .filter_map(N::cast)
-        .find(|i| i.node().span().unwrap().range().contains(&pos))
+        .find(|i| i.node().span().unwrap().range().contains(&index))
 }
 
 // Returns the location of the given syntax node.
 fn node_location(workspace: &mut Workspace, node: NRef) -> anyhow::Result<Location> {
     let span = node.span().unwrap();
     let text = workspace.read_file(span.locator())?;
-    let range = utf16_range(&text, span.range());
+    let range = utf8_range_to_position(&text, span.range());
     Ok(Location::new(span.locator().url().clone(), range))
 }
 
@@ -41,7 +41,7 @@ fn find_definition(
 ) -> anyhow::Result<Option<Definition>> {
     let tree = folder.module(loc).unwrap();
     let text = workspace.read_file(loc)?;
-    let index = char_index(&text, pos);
+    let index = position_to_utf8(&text, pos);
     if let Some(ident) = syntax_at::<Identifier<_>>(tree, index) {
         let parent = ident.node().ancestors().nth(1).unwrap();
         let definition = if let Some(decl) = Declaration::cast(parent) {
@@ -89,7 +89,7 @@ pub fn go_to_definition(
 
     let tree = folder.module(&loc).unwrap();
     let text = state.workspace.read_file(&loc)?;
-    let index = char_index(&text, pos);
+    let index = position_to_utf8(&text, pos);
 
     let mut res = GotoDefinitionResponse::Array(Vec::new());
 
@@ -141,7 +141,7 @@ pub fn prepare_rename(
 
     let tree = folder.module(&loc).unwrap();
     let text = state.workspace.read_file(&loc)?;
-    let index = char_index(&text, pos);
+    let index = position_to_utf8(&text, pos);
 
     if let Some(ident) = syntax_at::<Identifier<_>>(tree, index) {
         // Get the unqualified identifier from either a declaration or a variable.
@@ -152,7 +152,7 @@ pub fn prepare_rename(
         } else {
             Variable::cast(parent).map(|var| var.identifier().node())
         };
-        Ok(identifier.map(|n| utf16_range(&text, n.span().unwrap().range())))
+        Ok(identifier.map(|n| utf8_range_to_position(&text, n.span().unwrap().range())))
     } else {
         Ok(None)
     }

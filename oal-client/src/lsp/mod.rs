@@ -1,11 +1,12 @@
 pub mod dispatcher;
 pub mod handlers;
 pub mod state;
+pub mod unicode;
+
 #[cfg(test)]
 mod tests;
 
 use crate::config::Config;
-use crate::utf16::{utf16_position, utf8_index};
 use crate::{DefaultFileSystem, FileSystem};
 use anyhow::anyhow;
 use lsp_types::{
@@ -18,14 +19,7 @@ use oal_model::{locator::Locator, span::Span};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io;
-use std::ops::Range;
-
-/// Converts a Unicode character range to a UTF-16 range.
-fn utf16_range(text: &str, range: Range<usize>) -> lsp_types::Range {
-    let start = utf16_position(text, range.start);
-    let end = utf16_position(text, range.end);
-    lsp_types::Range { start, end }
-}
+use unicode::{position_to_utf8, utf8_range_to_position};
 
 /// A folder in the workspace.
 #[derive(Debug)]
@@ -113,8 +107,8 @@ impl Workspace {
         if let Some(text) = self.docs.get_mut(&loc) {
             for change in p.content_changes.into_iter() {
                 if let Some(r) = change.range {
-                    let start = utf8_index(text, r.start);
-                    let end = utf8_index(text, r.end);
+                    let start = position_to_utf8(text, r.start);
+                    let end = position_to_utf8(text, r.end);
                     text.replace_range(start..end, &change.text);
                 } else {
                     *text = change.text;
@@ -182,7 +176,7 @@ impl Workspace {
     /// Creates an LSP diagnostic from the given span and error.
     fn diagnostic<E: ToString>(&mut self, span: &Span, err: E) -> anyhow::Result<Diagnostic> {
         let text = self.read_file(span.locator())?;
-        let range = utf16_range(&text, span.range());
+        let range = utf8_range_to_position(&text, span.range());
         Ok(Diagnostic {
             message: err.to_string(),
             range,
