@@ -5,7 +5,8 @@ use crate::module::ModuleSet;
 use crate::tree::{NRef, Tree};
 use oal_model::grammar::NodeIdx;
 use oal_model::locator::Locator;
-use std::fmt::Debug;
+use sha2::{Digest, Sha256};
+use std::fmt::{Debug, Formatter, LowerHex};
 use std::rc::Rc;
 
 /// Internal identifier definition.
@@ -26,6 +27,7 @@ impl Eq for dyn Internal {}
 
 pub type InternalRef = Rc<dyn Internal>;
 
+// TODO: refactor with GlobalNodeId
 /// External identifier definition.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct External {
@@ -60,6 +62,19 @@ impl std::fmt::Display for External {
 impl std::fmt::Debug for External {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         <Self as std::fmt::Display>::fmt(self, f)
+    }
+}
+
+impl LowerHex for External {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let arena_index = generational_arena::Index::from(self.index);
+        let (index, generation) = arena_index.into_raw_parts();
+        let hash = Sha256::new()
+            .chain_update(self.loc.url().as_str().as_bytes())
+            .chain_update(index.to_be_bytes())
+            .chain_update(generation.to_be_bytes())
+            .finalize();
+        write!(f, "{:x}", hash)
     }
 }
 

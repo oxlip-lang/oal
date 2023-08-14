@@ -22,7 +22,7 @@ fn eval(code: &str, check: bool) -> anyhow::Result<Spec> {
     // Uncomment for debugging purpose:
     // println!("{:#?}", mods.main().root());
 
-    let spec = crate::eval::eval(&mods, mods.base())?;
+    let spec = crate::eval::eval(&mods)?;
     Ok(spec)
 }
 
@@ -710,49 +710,6 @@ fn eval_mutual_recursion() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eval_recursive_reference() -> anyhow::Result<()> {
-    let s = eval_check(
-        r#"
-        let @a = /?{ 'b @b };
-        let @b = /?{ 'a @a };
-        res @a on get -> <>;
-    "#,
-    )?;
-
-    assert_eq!(s.rels.len(), 1);
-    let rel = s.rels.iter().next().unwrap();
-
-    let params_rel = rel.uri.params.as_ref().expect("should have params");
-    let prop_rel = &params_rel.props[0];
-    assert_eq!(prop_rel.name, "b");
-    let SchemaExpr::Ref(id_rel) = &prop_rel.schema.expr else { panic!("schema should be a reference") };
-    let ref_b = s.refs.get(id_rel).expect("reference should exist");
-    let Reference::Schema(schema_b) = ref_b;
-    let SchemaExpr::Uri(uri_b) = &schema_b.expr else {
-        panic!("schema should be a URI")
-    };
-
-    let params_b = uri_b.params.as_ref().expect("should have params");
-    let prop_b = &params_b.props[0];
-    assert_eq!(prop_b.name, "a");
-    let SchemaExpr::Ref(id_b) = &prop_b.schema.expr else { panic!("schema should be a reference") };
-    let ref_a = s.refs.get(id_b).expect("reference should exist");
-    let Reference::Schema(schema_a) = ref_a;
-    let SchemaExpr::Uri(uri_a) = &schema_a.expr else {
-        panic!("schema should be a URI")
-    };
-
-    let params_a = uri_a.params.as_ref().expect("should have params");
-    let prop_a = &params_a.props[0];
-    assert_eq!(prop_a.name, "b");
-    let SchemaExpr::Ref(id_a) = &prop_a.schema.expr else { panic!("schema should be a reference") };
-
-    assert_eq!(id_rel, id_a);
-
-    Ok(())
-}
-
-#[test]
 fn eval_recursive_lambda() -> anyhow::Result<()> {
     let code = r#"
         let f x = { 'g (g x) };
@@ -769,6 +726,46 @@ fn eval_recursive_lambda() -> anyhow::Result<()> {
         errors::Kind::InvalidType
     ));
 
+    Ok(())
+}
+
+// TODO: uri with recursive schemas in query string
+#[test]
+#[ignore = "not implemented"]
+fn eval_recursive_uri() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let a = concat /a a; // Should not work
+        let x = /b?{ 'p b };
+        let b = concat /a x; // Should work
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn eval_inner_recursive_lambda() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let u b = concat b /a;
+        let r b = rec x (u b) on get -> { 'p x };
+        res (r /);
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn eval_binding_scopes() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let f b = rec x b;
+        res / on get -> f {};
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
     Ok(())
 }
 

@@ -11,7 +11,6 @@ use crate::tree::{Core, NRef};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
 use oal_model::grammar::{AbstractSyntaxNode, GlobalNodeId};
-use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;
@@ -433,9 +432,15 @@ pub fn eval_binding<'a>(
     binding: syn::Binding<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let scope = ctx.scopes.last().expect("scope should exist");
-    let Some((expr, prev_ann)) = scope.get(&binding.ident())
-        else { panic!("binding '{}' should exist", binding.ident()) };
+    let ident = binding.ident();
+    let Some((expr, prev_ann)) = ctx
+        .scopes
+        .iter()
+        .rev()
+        .map(|s| s.get(&ident))
+        .skip_while(Option::is_none)
+        .map(|s| s.unwrap()).next()
+        else { panic!("binding '{}' should exist", ident) };
     let mut next_ann = prev_ann.as_ref().clone();
     next_ann.extend(ann.as_ref().clone());
     Ok((expr.clone(), AnnRef::new(next_ann)))
@@ -778,10 +783,10 @@ pub fn eval_any<'a>(
     }
 }
 
-pub fn eval(mods: &ModuleSet, loc: &Locator) -> Result<Spec> {
+pub fn eval(mods: &ModuleSet) -> Result<Spec> {
     let ctx = &mut Context::new(mods);
     let ann = AnnRef::default();
-    let (expr, _) = eval_any(ctx, mods.get(loc).unwrap().root(), ann)?;
+    let (expr, _) = eval_any(ctx, mods.main().root(), ann)?;
     let Expr::Spec(spec) = expr else { panic!("expected a specification") };
     Ok(*spec)
 }

@@ -31,7 +31,14 @@ impl TagWrap {
         )
     }
 
-    fn is_schema_like(&self) -> bool {
+    fn is_referential(&self) -> bool {
+        matches!(self.0, |Tag::Relation| Tag::Object
+            | Tag::Array
+            | Tag::Any
+            | Tag::Var(_))
+    }
+
+    fn is_content_like(&self) -> bool {
         self.is_schema() || self.0 == Tag::Content
     }
 
@@ -85,7 +92,7 @@ fn check_variadic_operation(op: syn::VariadicOp<Core>) -> Result<()> {
             }
         }
         atom::VariadicOperator::Range => {
-            if !op.operands().all(|o| get_tag(o).is_schema_like()) {
+            if !op.operands().all(|o| get_tag(o).is_content_like()) {
                 return Err(Error::new(Kind::InvalidType, "ill-formed ranges").with(&op));
             }
         }
@@ -134,11 +141,11 @@ fn check_content(content: syn::Content<Core>) -> Result<()> {
 
 fn check_transfer(xfer: syn::Transfer<Core>) -> Result<()> {
     if let Some(domain) = xfer.domain() {
-        if !get_tag(domain.inner()).is_schema_like() {
+        if !get_tag(domain.inner()).is_content_like() {
             return Err(Error::new(Kind::InvalidType, "ill-formed domain").with(&domain));
         }
     }
-    if !get_tag(xfer.range()).is_schema_like() {
+    if !get_tag(xfer.range()).is_content_like() {
         return Err(Error::new(Kind::InvalidType, "ill-formed range").with(&xfer.range()));
     }
     Ok(())
@@ -198,6 +205,11 @@ fn check_declaration(decl: syn::Declaration<Core>) -> Result<()> {
                 Error::new(Kind::InvalidType, "ill-formed recursion, not a schema").with(&decl),
             );
         }
+        if !rhs.is_referential() {
+            return Err(
+                Error::new(Kind::InvalidType, "ill-formed recursion, not referential").with(&decl),
+            );
+        }
         if decl.has_bindings() {
             return Err(Error::new(Kind::InvalidType, "ill-formed lambda, recursive").with(&decl));
         }
@@ -213,8 +225,14 @@ fn check_resource(res: syn::Resource<Core>) -> Result<()> {
 }
 
 fn check_recursion(rec: syn::Recursion<Core>) -> Result<()> {
-    if !get_tag(rec.node()).is_schema_like() {
-        return Err(Error::new(Kind::InvalidType, "ill-formed recursion").with(&rec));
+    let tag = get_tag(rec.node());
+    if !tag.is_schema() {
+        return Err(Error::new(Kind::InvalidType, "ill-formed recursion, not a schema").with(&rec));
+    }
+    if !tag.is_referential() {
+        return Err(
+            Error::new(Kind::InvalidType, "ill-formed recursion, not referential").with(&rec),
+        );
     }
     Ok(())
 }

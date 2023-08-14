@@ -42,7 +42,7 @@ impl Processor {
 
     /// Evaluates a program.
     pub fn eval(&self, mods: &ModuleSet) -> anyhow::Result<Spec> {
-        match oal_compiler::eval::eval(mods, mods.base()) {
+        match oal_compiler::eval::eval(mods) {
             Err(err) => {
                 let span = match err.span() {
                     Some(s) => s.clone(),

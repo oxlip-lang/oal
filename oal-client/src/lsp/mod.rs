@@ -132,7 +132,7 @@ impl Workspace {
 
     /// Evaluates a program. Resets evaluation errors.
     pub fn eval(&mut self, mods: &ModuleSet) -> anyhow::Result<Spec> {
-        match oal_compiler::eval::eval(mods, mods.base()) {
+        match oal_compiler::eval::eval(mods) {
             Err(err) => {
                 let loc = match err.span() {
                     Some(s) => s.locator().clone(),
