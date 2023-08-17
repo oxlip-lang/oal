@@ -2,12 +2,11 @@ use crate::lexicon::{Cursor, Intern, Interner, Lexeme, Symbol, TokenAlias, Token
 use crate::locator::Locator;
 use crate::span::Span;
 use generational_indextree::NodeEdge;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter, LowerHex};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
-use url::Url;
 
 pub type NodeIdx = generational_indextree::NodeId;
 
@@ -352,6 +351,14 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     pub fn as_str(&self) -> &'a str {
         self.token().value().as_str(self.tree)
     }
+
+    /// Update the given digest with node reference information.
+    pub fn digest<D: Digest>(&self, digest: &mut D) {
+        let (index, generation) = generational_arena::Index::from(self.idx).into_raw_parts();
+        digest.update(self.tree.locator().url().as_str());
+        digest.update(index.to_be_bytes());
+        digest.update(generation.to_be_bytes());
+    }
 }
 
 impl<'a, T: Core, G: Grammar> Debug for NodeRef<'a, T, G> {
@@ -365,30 +372,6 @@ impl<'a, T: Core, G: Grammar> Debug for NodeRef<'a, T, G> {
             f.debug_list().entries(self.children()).finish()?;
         }
         Ok(())
-    }
-}
-
-/// A global node identifier is guaranteed to be unique across all compilation units.
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct GlobalNodeId(Url, usize, u64);
-
-impl<'a, T: Core, G: Grammar> From<NodeRef<'a, T, G>> for GlobalNodeId {
-    fn from(node: NodeRef<'a, T, G>) -> Self {
-        let arena_index = generational_arena::Index::from(node.index());
-        let (index, generation) = arena_index.into_raw_parts();
-        let url = node.tree().locator().url().clone();
-        GlobalNodeId(url, index, generation)
-    }
-}
-
-impl LowerHex for GlobalNodeId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let hash = Sha256::new()
-            .chain_update(self.0.as_str().as_bytes())
-            .chain_update(self.1.to_be_bytes())
-            .chain_update(self.2.to_be_bytes())
-            .finalize();
-        write!(f, "{:x}", hash)
     }
 }
 

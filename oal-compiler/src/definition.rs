@@ -2,7 +2,7 @@ use crate::errors::Result;
 use crate::eval;
 use crate::inference::tag::{Seq, Tag};
 use crate::module::ModuleSet;
-use crate::tree::{NRef, Tree};
+use crate::tree::NRef;
 use oal_model::grammar::NodeIdx;
 use oal_model::locator::Locator;
 use sha2::{Digest, Sha256};
@@ -27,7 +27,6 @@ impl Eq for dyn Internal {}
 
 pub type InternalRef = Rc<dyn Internal>;
 
-// TODO: refactor with GlobalNodeId
 /// External identifier definition.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct External {
@@ -36,9 +35,9 @@ pub struct External {
 }
 
 impl External {
-    pub fn new(module: &Tree, node: NRef) -> Self {
+    pub fn new(node: NRef) -> Self {
         External {
-            loc: module.locator().clone(),
+            loc: node.tree().locator().clone(),
             index: node.index(),
         }
     }
@@ -70,7 +69,7 @@ impl LowerHex for External {
         let arena_index = generational_arena::Index::from(self.index);
         let (index, generation) = arena_index.into_raw_parts();
         let hash = Sha256::new()
-            .chain_update(self.loc.url().as_str().as_bytes())
+            .chain_update(self.loc.url().as_str())
             .chain_update(index.to_be_bytes())
             .chain_update(generation.to_be_bytes())
             .finalize();

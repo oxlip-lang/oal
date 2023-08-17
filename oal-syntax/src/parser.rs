@@ -1119,6 +1119,17 @@ pub fn parse_declaration<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult
     let (s, n1) = parse_token(c, s, TokenKind::KeywordLet)?;
     let (s, n2) = parse_identifier(c, s)?;
     let (s, n3) = parse_bindings(c, s)?;
+    match (&n2, &n3) {
+        (ParserMatch::Token(t), ParserMatch::Node(_))
+            if t.kind() == TokenKind::IdentifierReference =>
+        {
+            return Err(ParserError::new(
+                "invalid reference identifier (function)",
+                c.span(s),
+            ))
+        }
+        _ => {}
+    }
     let (s, n4) = parse_token(c, s, TokenKind::OperatorEqual)?;
     let (s, n5) = parse_expression(c, s)?;
     let (s, n6) = parse_token(c, s, TokenKind::ControlSemicolon)?;

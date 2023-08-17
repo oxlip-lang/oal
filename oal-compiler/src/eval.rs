@@ -10,10 +10,11 @@ use crate::spec::{
 use crate::tree::{Core, NRef};
 use enum_map::EnumMap;
 use indexmap::IndexMap;
-use oal_model::grammar::{AbstractSyntaxNode, GlobalNodeId};
+use oal_model::grammar::AbstractSyntaxNode;
 use oal_syntax::atom;
 use oal_syntax::lexer as lex;
 use oal_syntax::parser as syn;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -81,10 +82,17 @@ impl<'a> Expr<'a> {
     }
 }
 
+type Scope<'a> = HashMap<atom::Ident, Value<'a>>;
+type ScopeId = u64;
+
 pub struct Context<'a> {
     mods: &'a ModuleSet,
+    /// The explicit and implicit (e.g. recursive) references.
     refs: IndexMap<atom::Ident, Option<Value<'a>>>,
-    scopes: Vec<HashMap<atom::Ident, Value<'a>>>,
+    /// The stack of evaluation scopes.
+    scopes: Vec<(ScopeId, Scope<'a>)>,
+    /// The sequence of unique scope identifiers in the evaluation tree.
+    scope_id_seq: ScopeId,
 }
 
 impl<'a> Context<'a> {
@@ -93,12 +101,41 @@ impl<'a> Context<'a> {
             mods,
             refs: IndexMap::new(),
             scopes: Vec::new(),
+            scope_id_seq: 0,
         }
     }
-}
 
-fn recursive_node_id(node: NRef) -> atom::Ident {
-    atom::Ident::from(format!("rec-{:x}", GlobalNodeId::from(node)))
+    /// Adds a new scope to the top of the stack.
+    fn push_scope(&mut self, scope: Scope<'a>) {
+        self.scope_id_seq += 1;
+        self.scopes.push((self.scope_id_seq, scope));
+    }
+
+    /// Removes the last scope from the top of the stack.
+    fn pop_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    /// Looks for a matching binding in the stack of scopes.
+    fn lookup_binding(&self, ident: &atom::Ident) -> Option<(Expr<'a>, AnnRef)> {
+        self.scopes
+            .iter()
+            .rev()
+            .map(|s| s.1.get(ident))
+            .skip_while(Option::is_none)
+            .map(|s| s.unwrap())
+            .next()
+            .cloned()
+    }
+
+    /// Returns a unique identifier for the given node within the current scope.
+    fn node_identifier(&self, node: NRef) -> atom::Ident {
+        let scope_id = self.scopes.last().map_or(0, |(id, _)| *id);
+        let mut hash = Sha256::new();
+        hash.update(scope_id.to_be_bytes());
+        node.digest(&mut hash);
+        atom::Ident::from(format!("hash-{:x}", hash.finalize()))
+    }
 }
 
 fn compose_annotations<'a, I>(anns: I) -> Result<Annotation>
@@ -400,7 +437,7 @@ pub fn eval_declaration<'a>(
 
         if ident.is_reference() || decl.node().syntax().core_ref().is_recursive {
             if !ident.is_reference() {
-                ident = recursive_node_id(decl.node());
+                ident = ctx.node_identifier(decl.node());
             }
             // Make sure we evaluate the reference or recursive declaration only once.
             let expr = if !ctx.refs.contains_key(&ident) {
@@ -433,17 +470,11 @@ pub fn eval_binding<'a>(
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
     let ident = binding.ident();
-    let Some((expr, prev_ann)) = ctx
-        .scopes
-        .iter()
-        .rev()
-        .map(|s| s.get(&ident))
-        .skip_while(Option::is_none)
-        .map(|s| s.unwrap()).next()
-        else { panic!("binding '{}' should exist", ident) };
+    let Some((expr, prev_ann)) = ctx.lookup_binding(&ident)
+            else { panic!("binding '{}' should exist", ident) };
     let mut next_ann = prev_ann.as_ref().clone();
     next_ann.extend(ann.as_ref().clone());
-    Ok((expr.clone(), AnnRef::new(next_ann)))
+    Ok((expr, AnnRef::new(next_ann)))
 }
 
 pub fn eval_variable<'a>(
@@ -699,9 +730,9 @@ pub fn eval_application<'a>(
             app_ann.extend(ann.as_ref().clone());
             let app_ann = AnnRef::new(app_ann);
 
-            ctx.scopes.push(scope);
+            ctx.push_scope(scope);
             let (expr, next_ann) = eval_any(ctx, decl.rhs(), app_ann)?;
-            ctx.scopes.pop();
+            ctx.pop_scope();
 
             Ok((expr, next_ann))
         }
@@ -721,15 +752,13 @@ pub fn eval_recursion<'a>(
     rec: syn::Recursion<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let ident = recursive_node_id(rec.node());
-
+    let ident = ctx.node_identifier(rec.node());
     let mut scope = HashMap::new();
     let recursion = (Expr::Recursion(ident.clone()), AnnRef::default());
     scope.insert(rec.binding().ident(), recursion);
-    ctx.scopes.push(scope);
+    ctx.push_scope(scope);
     let rhs = eval_any(ctx, rec.rhs(), AnnRef::default())?;
-    ctx.scopes.pop();
-
+    ctx.pop_scope();
     ctx.refs.insert(ident.clone(), Some(rhs.clone()));
     let expr = Expr::Reference(ident, rhs.into());
     Ok((expr, ann))

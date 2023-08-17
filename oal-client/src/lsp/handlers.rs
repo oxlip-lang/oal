@@ -45,7 +45,7 @@ fn find_definition(
     if let Some(ident) = syntax_at::<Identifier<_>>(tree, index) {
         let parent = ident.node().ancestors().nth(1).unwrap();
         let definition = if let Some(decl) = Declaration::cast(parent) {
-            Some(Definition::External(External::new(tree, decl.node())))
+            Some(Definition::External(External::new(decl.node())))
         } else if let Some(var) = Variable::cast(parent) {
             var.node().syntax().core_ref().definition().cloned()
         } else {

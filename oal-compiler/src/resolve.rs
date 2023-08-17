@@ -37,23 +37,15 @@ fn declare_import(
     let Some(module) = mods.get(&other) else { panic!("unknown module: {other}") };
     let program = Program::cast(module.root()).expect("module root must be a program");
     for decl in program.declarations() {
-        let ext = External::new(module, decl.node());
-        let defn = Definition::External(ext);
+        let defn = Definition::External(External::new(decl.node()));
         let entry = Entry::new(decl.ident(), import.qualifier());
         env.declare(entry, defn);
     }
     Ok(())
 }
 
-fn declare_variable(
-    env: &mut Env,
-    mods: &ModuleSet,
-    loc: &Locator,
-    decl: Declaration<'_, Core>,
-) -> Result<()> {
-    let current = mods.get(loc).unwrap();
-    let ext = External::new(current, decl.node());
-    let defn = Definition::External(ext);
+fn declare_variable(env: &mut Env, decl: Declaration<'_, Core>) -> Result<()> {
+    let defn = Definition::External(External::new(decl.node()));
     let entry = Entry::from(decl.ident());
     if env.declare(entry, defn).is_some() {
         let span = decl.identifier().node().span();
@@ -63,19 +55,11 @@ fn declare_variable(
     }
 }
 
-fn open_declaration(
-    env: &mut Env,
-    mods: &ModuleSet,
-    loc: &Locator,
-    defg: &mut DefGraph,
-    decl: Declaration<'_, Core>,
-) -> Result<()> {
+fn open_declaration(env: &mut Env, defg: &mut DefGraph, decl: Declaration<'_, Core>) -> Result<()> {
     env.open();
-    let current = mods.get(loc).unwrap();
-    defg.open(External::new(current, decl.node()));
+    defg.open(External::new(decl.node()));
     for binding in decl.bindings() {
-        let ext = External::new(current, binding.node());
-        let defn = Definition::External(ext);
+        let defn = Definition::External(External::new(binding.node()));
         let entry = Entry::from(binding.ident());
         env.declare(entry, defn);
     }
@@ -88,17 +72,10 @@ fn close_declaration(env: &mut Env, defg: &mut DefGraph) -> Result<()> {
     Ok(())
 }
 
-fn open_recursion(
-    env: &mut Env,
-    mods: &ModuleSet,
-    loc: &Locator,
-    rec: Recursion<'_, Core>,
-) -> Result<()> {
+fn open_recursion(env: &mut Env, rec: Recursion<'_, Core>) -> Result<()> {
     env.open();
-    let current = mods.get(loc).unwrap();
     let binding = rec.binding();
-    let ext = External::new(current, binding.node());
-    let defn = Definition::External(ext);
+    let defn = Definition::External(External::new(binding.node()));
     let entry = Entry::from(binding.ident());
     env.declare(entry, defn);
     Ok(())
@@ -121,18 +98,18 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         declare_import(env, mods, loc, import)?;
     }
     for decl in prog.declarations() {
-        declare_variable(env, mods, loc, decl)?;
+        declare_variable(env, decl)?;
     }
 
     for cursor in tree.root().traverse() {
         match cursor {
             NodeCursor::Start(node) => {
                 if let Some(decl) = Declaration::cast(node) {
-                    open_declaration(env, mods, loc, defg, decl)?;
+                    open_declaration(env, defg, decl)?;
                 } else if let Some(var) = Variable::cast(node) {
                     define_variable(env, defg, var)?;
                 } else if let Some(rec) = Recursion::cast(node) {
-                    open_recursion(env, mods, loc, rec)?;
+                    open_recursion(env, rec)?;
                 }
             }
             NodeCursor::End(node) => {

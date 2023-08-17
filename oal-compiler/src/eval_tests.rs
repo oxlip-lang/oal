@@ -448,25 +448,6 @@ fn eval_reference_fallback() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eval_reference_lambda() -> anyhow::Result<()> {
-    let s = eval_check(
-        r#"
-        let @a x = x;
-        res (@a /) on get -> <>;
-    "#,
-    )?;
-
-    assert_eq!(s.rels.len(), 1);
-    let p = s.rels.iter().next().unwrap();
-    assert_eq!(p.uri.path.len(), 1);
-    assert_eq!(*p.uri.path.first().unwrap(), UriSegment::Literal("".into()));
-
-    assert!(s.refs.is_empty());
-
-    Ok(())
-}
-
-#[test]
 fn eval_identifier_duplicate() -> anyhow::Result<()> {
     let code = r#"
         let a = {};
@@ -649,7 +630,7 @@ fn eval_single_recursion() -> anyhow::Result<()> {
     assert_eq!(p2.name, "b");
     let SchemaExpr::Ref(id1) = &p1.schema.expr else { panic!("schema should be a reference") };
     let SchemaExpr::Ref(id2) = &p2.schema.expr else { panic!("schema should be a reference") };
-    assert!(id1.as_ref().starts_with("rec-"));
+    assert!(id1.as_ref().starts_with("hash-"));
     assert_eq!(id1, id2);
     let recursion = s.refs.get(id1).expect("reference should exist");
     let Reference::Schema(schema) = recursion;
@@ -726,6 +707,22 @@ fn eval_recursive_lambda() -> anyhow::Result<()> {
         errors::Kind::InvalidType
     ));
 
+    Ok(())
+}
+
+#[test]
+fn eval_unique_recursive_identifiers() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let g x = x;
+        let f x = rec y (g x);
+        let a = f { 'p int };
+        let b = f { 'p str };
+        res / on get -> { 'a a, 'b b, 'c b };
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
+    assert_eq!(s.refs.len(), 3);
     Ok(())
 }
 
