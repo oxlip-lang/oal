@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
 
     eprintln!("Generating API definition");
     let spec = proc.eval(&mods)?;
-    let mut builder = oal_openapi::Builder::new().with_spec(spec);
+    let mut builder = oal_openapi::Builder::new(spec);
 
     if let Some(ref loc) = base {
         let path: PathBuf = loc.try_into()?;

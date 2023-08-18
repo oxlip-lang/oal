@@ -8,27 +8,27 @@ use oal_syntax::atom;
 use openapiv3::*;
 use std::iter::once;
 
-#[derive(Default)]
 pub struct Builder {
-    spec: Option<spec::Spec>,
+    spec: spec::Spec,
     base: Option<OpenAPI>,
 }
 
 type Headers = IndexMap<String, ReferenceOr<Header>>;
 type Examples = IndexMap<String, ReferenceOr<Example>>;
 
+impl From<Builder> for OpenAPI {
+    fn from(b: Builder) -> Self {
+        b.into_openapi()
+    }
+}
+
 impl Builder {
-    pub fn new() -> Builder {
-        Builder::default()
+    pub fn new(spec: spec::Spec) -> Builder {
+        Builder { spec, base: None }
     }
 
     pub fn with_base(mut self, base: OpenAPI) -> Self {
         self.base = Some(base);
-        self
-    }
-
-    pub fn with_spec(mut self, spec: spec::Spec) -> Self {
-        self.spec = Some(spec);
         self
     }
 
@@ -248,32 +248,61 @@ impl Builder {
         }
     }
 
-    fn schema(&self, s: &spec::Schema) -> ReferenceOr<Schema> {
-        if let spec::SchemaExpr::Ref(name) = &s.expr {
+    fn maybe_inline(&self, name: &atom::Ident) -> Option<&spec::Schema> {
+        // Implicit and atomic references should be inlined.
+        if name.is_reference() {
+            return None;
+        }
+        let spec::Reference::Schema(s) = self.spec.refs.get(name).expect("reference should exist");
+        match s.expr {
+            spec::SchemaExpr::Num(_)
+            | spec::SchemaExpr::Str(_)
+            | spec::SchemaExpr::Bool(_)
+            | spec::SchemaExpr::Int(_)
+            | spec::SchemaExpr::Rel(_)
+            | spec::SchemaExpr::Uri(_) => Some(s),
+            _ => None,
+        }
+    }
+
+    fn reference_schema(&self, name: &atom::Ident) -> ReferenceOr<Schema> {
+        if let Some(s) = self.maybe_inline(name) {
+            self.schema(s)
+        } else {
             ReferenceOr::Reference {
                 reference: format!("#/components/schemas/{}", name.untagged()),
             }
+        }
+    }
+
+    fn value_schema(&self, s: &spec::Schema) -> ReferenceOr<Schema> {
+        let mut sch = match &s.expr {
+            spec::SchemaExpr::Num(p) => self.number_schema(p),
+            spec::SchemaExpr::Str(p) => self.string_schema(p),
+            spec::SchemaExpr::Bool(p) => self.boolean_schema(p),
+            spec::SchemaExpr::Int(p) => self.integer_schema(p),
+            spec::SchemaExpr::Rel(rel) => self.rel_schema(rel),
+            spec::SchemaExpr::Uri(uri) => self.uri_schema(uri),
+            spec::SchemaExpr::Object(obj) => self.object_schema(obj),
+            spec::SchemaExpr::Array(array) => self.array_schema(array),
+            spec::SchemaExpr::Op(operation) => match operation.op {
+                atom::VariadicOperator::Join => self.join_schema(&operation.schemas),
+                atom::VariadicOperator::Sum => self.sum_schema(&operation.schemas),
+                atom::VariadicOperator::Any => self.any_schema(&operation.schemas),
+                atom::VariadicOperator::Range => unreachable!(),
+            },
+            spec::SchemaExpr::Ref(_) => unreachable!(),
+        };
+        sch.schema_data.description = s.desc.clone();
+        sch.schema_data.title = s.title.clone();
+        ReferenceOr::Item(sch)
+    }
+
+    fn schema(&self, s: &spec::Schema) -> ReferenceOr<Schema> {
+        if let spec::SchemaExpr::Ref(name) = &s.expr {
+            self.reference_schema(name)
         } else {
-            let mut sch = match &s.expr {
-                spec::SchemaExpr::Num(p) => self.number_schema(p),
-                spec::SchemaExpr::Str(p) => self.string_schema(p),
-                spec::SchemaExpr::Bool(p) => self.boolean_schema(p),
-                spec::SchemaExpr::Int(p) => self.integer_schema(p),
-                spec::SchemaExpr::Rel(rel) => self.rel_schema(rel),
-                spec::SchemaExpr::Uri(uri) => self.uri_schema(uri),
-                spec::SchemaExpr::Object(obj) => self.object_schema(obj),
-                spec::SchemaExpr::Array(array) => self.array_schema(array),
-                spec::SchemaExpr::Op(operation) => match operation.op {
-                    atom::VariadicOperator::Join => self.join_schema(&operation.schemas),
-                    atom::VariadicOperator::Sum => self.sum_schema(&operation.schemas),
-                    atom::VariadicOperator::Any => self.any_schema(&operation.schemas),
-                    atom::VariadicOperator::Range => unreachable!(),
-                },
-                spec::SchemaExpr::Ref(_) => unreachable!(),
-            };
-            sch.schema_data.description = s.desc.clone();
-            sch.schema_data.title = s.title.clone();
-            ReferenceOr::Item(sch)
+            self.value_schema(s)
         }
     }
 
@@ -328,32 +357,33 @@ impl Builder {
     }
 
     fn xfer_params(&self, xfer: &spec::Transfer) -> Vec<ReferenceOr<Parameter>> {
-        xfer.params
-            .iter()
-            .flat_map(|o| {
-                o.props
-                    .iter()
-                    .map(|p| ReferenceOr::Item(self.prop_query_param(p)))
-            })
-            .chain(xfer.domain.headers.iter().flat_map(|o| {
-                o.props
-                    .iter()
-                    .map(|p| ReferenceOr::Item(self.prop_header_param(p)))
-            }))
-            .collect()
+        let mut params = Vec::new();
+        if let Some(o) = xfer.params.as_ref() {
+            for p in o.props.iter() {
+                params.push(ReferenceOr::Item(self.prop_query_param(p)));
+            }
+        }
+        if let Some(o) = xfer.domain.headers.as_ref() {
+            for p in o.props.iter() {
+                params.push(ReferenceOr::Item(self.prop_header_param(p)));
+            }
+        }
+        params
     }
 
     fn uri_params(&self, uri: &spec::Uri) -> Vec<ReferenceOr<Parameter>> {
-        let path = uri.path.iter().flat_map(|s| match s {
-            spec::UriSegment::Variable(p) => Some(ReferenceOr::Item(self.prop_path_param(p))),
-            _ => None,
-        });
-        let query = uri.params.iter().flat_map(|o| {
-            o.props
-                .iter()
-                .map(|p| ReferenceOr::Item(self.prop_query_param(p)))
-        });
-        path.chain(query).collect()
+        let mut params = Vec::new();
+        for s in uri.path.iter() {
+            if let spec::UriSegment::Variable(p) = s {
+                params.push(ReferenceOr::Item(self.prop_path_param(p)));
+            }
+        }
+        if let Some(o) = uri.params.as_ref() {
+            for p in o.props.iter() {
+                params.push(ReferenceOr::Item(self.prop_query_param(p)));
+            }
+        }
+        params
     }
 
     fn domain_request(&self, domain: &spec::Content) -> Option<ReferenceOr<RequestBody>> {
@@ -547,19 +577,17 @@ impl Builder {
     }
 
     fn all_paths(&self) -> Paths {
-        let paths = if let Some(spec) = &self.spec {
-            spec.rels
-                .iter()
-                .map(|rel| {
-                    (
-                        rel.uri.pattern(),
-                        ReferenceOr::Item(self.relation_path_item(rel)),
-                    )
-                })
-                .collect()
-        } else {
-            Default::default()
-        };
+        let paths = self
+            .spec
+            .rels
+            .iter()
+            .map(|rel| {
+                (
+                    rel.uri.pattern(),
+                    ReferenceOr::Item(self.relation_path_item(rel)),
+                )
+            })
+            .collect();
         Paths {
             paths,
             extensions: Default::default(),
@@ -567,25 +595,16 @@ impl Builder {
     }
 
     fn all_components(&self) -> Components {
-        let schemas = if let Some(spec) = &self.spec {
-            spec.refs
-                .iter()
-                .flat_map(|(name, reference)| match reference {
-                    spec::Reference::Schema(s) => Some((name.untagged(), self.schema(s))),
-                })
-                .collect()
-        } else {
-            Default::default()
-        };
+        let mut schemas = IndexMap::new();
+        for (name, spec::Reference::Schema(s)) in self.spec.refs.iter() {
+            // Only keep components that couldn't be inlined.
+            if self.maybe_inline(name).is_none() {
+                schemas.insert(name.untagged(), self.schema(s));
+            }
+        }
         Components {
             schemas,
             ..Default::default()
         }
-    }
-}
-
-impl From<Builder> for OpenAPI {
-    fn from(b: Builder) -> Self {
-        b.into_openapi()
     }
 }

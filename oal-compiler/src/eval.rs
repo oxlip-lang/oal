@@ -757,11 +757,11 @@ pub fn eval_recursion<'a>(
     let recursion = (Expr::Recursion(ident.clone()), AnnRef::default());
     scope.insert(rec.binding().ident(), recursion);
     ctx.push_scope(scope);
-    let rhs = eval_any(ctx, rec.rhs(), AnnRef::default())?;
+    let rhs = eval_any(ctx, rec.rhs(), ann)?;
     ctx.pop_scope();
     ctx.refs.insert(ident.clone(), Some(rhs.clone()));
     let expr = Expr::Reference(ident, rhs.into());
-    Ok((expr, ann))
+    Ok((expr, AnnRef::default()))
 }
 
 pub fn eval_any<'a>(
