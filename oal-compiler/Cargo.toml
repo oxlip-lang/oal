@@ -14,9 +14,9 @@ categories = ["compilers"]
 [dependencies]
 oal-model = { path = "../oal-model" }
 oal-syntax = { path = "../oal-syntax" }
-indexmap = "1.9"
+indexmap = "2.0"
 enum-map = "2.6"
-enum-map-derive = "0.12"
+enum-map-derive = "0.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 anyhow = "1.0"
