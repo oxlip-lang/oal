@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,6 +20,9 @@ jobs:
           profile: minimal
           toolchain: 1.72.0
           override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: tree
       - uses: actions-rs/cargo@v1
         with:
           command: check
