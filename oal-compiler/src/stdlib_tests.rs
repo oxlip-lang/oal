@@ -21,6 +21,8 @@ fn concat() {
         (Expr::Uri(right.into()), AnnRef::default()),
     ];
     let (expr, _) = c.eval(args, AnnRef::default()).expect("evaluation failed");
-    let Expr::Uri(uri) = expr else { panic!("expected a uri") };
+    let Expr::Uri(uri) = expr else {
+        panic!("expected a uri")
+    };
     assert_eq!(uri.pattern(), "/a/b");
 }

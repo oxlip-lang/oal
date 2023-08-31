@@ -34,7 +34,9 @@ fn declare_import(
 ) -> Result<()> {
     let other = loc.join(import.module())?;
     // All modules that are to be imported must be present in the module-set.
-    let Some(module) = mods.get(&other) else { panic!("unknown module: {other}") };
+    let Some(module) = mods.get(&other) else {
+        panic!("unknown module: {other}")
+    };
     let program = Program::cast(module.root()).expect("module root must be a program");
     for decl in program.declarations() {
         let defn = Definition::External(External::new(decl.node()));

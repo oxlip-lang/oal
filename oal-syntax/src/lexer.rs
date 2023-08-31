@@ -372,7 +372,9 @@ fn test_tokenize() {
     let loc = Locator::try_from("file:///example.oal").unwrap();
     let input = "let @var = { 'p 100, 'p { 'p { 'p { 'p { 'p \"string\" ! }}}}};";
 
-    let (Some(list), errors) = tokenize(loc, input) else { panic!() };
+    let (Some(list), errors) = tokenize(loc, input) else {
+        panic!()
+    };
 
     assert!(errors.is_empty());
     assert_eq!(list.end(), input.len());

@@ -48,14 +48,18 @@ fn assert_prim(n: NRef, kind: PrimitiveKind) -> Primitive<()> {
 fn assert_next_path_elem<'a>(
     segs: &mut impl Iterator<Item = UriSegment<'a, ()>>,
 ) -> PathElement<'a, ()> {
-    let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
+    let UriSegment::Element(elem) = segs.next().expect("expected a segment") else {
+        panic!("expected an URI element")
+    };
     elem
 }
 
 fn assert_next_path_var<'a>(
     segs: &mut impl Iterator<Item = UriSegment<'a, ()>>,
 ) -> Property<'a, ()> {
-    let UriSegment::Variable(var) = segs.next().expect("expected a segment") else { panic!("expected an URI variable") };
+    let UriSegment::Variable(var) = segs.next().expect("expected a segment") else {
+        panic!("expected an URI variable")
+    };
     Property::cast(assert_term(var.inner())).expect("expected a property")
 }
 
@@ -110,7 +114,9 @@ fn parse_decl_uri() {
         let segs = &mut UriTemplate::cast(rhs)
             .expect("expected an URI template")
             .segments();
-        let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
+        let UriSegment::Element(elem) = segs.next().expect("expected a segment") else {
+            panic!("expected an URI element")
+        };
         assert_eq!(elem.as_str(), "");
     });
     parse("let a = /p;", |p: Prog| {
@@ -118,7 +124,9 @@ fn parse_decl_uri() {
         let segs = &mut UriTemplate::cast(rhs)
             .expect("expected an URI template")
             .segments();
-        let UriSegment::Element(elem) = segs.next().expect("expected a segment") else { panic!("expected an URI element") };
+        let UriSegment::Element(elem) = segs.next().expect("expected a segment") else {
+            panic!("expected an URI element")
+        };
         assert_eq!(elem.as_str(), "p");
     });
     parse("let a = /x/{ 'y str }/z?{ 'q str, 'n num };", |p: Prog| {
@@ -219,13 +227,17 @@ fn parse_decl_number() {
     parse("let a = 404;", |p: Prog| {
         let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
         assert_eq!(lit.kind(), LiteralKind::Number);
-        let lex::TokenValue::Number(num) = lit.value() else { panic!("expected a number") };
+        let lex::TokenValue::Number(num) = lit.value() else {
+            panic!("expected a number")
+        };
         assert_eq!(*num, 404);
     });
     parse("let a = 4XX;", |p: Prog| {
         let lit = assert_lit(assert_term(assert_decl(p, "a").rhs()));
         assert_eq!(lit.kind(), LiteralKind::HttpStatus);
-        let lex::TokenValue::HttpStatus(status) = lit.value() else { panic!("expected a status") };
+        let lex::TokenValue::HttpStatus(status) = lit.value() else {
+            panic!("expected a status")
+        };
         assert_eq!(
             *status,
             atom::HttpStatus::Range(atom::HttpStatusRange::ClientError)
@@ -259,8 +271,9 @@ fn parse_import() {
     parse(r#"use "module" as mod;"#, |p: Prog| {
         let imp = p.imports().next().expect("expected an import");
         assert_eq!(imp.module(), "module");
-        let Some(qualifier) = imp.qualifier()
-            else { panic!("expected qualifier") };
+        let Some(qualifier) = imp.qualifier() else {
+            panic!("expected qualifier")
+        };
         assert_eq!(qualifier, "mod");
     })
 }
@@ -317,7 +330,9 @@ fn parse_decl_content() {
 
             let meta = metas.next().expect("expected meta");
             assert_eq!(meta.kind(), ContentTagKind::Status);
-            let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
+            let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else {
+                panic!("expected a number")
+            };
             assert_eq!(*num, 200);
 
             let meta = metas.next().expect("expected meta");
@@ -336,7 +351,9 @@ fn parse_decl_content() {
         let metas = &mut cnt.meta().expect("expected meta list");
         let meta = metas.next().expect("expected meta");
         assert_eq!(meta.kind(), ContentTagKind::Status);
-        let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else { panic!("expected a number" )};
+        let lex::TokenValue::Number(num) = assert_lit(assert_term(meta.rhs())).value() else {
+            panic!("expected a number")
+        };
         assert_eq!(*num, 204);
 
         assert!(metas.next().is_none());
@@ -436,7 +453,9 @@ fn parse_decl_relation() {
 
         let uri = UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
         let segs = &mut uri.segments();
-        let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else { panic!("expected path element") };
+        let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else {
+            panic!("expected path element")
+        };
         assert_eq!(elem.as_str(), "p");
         assert!(segs.next().is_none(), "expected no more URI segment");
 
@@ -461,7 +480,9 @@ let a = /p on
 
             let uri = UriTemplate::cast(rel.uri().inner()).expect("expected an URI template");
             let segs = &mut uri.segments();
-            let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else { panic!("expected path element") };
+            let UriSegment::Element(elem) = segs.next().expect("expected an URI segment") else {
+                panic!("expected path element")
+            };
             assert_eq!(elem.as_str(), "p");
             assert!(segs.next().is_none(), "expected no more URI segment");
 

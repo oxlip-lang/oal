@@ -34,7 +34,7 @@ fn deep_extend_mapping(prev: &mut Mapping, other: Mapping) {
 
 /// Extends a sequence by concatenation.
 fn deep_extend_sequence(prev: &mut Sequence, other: Sequence) {
-    prev.extend(other.into_iter());
+    prev.extend(other);
 }
 
 #[test]

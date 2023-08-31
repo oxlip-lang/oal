@@ -84,7 +84,7 @@ pub fn go_to_definition(
 
     let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
         // Location not found in any folder.
-        return Ok(None)
+        return Ok(None);
     };
 
     let tree = folder.module(&loc).unwrap();
@@ -114,12 +114,12 @@ pub fn references(
 
     let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
         // Location not found in any folder.
-        return Ok(None)
+        return Ok(None);
     };
 
     let Some(definition) = find_definition(&mut state.workspace, folder, &loc, pos)? else {
         // Not a variable or definition.
-        return Ok(None)
+        return Ok(None);
     };
 
     let refs = find_references(&mut state.workspace, folder, definition)?;
@@ -136,7 +136,7 @@ pub fn prepare_rename(
 
     let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
         // Location not found in any folder.
-        return Ok(None)
+        return Ok(None);
     };
 
     let tree = folder.module(&loc).unwrap();
@@ -169,17 +169,17 @@ pub fn rename(
 
     let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
         // Location not found in any folder.
-        return Ok(None)
+        return Ok(None);
     };
 
     let Some(definition) = find_definition(&mut state.workspace, folder, &loc, pos)? else {
         // Not a variable or definition.
-        return Ok(None)
+        return Ok(None);
     };
 
     let Definition::External(ref external) = definition else {
         // Not an external definition.
-        return Ok(None)
+        return Ok(None);
     };
 
     let mut changes = HashMap::new();

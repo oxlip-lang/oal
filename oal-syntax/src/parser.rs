@@ -355,8 +355,7 @@ impl<'a, T: Core> Terminal<'a, T> {
     }
 
     pub fn annotations(&self) -> impl Iterator<Item = Annotation<'a, T>> {
-        self.prefix_annotations()
-            .chain(self.suffix_annotation().into_iter())
+        self.prefix_annotations().chain(self.suffix_annotation())
     }
 }
 
@@ -1158,7 +1157,9 @@ fn test_parser<T: Core>(parser: ParserFn<T>, tokens: Vec<TokenKind>) {
     let cursor = ctx.head();
     let (end, root) = parser(&mut ctx, cursor).unwrap();
     assert!(!end.is_valid(), "remaining input");
-    let ParserMatch::Node(root) = root else { panic!("root should be a node") };
+    let ParserMatch::Node(root) = root else {
+        panic!("root should be a node")
+    };
     println!("{:?}", ctx);
     let count = ctx.count();
     let tree = ctx.tree().finalize(root);

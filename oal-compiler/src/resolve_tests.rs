@@ -13,7 +13,9 @@ use oal_syntax::parser::{
 fn definition<'a>(mods: &'a ModuleSet, node: NRef<'a>) -> NRef<'a> {
     let core = node.syntax().core_ref();
     let defn = core.definition().expect("expected a definition");
-    let Definition::External(ext) = defn else { panic!("expected an external") };
+    let Definition::External(ext) = defn else {
+        panic!("expected an external")
+    };
     ext.node(mods)
 }
 

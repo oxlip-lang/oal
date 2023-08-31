@@ -93,7 +93,9 @@ fn eval_composed_annotation() -> anyhow::Result<()> {
     assert_eq!(x.ranges.len(), 1);
     let c = x.ranges.values().next().unwrap();
     let s = c.schema.as_ref().unwrap();
-    let SchemaExpr::Object(ref o) = s.expr else { panic!("expected an object") };
+    let SchemaExpr::Object(ref o) = s.expr else {
+        panic!("expected an object")
+    };
     assert_eq!(o.props.len(), 1);
     let p = o.props.first().unwrap();
     assert_eq!(p.name, "prop");
@@ -103,7 +105,9 @@ fn eval_composed_annotation() -> anyhow::Result<()> {
     assert_eq!(s.desc.as_ref().unwrap(), "a number");
     assert_eq!(s.title.as_ref().unwrap(), "a property type");
     assert!(s.required.is_none());
-    let SchemaExpr::Num(ref n) = s.expr else { panic!("expected a number") };
+    let SchemaExpr::Num(ref n) = s.expr else {
+        panic!("expected a number")
+    };
     assert_eq!(n.minimum.unwrap(), 0f64);
 
     Ok(())
@@ -257,7 +261,9 @@ fn eval_content_schema() -> anyhow::Result<()> {
         .as_ref()
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+    let SchemaExpr::Object(o) = &r.expr else {
+        panic!("expected an object")
+    };
     assert_eq!(o.props.len(), 2);
     let p = &o.props[0];
     assert_eq!(p.name, "a");
@@ -280,16 +286,22 @@ fn eval_operation_any() -> anyhow::Result<()> {
         .as_ref()
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
+    let SchemaExpr::Op(op) = &r.expr else {
+        panic!("expected an operation")
+    };
     assert_eq!(op.op, VariadicOperator::Any);
     assert_eq!(op.schemas.len(), 3);
 
     let s = op.schemas.get(0).expect("expected a schema");
-    let SchemaExpr::Object(o) = &s.expr else { panic!("expected an object") };
+    let SchemaExpr::Object(o) = &s.expr else {
+        panic!("expected an object")
+    };
     assert_eq!(o.props.len(), 2);
     let p = &o.props[0];
     assert_eq!(p.name, "b");
-    let SchemaExpr::Array(a) = &p.schema.expr else { panic!("expected an array") };
+    let SchemaExpr::Array(a) = &p.schema.expr else {
+        panic!("expected an array")
+    };
     assert!(matches!(a.item.expr, SchemaExpr::Bool(_)));
     let p = &o.props[1];
     assert_eq!(p.name, "c");
@@ -315,7 +327,9 @@ fn eval_operation_sum() -> anyhow::Result<()> {
         .as_ref()
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
+    let SchemaExpr::Op(op) = &r.expr else {
+        panic!("expected an operation")
+    };
     assert_eq!(op.op, VariadicOperator::Sum);
     assert_eq!(op.schemas.len(), 2);
 
@@ -339,7 +353,9 @@ fn eval_operation_required() -> anyhow::Result<()> {
         .as_ref()
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+    let SchemaExpr::Object(o) = &r.expr else {
+        panic!("expected an object")
+    };
     assert_eq!(o.props.len(), 1);
     let p = &o.props[0];
     assert_eq!(p.name, "a");
@@ -358,7 +374,9 @@ fn eval_uri() -> anyhow::Result<()> {
     let r = s.rels.iter().next().unwrap();
 
     assert!(matches!(r.uri.path[0], UriSegment::Literal(_)));
-    let UriSegment::Variable(v) = &r.uri.path[1] else { panic!("expected uri variable") };
+    let UriSegment::Variable(v) = &r.uri.path[1] else {
+        panic!("expected uri variable")
+    };
     assert!(matches!(v.schema.expr, SchemaExpr::Num(_)));
     assert!(matches!(r.uri.path[2], UriSegment::Literal(_)));
 
@@ -412,13 +430,17 @@ fn eval_reference() -> anyhow::Result<()> {
         .expect("expected transfer on HTTP GET");
 
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Ref(i) = &r.expr else { panic!("expected a reference") };
+    let SchemaExpr::Ref(i) = &r.expr else {
+        panic!("expected a reference")
+    };
     assert_eq!(*i, "@a");
 
     assert_eq!(s.refs.len(), 1);
 
     let Reference::Schema(r) = s.refs.values().next().unwrap();
-    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+    let SchemaExpr::Object(o) = &r.expr else {
+        panic!("expected an object")
+    };
     assert!(o.props.is_empty());
 
     Ok(())
@@ -440,7 +462,9 @@ fn eval_reference_fallback() -> anyhow::Result<()> {
 
     assert_eq!(s.refs.len(), 1);
     let Reference::Schema(r) = s.refs.values().next().unwrap();
-    let SchemaExpr::Uri(u) = &r.expr else { panic!("expected an URI") };
+    let SchemaExpr::Uri(u) = &r.expr else {
+        panic!("expected an URI")
+    };
     assert_eq!(u.path.len(), 1);
     assert_eq!(*u.path.first().unwrap(), UriSegment::Literal("".into()));
 
@@ -484,13 +508,17 @@ fn eval_application() -> anyhow::Result<()> {
         .as_ref()
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Object(o) = &r.expr else { panic!("expected an object") };
+    let SchemaExpr::Object(o) = &r.expr else {
+        panic!("expected an object")
+    };
 
     assert_eq!(o.props.len(), 2);
 
     let p = &o.props[0];
     assert_eq!(p.name, "p");
-    let SchemaExpr::Op(op) = &p.schema.expr else { panic!("expected an operation") };
+    let SchemaExpr::Op(op) = &p.schema.expr else {
+        panic!("expected an operation")
+    };
     assert_eq!(op.op, VariadicOperator::Sum);
     assert_eq!(op.schemas.len(), 2);
 
@@ -537,7 +565,9 @@ fn eval_subexpr() -> anyhow::Result<()> {
         .as_ref()
         .expect("expected transfer on HTTP GET");
     let r = x.ranges.values().next().unwrap().schema.as_ref().unwrap();
-    let SchemaExpr::Op(op) = &r.expr else { panic!("expected an operation") };
+    let SchemaExpr::Op(op) = &r.expr else {
+        panic!("expected an operation")
+    };
 
     assert_eq!(op.op, VariadicOperator::Join);
     assert_eq!(op.schemas.len(), 2);
@@ -624,12 +654,18 @@ fn eval_single_recursion() -> anyhow::Result<()> {
         .schema
         .as_ref()
         .unwrap();
-    let SchemaExpr::Object(obj) = &range.expr else { panic!("range should be an object") };
+    let SchemaExpr::Object(obj) = &range.expr else {
+        panic!("range should be an object")
+    };
     let (p1, p2) = (&obj.props[0], &obj.props[1]);
     assert_eq!(p1.name, "a");
     assert_eq!(p2.name, "b");
-    let SchemaExpr::Ref(id1) = &p1.schema.expr else { panic!("schema should be a reference") };
-    let SchemaExpr::Ref(id2) = &p2.schema.expr else { panic!("schema should be a reference") };
+    let SchemaExpr::Ref(id1) = &p1.schema.expr else {
+        panic!("schema should be a reference")
+    };
+    let SchemaExpr::Ref(id2) = &p2.schema.expr else {
+        panic!("schema should be a reference")
+    };
     assert!(id1.as_ref().starts_with("hash-"));
     assert_eq!(id1, id2);
     let recursion = s.refs.get(id1).expect("reference should exist");
@@ -666,7 +702,9 @@ fn eval_mutual_recursion() -> anyhow::Result<()> {
         .as_ref()
         .unwrap();
 
-    let SchemaExpr::Ref(id_a) = &range.expr else { panic!("range should be a reference") };
+    let SchemaExpr::Ref(id_a) = &range.expr else {
+        panic!("range should be a reference")
+    };
     let ref_a = s.refs.get(id_a).expect("reference should exist");
     let Reference::Schema(schema) = ref_a;
     let SchemaExpr::Object(obj) = &schema.expr else {
@@ -675,7 +713,9 @@ fn eval_mutual_recursion() -> anyhow::Result<()> {
 
     let prop = &obj.props[0];
     assert_eq!(prop.name, "b");
-    let SchemaExpr::Ref(id_b) = &prop.schema.expr else { panic!("schema should be a reference") };
+    let SchemaExpr::Ref(id_b) = &prop.schema.expr else {
+        panic!("schema should be a reference")
+    };
     let ref_b = s.refs.get(id_b).expect("reference should exist");
     let Reference::Schema(schema) = ref_b;
     let SchemaExpr::Object(obj) = &schema.expr else {
@@ -684,7 +724,9 @@ fn eval_mutual_recursion() -> anyhow::Result<()> {
 
     let prop = &obj.props[0];
     assert_eq!(prop.name, "a");
-    let SchemaExpr::Ref(id) = &prop.schema.expr else { panic!("schema should be a reference") };
+    let SchemaExpr::Ref(id) = &prop.schema.expr else {
+        panic!("schema should be a reference")
+    };
     assert_eq!(id, id_a);
 
     Ok(())

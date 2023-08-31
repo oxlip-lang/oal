@@ -46,34 +46,41 @@ fn infer_tag() -> anyhow::Result<()> {
     let prog = Program::cast(mods.main().root()).expect("expected a program");
 
     let decl1 = prog.declarations().nth(0).expect("expected a declaration");
-    let Tag::Var(t1) = decl1.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t1) = decl1.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     let binding = decl1.bindings().next().expect("expected a binding");
     assert_eq!(binding.ident(), "x");
-    let Tag::Var(t2) = binding.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t2) = binding.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     let term = Terminal::cast(decl1.rhs()).expect("expected a terminal");
-    let Tag::Var(t3) = term.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t3) = term.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     let variable = Variable::cast(term.inner()).expect("expected a variable");
     assert_eq!(variable.ident(), "x");
-    let Tag::Var(t4) = variable.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t4) = variable.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     let decl2 = prog.declarations().nth(1).expect("expected a declaration");
-    let Tag::Var(t5) = decl2.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t5) = decl2.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     let app = Application::cast(decl2.rhs()).expect("expected an application");
-    let Tag::Var(t6) = app.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t6) = app.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     let arg = app.arguments().next().expect("expected an argument");
-    let Tag::Var(t7) = arg.node().syntax().core_ref().unwrap_tag()
-        else { panic!("expected a tag variable") };
+    let Tag::Var(t7) = arg.node().syntax().core_ref().unwrap_tag() else {
+        panic!("expected a tag variable")
+    };
 
     assert_eq!(arg.inner().syntax().core_ref().unwrap_tag(), Tag::Primitive);
 

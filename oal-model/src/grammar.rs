@@ -226,10 +226,7 @@ pub struct NodeRef<'a, T: Core, G: Grammar> {
 // Note: for some reason the derive macro is not doing the right thing for Clone/Copy.
 impl<'a, T: Core, G: Grammar> Clone for NodeRef<'a, T, G> {
     fn clone(&self) -> Self {
-        NodeRef {
-            tree: self.tree,
-            idx: self.idx,
-        }
+        *self
     }
 }
 
@@ -294,7 +291,9 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     }
 
     pub fn nth(&self, n: usize) -> NodeRef<'a, T, G> {
-        let Some(node) = self.children().nth(n) else { panic!("expected node at {n}") };
+        let Some(node) = self.children().nth(n) else {
+            panic!("expected node at {n}")
+        };
         node
     }
 

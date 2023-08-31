@@ -470,8 +470,9 @@ pub fn eval_binding<'a>(
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
     let ident = binding.ident();
-    let Some((expr, prev_ann)) = ctx.lookup_binding(&ident)
-            else { panic!("binding '{}' should exist", ident) };
+    let Some((expr, prev_ann)) = ctx.lookup_binding(&ident) else {
+        panic!("binding '{}' should exist", ident)
+    };
     let mut next_ann = prev_ann.as_ref().clone();
     next_ann.extend(ann.as_ref().clone());
     Ok((expr, AnnRef::new(next_ann)))
@@ -608,13 +609,15 @@ pub fn eval_literal<'a>(
 ) -> Result<(Expr<'a>, AnnRef)> {
     let expr = match literal.kind() {
         syn::LiteralKind::HttpStatus => {
-            let lex::TokenValue::HttpStatus(status) = literal.value()
-                else { panic!("expected an HTTP status") };
+            let lex::TokenValue::HttpStatus(status) = literal.value() else {
+                panic!("expected an HTTP status")
+            };
             Expr::HttpStatus(*status)
         }
         syn::LiteralKind::Number => {
-            let lex::TokenValue::Number(number) = literal.value()
-                else { panic!("expected a number") };
+            let lex::TokenValue::Number(number) = literal.value() else {
+                panic!("expected a number")
+            };
             Expr::Number(*number)
         }
         syn::LiteralKind::String => {
@@ -816,6 +819,8 @@ pub fn eval(mods: &ModuleSet) -> Result<Spec> {
     let ctx = &mut Context::new(mods);
     let ann = AnnRef::default();
     let (expr, _) = eval_any(ctx, mods.main().root(), ann)?;
-    let Expr::Spec(spec) = expr else { panic!("expected a specification") };
+    let Expr::Spec(spec) = expr else {
+        panic!("expected a specification")
+    };
     Ok(*spec)
 }
