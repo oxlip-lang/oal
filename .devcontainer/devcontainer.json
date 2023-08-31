@@ -1,5 +1,5 @@
 {
-	"name": "OpenAPI Lang",
+	"name": "Oxlip API Language",
 	"image": "mcr.microsoft.com/devcontainers/rust:1-1-bullseye",
 	"containerUser": "vscode",
 	"customizations": {
@@ -8,7 +8,7 @@
 				"oal.serverPath": "/usr/local/cargo/bin/oal-lsp"
 			},
 			"extensions": [
-				"emmanuel-bastien.openapi-lang"
+				"e7bastien.oxlip-lang"
 			]
 		}
 	},

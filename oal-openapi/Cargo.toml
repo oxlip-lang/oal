@@ -2,6 +2,14 @@
 name = "oal-openapi"
 version = "0.1.0"
 edition = "2021"
+authors = ["Emmanuel Bastien <os@ebastien.name>"]
+license = "Apache-2.0"
+description = "A high-level functional programming language for designing OpenAPI definitions"
+readme = "../README.md"
+homepage = "https://www.oxlip-lang.org"
+repository = "https://github.com/oxlip-lang/oal"
+keywords = ["api"]
+categories = ["compilers"]
 
 [dependencies]
 oal-syntax = { path = "../oal-syntax" }

@@ -6,8 +6,8 @@ authors = ["Emmanuel Bastien <os@ebastien.name>"]
 license = "Apache-2.0"
 description = "A language for describing web services as OpenAPI"
 readme = "../README.md"
-homepage = "https://github.com/ebastien/openapi-lang"
-repository = "https://github.com/ebastien/openapi-lang"
+homepage = "https://www.oxlip-lang.org"
+repository = "https://github.com/oxlip-lang/oal"
 keywords = ["api"]
 categories = ["compilers"]
 
