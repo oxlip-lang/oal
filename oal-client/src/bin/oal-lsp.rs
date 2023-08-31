@@ -17,7 +17,7 @@ use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
     // Note that we must have our logging only write out to stderr.
-    eprintln!("starting OpenAPI Lang server");
+    eprintln!("starting Oxlip API Language server");
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
     threads.join()?;
 
     // Shut down gracefully.
-    eprintln!("shutting down OpenAPI Lang server");
+    eprintln!("shutting down Oxlip API Language server");
     Ok(())
 }
 
