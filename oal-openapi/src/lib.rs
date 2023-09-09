@@ -267,7 +267,7 @@ impl Builder {
 
     fn reference_schema(&self, name: &atom::Ident) -> ReferenceOr<Schema> {
         if let Some(s) = self.maybe_inline(name) {
-            self.schema(s)
+            self.value_schema(s)
         } else {
             ReferenceOr::Reference {
                 reference: format!("#/components/schemas/{}", name.untagged()),
