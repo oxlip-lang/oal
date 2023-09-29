@@ -3,16 +3,17 @@ use crate::inference::{check_complete, constrain, substitute, tag};
 use crate::module::ModuleSet;
 use crate::resolve::resolve;
 use crate::tests::mods_from;
-use crate::typecheck::type_check;
+use crate::typecheck::{cycles_check, type_check};
 
 fn compile(code: &str) -> anyhow::Result<ModuleSet> {
     let mods = mods_from(code)?;
-    resolve(&mods, mods.base())?;
+    let graph = resolve(&mods, mods.base())?;
     let _nvars = tag(&mods, mods.base())?;
     let eqs = constrain(&mods, mods.base())?;
     let set = eqs.unify()?;
     substitute(&mods, mods.base(), &set)?;
     check_complete(&mods, mods.base())?;
+    cycles_check(graph, &mods)?;
     type_check(&mods, mods.base())?;
     Ok(mods)
 }
@@ -57,6 +58,8 @@ fn typecheck_error() {
         "res num;",
         "let a = str !;",
         "res / on (rec x (get -> { 'self uri }));",
+        "let f a = {} & (f { 'p a });",
+        "let a = rec x (concat /a x);",
     ];
 
     for c in cases {
