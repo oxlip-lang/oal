@@ -3,13 +3,13 @@ use crate::inference::{check_complete, constrain, substitute, tag};
 use crate::resolve::resolve;
 use crate::spec::{Object, Reference, SchemaExpr, Spec, UriSegment};
 use crate::tests::mods_from;
-use crate::typecheck::type_check;
+use crate::typecheck::{cycles_check, type_check};
 use oal_syntax::atom::{HttpStatus, Method, VariadicOperator};
 
 fn eval(code: &str, check: bool) -> anyhow::Result<Spec> {
     let mods = mods_from(code)?;
     let loc = mods.base();
-    resolve(&mods, loc)?;
+    let graph = resolve(&mods, loc)?;
     let _nvars = tag(&mods, loc)?;
     let eqs = constrain(&mods, loc)?;
     let set = eqs.unify()?;
@@ -17,6 +17,7 @@ fn eval(code: &str, check: bool) -> anyhow::Result<Spec> {
     if check {
         check_complete(&mods, loc)?;
     }
+    cycles_check(graph, &mods)?;
     type_check(&mods, loc)?;
 
     // Uncomment for debugging purpose:
@@ -772,14 +773,44 @@ fn eval_unique_recursive_identifiers() -> anyhow::Result<()> {
 #[test]
 #[ignore = "not implemented"]
 fn eval_recursive_uri() -> anyhow::Result<()> {
+    let code = r#"
+        let a = concat /a a;
+        res a;
+    "#;
+
+    assert!(matches!(
+        eval_check(code)
+            .expect_err(format!("expected error evaluating: {}", code).as_str())
+            .downcast_ref::<errors::Error>()
+            .expect("expected compiler error")
+            .kind,
+        errors::Kind::InvalidType
+    ));
+
     let s = eval_check(
         r#"
-        let a = concat /a a; // Should not work
-        let x = /b?{ 'p b };
-        let b = concat /a x; // Should work
+        let a = /b?{ 'p b };
+        let b = concat /a a;
+        res b;
     "#,
     )?;
     assert_eq!(s.rels.len(), 1);
+    assert_eq!(s.refs.len(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn eval_recursive_content() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let c = <headers={ 'Location r }, {}>;
+        let r = / on get -> c;
+        res r;
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
+    assert_eq!(s.refs.len(), 1);
     Ok(())
 }
 

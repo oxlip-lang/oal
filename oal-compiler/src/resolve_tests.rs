@@ -9,6 +9,7 @@ use oal_syntax::parser as syn;
 use oal_syntax::parser::{
     Application, Binding, Declaration, Primitive, Program, Terminal, Variable,
 };
+use petgraph::dot::{Config, Dot};
 
 fn definition<'a>(mods: &'a ModuleSet, node: NRef<'a>) -> NRef<'a> {
     let core = node.syntax().core_ref();
@@ -116,7 +117,7 @@ fn resolve_not_in_scope() -> anyhow::Result<()> {
 }
 
 #[test]
-fn resolve_recursion() -> anyhow::Result<()> {
+fn resolve_graph() -> anyhow::Result<()> {
     let mods = mods_from(
         r#"
     let a = { 'b b }; // mutually recursive
@@ -126,18 +127,26 @@ fn resolve_recursion() -> anyhow::Result<()> {
 "#,
     )?;
 
-    resolve(&mods, mods.base()).expect("expected resolution");
-
-    let prog = Program::cast(mods.main().root()).expect("expected a program");
-    let a = prog.declarations().nth(0).expect("expected a declaration");
-    let b = prog.declarations().nth(1).expect("expected a declaration");
-    let c = prog.declarations().nth(2).expect("expected a declaration");
-    let d = prog.declarations().nth(3).expect("expected a declaration");
-
-    assert!(a.node().syntax().core_ref().is_recursive);
-    assert!(b.node().syntax().core_ref().is_recursive);
-    assert!(!c.node().syntax().core_ref().is_recursive);
-    assert!(d.node().syntax().core_ref().is_recursive);
+    let graph = resolve(&mods, mods.base()).expect("should return a graph");
+    let graphviz = format!(
+        "{:?}",
+        Dot::with_config(&graph, &[Config::EdgeNoLabel, Config::NodeNoLabel])
+    );
+    assert_eq!(
+        graphviz,
+        r#"digraph {
+    0 [ ]
+    1 [ ]
+    2 [ ]
+    3 [ ]
+    0 -> 1 [ ]
+    1 -> 0 [ ]
+    2 -> 0 [ ]
+    2 -> 1 [ ]
+    3 -> 3 [ ]
+}
+"#
+    );
 
     Ok(())
 }

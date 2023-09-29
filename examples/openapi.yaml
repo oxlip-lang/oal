@@ -207,7 +207,7 @@ components:
               - example: /some/path/_id_number_/template
                 type: string
                 format: uri-reference
-              - $ref: '#/components/schemas/hash-d60d1f8c1c82157cf19abfacf4d4aeae665becd17938a08d6436fbfc3ca277f2'
+              - $ref: '#/components/schemas/hash-949ca8b37ea72edb5d2a99579d7f8e77bab63f43a8e2dc6a7788ae9404b493bd'
     obj2:
       allOf:
       - $ref: '#/components/schemas/obj1'
@@ -217,7 +217,7 @@ components:
             type: integer
             minimum: 0
             maximum: 999
-    hash-d60d1f8c1c82157cf19abfacf4d4aeae665becd17938a08d6436fbfc3ca277f2:
+    hash-949ca8b37ea72edb5d2a99579d7f8e77bab63f43a8e2dc6a7788ae9404b493bd:
       type: object
       properties:
         name:
@@ -227,4 +227,4 @@ components:
         children:
           type: array
           items:
-            $ref: '#/components/schemas/hash-d60d1f8c1c82157cf19abfacf4d4aeae665becd17938a08d6436fbfc3ca277f2'
+            $ref: '#/components/schemas/hash-949ca8b37ea72edb5d2a99579d7f8e77bab63f43a8e2dc6a7788ae9404b493bd'

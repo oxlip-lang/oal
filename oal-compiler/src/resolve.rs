@@ -1,4 +1,3 @@
-use crate::defgraph::DefGraph;
 use crate::definition::{Definition, External};
 use crate::env::{Entry, Env};
 use crate::errors::{Error, Kind, Result};
@@ -8,8 +7,58 @@ use crate::tree::Core;
 use oal_model::grammar::{AbstractSyntaxNode, NodeCursor};
 use oal_model::locator::Locator;
 use oal_syntax::parser::{Declaration, Import, Program, Recursion, Variable};
+use petgraph::graph::NodeIndex;
+use petgraph::stable_graph::StableDiGraph;
+use std::collections::{hash_map, HashMap};
 
-fn define_variable(env: &mut Env, defg: &mut DefGraph, var: Variable<'_, Core>) -> Result<()> {
+pub type Graph = StableDiGraph<External, ()>;
+
+/// A builder for the graph of dependencies between variable definitions.
+#[derive(Debug, Default)]
+pub struct Builder {
+    /// The current (i.e. opened) definition.
+    current: Option<External>,
+    /// The map from definitions to graph node indices.
+    externals: HashMap<External, NodeIndex>,
+    /// The graph of definitions.
+    graph: Graph,
+}
+
+impl Builder {
+    /// Inserts a new definition.
+    fn insert(&mut self, ext: External) -> NodeIndex {
+        match self.externals.entry(ext.clone()) {
+            hash_map::Entry::Occupied(e) => *e.get(),
+            hash_map::Entry::Vacant(e) => *e.insert(self.graph.add_node(ext)),
+        }
+    }
+
+    /// Opens a definition, becoming the current definition.
+    pub fn open(&mut self, from: External) {
+        self.current = Some(from);
+    }
+
+    /// Closes a definition.
+    pub fn close(&mut self) {
+        self.current = None;
+    }
+
+    /// Connects the current definition to another definition.
+    pub fn connect(&mut self, to: External) {
+        if let Some(from) = &self.current {
+            let from_idx = self.insert(from.clone());
+            let to_idx = self.insert(to);
+            self.graph.add_edge(from_idx, to_idx, ());
+        }
+    }
+
+    /// Returns the graph of definitions.
+    pub fn graph(self) -> Graph {
+        self.graph
+    }
+}
+
+fn define_variable(env: &mut Env, defg: &mut Builder, var: Variable<'_, Core>) -> Result<()> {
     let qualifier = var.qualifier().map(|q| q.ident());
     let entry = Entry::new(var.ident(), qualifier);
     if let Some(definition) = env.lookup(&entry) {
@@ -57,7 +106,7 @@ fn declare_variable(env: &mut Env, decl: Declaration<'_, Core>) -> Result<()> {
     }
 }
 
-fn open_declaration(env: &mut Env, defg: &mut DefGraph, decl: Declaration<'_, Core>) -> Result<()> {
+fn open_declaration(env: &mut Env, defg: &mut Builder, decl: Declaration<'_, Core>) -> Result<()> {
     env.open();
     defg.open(External::new(decl.node()));
     for binding in decl.bindings() {
@@ -68,7 +117,7 @@ fn open_declaration(env: &mut Env, defg: &mut DefGraph, decl: Declaration<'_, Co
     Ok(())
 }
 
-fn close_declaration(env: &mut Env, defg: &mut DefGraph) -> Result<()> {
+fn close_declaration(env: &mut Env, defg: &mut Builder) -> Result<()> {
     defg.close();
     env.close();
     Ok(())
@@ -88,8 +137,8 @@ fn close_recursion(env: &mut Env) -> Result<()> {
     Ok(())
 }
 
-pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
-    let defg = &mut DefGraph::default();
+pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<Graph> {
+    let mut defg = Builder::default();
 
     let env = &mut Env::new();
     stdlib::import(env)?;
@@ -107,16 +156,16 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         match cursor {
             NodeCursor::Start(node) => {
                 if let Some(decl) = Declaration::cast(node) {
-                    open_declaration(env, defg, decl)?;
+                    open_declaration(env, &mut defg, decl)?;
                 } else if let Some(var) = Variable::cast(node) {
-                    define_variable(env, defg, var)?;
+                    define_variable(env, &mut defg, var)?;
                 } else if let Some(rec) = Recursion::cast(node) {
                     open_recursion(env, rec)?;
                 }
             }
             NodeCursor::End(node) => {
                 if Declaration::cast(node).is_some() {
-                    close_declaration(env, defg)?;
+                    close_declaration(env, &mut defg)?;
                 } else if Recursion::cast(node).is_some() {
                     close_recursion(env)?;
                 }
@@ -124,7 +173,5 @@ pub fn resolve(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         }
     }
 
-    defg.identify_recursion(mods);
-
-    Ok(())
+    Ok(defg.graph())
 }

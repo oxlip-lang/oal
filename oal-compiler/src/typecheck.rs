@@ -1,19 +1,18 @@
 use crate::errors::{Error, Kind, Result};
 use crate::inference::tag::Tag;
 use crate::module::ModuleSet;
+use crate::resolve::Graph;
 use crate::tree::{Core, NRef};
 use oal_model::grammar::AbstractSyntaxNode;
 use oal_model::locator::Locator;
 use oal_syntax::atom;
 use oal_syntax::parser as syn;
+use petgraph::visit::EdgeRef;
+use petgraph::Direction::Incoming;
 
-struct TagWrap(Tag, bool);
+struct TagWrap(Tag);
 
 impl TagWrap {
-    fn is_recursive(&self) -> bool {
-        self.1
-    }
-
     fn is_variable(&self) -> bool {
         matches!(self.0, Tag::Var(_))
     }
@@ -29,13 +28,6 @@ impl TagWrap {
                 | Tag::Any
                 | Tag::Var(_)
         )
-    }
-
-    fn is_referential(&self) -> bool {
-        matches!(self.0, |Tag::Relation| Tag::Object
-            | Tag::Array
-            | Tag::Any
-            | Tag::Var(_))
     }
 
     fn is_content_like(&self) -> bool {
@@ -76,7 +68,7 @@ impl TagWrap {
 }
 
 fn get_tag(n: NRef) -> TagWrap {
-    TagWrap(crate::tree::get_tag(n), n.syntax().core_ref().is_recursive)
+    TagWrap(crate::tree::get_tag(n))
 }
 
 fn check_variadic_operation(op: syn::VariadicOp<Core>) -> Result<()> {
@@ -199,21 +191,6 @@ fn check_declaration(decl: syn::Declaration<Core>) -> Result<()> {
             Error::new(Kind::InvalidType, "ill-formed reference, not a schema").with(&decl),
         );
     }
-    if get_tag(decl.node()).is_recursive() {
-        if !rhs.is_schema() {
-            return Err(
-                Error::new(Kind::InvalidType, "ill-formed recursion, not a schema").with(&decl),
-            );
-        }
-        if !rhs.is_referential() {
-            return Err(
-                Error::new(Kind::InvalidType, "ill-formed recursion, not referential").with(&decl),
-            );
-        }
-        if decl.has_bindings() {
-            return Err(Error::new(Kind::InvalidType, "ill-formed lambda, recursive").with(&decl));
-        }
-    }
     Ok(())
 }
 
@@ -226,13 +203,9 @@ fn check_resource(res: syn::Resource<Core>) -> Result<()> {
 
 fn check_recursion(rec: syn::Recursion<Core>) -> Result<()> {
     let tag = get_tag(rec.node());
-    if !tag.is_schema() {
+    // TODO: support for recursive URI definitions (i.e. self-reference via query string)
+    if !tag.is_schema() || tag.is_uri() {
         return Err(Error::new(Kind::InvalidType, "ill-formed recursion, not a schema").with(&rec));
-    }
-    if !tag.is_referential() {
-        return Err(
-            Error::new(Kind::InvalidType, "ill-formed recursion, not referential").with(&rec),
-        );
     }
     Ok(())
 }
@@ -272,5 +245,61 @@ pub fn type_check(mods: &ModuleSet, loc: &Locator) -> Result<()> {
         .map_err(|err| err.at(node.span()))?;
     }
 
+    Ok(())
+}
+
+/// Validates points of recursion in the graph of definitions.
+pub fn cycles_check(mut graph: Graph, mods: &ModuleSet) -> Result<()> {
+    let mut has_changed = true; // whether the graph has changed and another iteration is required.
+    let mut inbounds = Vec::new(); // to avoid an allocation on each iteration.
+
+    while has_changed {
+        has_changed = false;
+        // Iterate over the strongly connected components of the definition graph.
+        for component in petgraph::algo::kosaraju_scc(&graph) {
+            // A trivial component contains a single vertex which is not connected to itself.
+            // All non-trivial components contain self or mutually recursive definitions.
+            let is_trivial = component.len() == 1 && {
+                let idx = *component.first().unwrap();
+                graph.find_edge(idx, idx).is_none()
+            };
+            // Trivial components are not relevant to cycle detection.
+            if is_trivial {
+                continue;
+            }
+            // Check each non-trivial strongly connected component for referential nodes.
+            for index in component.iter() {
+                let ext = graph.node_weight(*index).expect("node should exist");
+                let node = ext.node(mods);
+                let tag = get_tag(node);
+                // Flag incoming edges to referential definitions for removal,
+                // as those definitions evaluate to references.
+                // TODO: support for recursive URI definitions (i.e. self-reference via query string)
+                if tag.is_schema() && !tag.is_uri() {
+                    node.syntax().core_mut().is_recursive = true;
+                    for e in graph.edges_directed(*index, Incoming) {
+                        inbounds.push(e.id())
+                    }
+                }
+            }
+            if inbounds.is_empty() {
+                // The program is invalid if there are non-trivial strongly connected components
+                // that cannot be eliminated with references, i.e. a component without a referential node.
+                let index = component.first().expect("component should not be empty");
+                let ext = graph.node_weight(*index).expect("node should exist");
+                let node = ext.node(mods);
+                return Err(Error::new(Kind::InvalidType, "ill-formed recursion").at(node.span()));
+            }
+        }
+        if !inbounds.is_empty() {
+            // Try again after removing edges.
+            has_changed = true;
+        }
+        // Remove the incoming edges to referential definitions,
+        // to get rid of non-trivial strongly connected components.
+        for e in inbounds.drain(..) {
+            graph.remove_edge(e);
+        }
+    }
     Ok(())
 }
