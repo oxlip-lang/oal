@@ -26,4 +26,4 @@ test:
 install:
 	$(CARGO_BIN) install --path oal-client
 
-all: build lint fmt test install
+all: fmt lint build test install

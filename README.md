@@ -16,7 +16,7 @@ As OpenAPI is better produced or consumed by machines rather than humans, OAL tr
 This step requires a [local Rust and Cargo installation](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
 ```
-cargo install --path oal-client
+make install
 ```
 Optional: a [VSCode language extension](https://github.com/oxlip-lang/oal-vscode) is available for syntax highlighting and IDE capabilities.
 
