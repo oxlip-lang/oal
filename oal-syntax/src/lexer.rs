@@ -351,7 +351,9 @@ pub fn tokenize(loc: Locator, input: &str) -> (Option<TokenList<Token>>, Vec<Par
                     TokenKind::Property => {
                         TokenValue::Symbol(list.register(parse_prefixed_string(slice)))
                     }
-                    TokenKind::Space => TokenValue::Symbol(list.register(slice)),
+                    TokenKind::CommentBlock | TokenKind::CommentLine | TokenKind::Space => {
+                        TokenValue::Symbol(list.register(slice))
+                    }
                     _ => TokenValue::None,
                 };
                 let token = Token(kind, value);
