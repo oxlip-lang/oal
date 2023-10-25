@@ -128,11 +128,15 @@ impl<'a> Context<'a> {
             .cloned()
     }
 
-    /// Returns a unique identifier for the given node within the current scope.
-    fn node_identifier(&self, node: NRef) -> atom::Ident {
-        let scope_id = self.scopes.last().map_or(0, |(id, _)| *id);
+    /// Returns a unique identifier for the given node.
+    ///
+    /// If `scoped` is true, the identifier is unique per evaluation scope.
+    fn node_identifier(&self, node: NRef, scoped: bool) -> atom::Ident {
         let mut hash = Sha256::new();
-        hash.update(scope_id.to_be_bytes());
+        if scoped {
+            let scope_id = self.scopes.last().map_or(0, |(id, _)| *id);
+            hash.update(scope_id.to_be_bytes());
+        }
         node.digest(&mut hash);
         atom::Ident::from(format!("hash-{:x}", hash.finalize()))
     }
@@ -437,7 +441,9 @@ pub fn eval_declaration<'a>(
 
         if ident.is_reference() || decl.node().syntax().core_ref().is_recursive {
             if !ident.is_reference() {
-                ident = ctx.node_identifier(decl.node());
+                // As declarations only appear at the global scope,
+                // The identifier does not depend on the scope of evaluation.
+                ident = ctx.node_identifier(decl.node(), false);
             }
             // Make sure we evaluate the reference or recursive declaration only once.
             let expr = if !ctx.refs.contains_key(&ident) {
@@ -755,7 +761,7 @@ pub fn eval_recursion<'a>(
     rec: syn::Recursion<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let ident = ctx.node_identifier(rec.node());
+    let ident = ctx.node_identifier(rec.node(), true);
     let mut scope = HashMap::new();
     let recursion = (Expr::Recursion(ident.clone()), AnnRef::default());
     scope.insert(rec.binding().ident(), recursion);
