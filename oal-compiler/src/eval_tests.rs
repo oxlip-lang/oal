@@ -815,6 +815,20 @@ fn eval_recursive_content() -> anyhow::Result<()> {
 }
 
 #[test]
+fn eval_recursive_content_function() -> anyhow::Result<()> {
+    let s = eval_check(
+        r#"
+        let c s = <status=s, headers={ 'Location r }, {}>;
+        let r = / on get -> c 200;
+        res r;
+    "#,
+    )?;
+    assert_eq!(s.rels.len(), 1);
+    assert_eq!(s.refs.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn eval_inner_recursive_lambda() -> anyhow::Result<()> {
     let s = eval_check(
         r#"
