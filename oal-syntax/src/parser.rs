@@ -675,7 +675,7 @@ type TokenOrNode = oal_model::grammar::ParserMatch<Gram>;
 pub fn parse_program<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
     let ns = &mut Vec::new();
     let s = repeat(c, s, ns, &[parse_statement]);
-    Ok((s, c.compose(SyntaxKind::Program, ns)))
+    Ok((s, c.compose_node(SyntaxKind::Program, ns)))
 }
 
 pub fn parse_statement<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {

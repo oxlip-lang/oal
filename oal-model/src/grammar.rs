@@ -533,6 +533,10 @@ impl<T: Core, G: Grammar> Context<T, G> {
         if children.is_empty() {
             return ParserMatch::Syntax(kind);
         }
+        self.compose_node(kind, children)
+    }
+
+    pub fn compose_node(&mut self, kind: G::Kind, children: &[ParserMatch<G>]) -> ParserMatch<G> {
         let node = SyntaxNode::new(SyntaxTrunk::Tree(kind));
         let parent = self.tree.new_node(node);
         for child in children {

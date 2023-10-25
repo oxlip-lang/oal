@@ -75,6 +75,15 @@ fn assert_lit(n: NRef) -> Literal<()> {
 }
 
 #[test]
+fn parse_empty_program() {
+    parse("", |p: Prog| {
+        assert_eq!(p.imports().count(), 0);
+        assert_eq!(p.declarations().count(), 0);
+        assert_eq!(p.resources().count(), 0);
+    })
+}
+
+#[test]
 fn parse_decl_primitive() {
     parse("let a = num;", |p: Prog| {
         let rhs = assert_term(assert_decl(p, "a").rhs());
