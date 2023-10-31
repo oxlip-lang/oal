@@ -7,7 +7,6 @@ use oal_compiler::tree::Tree;
 use oal_model::locator::Locator;
 use oal_model::span::Span;
 use std::fmt::{Display, Formatter};
-use std::io;
 
 #[derive(Default)]
 /// The CLI compilation processor.
@@ -21,7 +20,7 @@ impl Processor {
 
 impl Processor {
     /// Reports an error.
-    pub fn report<M: ToString>(&self, span: Span, msg: M) -> io::Result<()> {
+    pub fn report<M: ToString>(&self, span: Span, msg: M) -> anyhow::Result<()> {
         let mut colors = ColorGenerator::new();
         let color = colors.next();
         let loc = span.locator().clone();
@@ -32,7 +31,8 @@ impl Processor {
             let s = CharSpan::from(&input, span);
             builder.add_label(Label::new(s).with_color(color))
         }
-        builder.finish().eprint((loc, Source::from(input)))
+        builder.finish().eprint((loc, Source::from(input)))?;
+        Ok(())
     }
 
     pub fn load(&self, main: &Locator) -> anyhow::Result<ModuleSet> {
@@ -63,9 +63,15 @@ impl Processor {
 struct ProcLoader<'a>(&'a Processor);
 
 impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
+    /// Returns true if the given locator points to a valid source file.
+    fn is_valid(&mut self, loc: &Locator) -> bool {
+        DefaultFileSystem.is_valid(loc)
+    }
+
     /// Loads a source file.
-    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
-        DefaultFileSystem.read_file(loc)
+    fn load(&mut self, loc: &Locator) -> anyhow::Result<String> {
+        let code = DefaultFileSystem.read_file(loc)?;
+        Ok(code)
     }
 
     /// Parses a source file into a concrete syntax tree.

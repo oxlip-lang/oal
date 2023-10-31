@@ -1,5 +1,4 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::path::{Path, PathBuf};
 use std::result::Result;
 use std::sync::Arc;
 use url::Url;
@@ -8,10 +7,8 @@ use url::Url;
 pub enum Error {
     #[error("invalid URL")]
     InvalidUrl(#[from] url::ParseError),
-    #[error("invalid path {0:?}")]
-    InvalidPath(std::ffi::OsString),
-    #[error("input/output error")]
-    IO(#[from] std::io::Error),
+    #[error("empty path")]
+    EmptyPath,
 }
 
 /// A file locator backed by a URL.
@@ -37,7 +34,7 @@ impl Locator {
     /// Appends a relative path to the locator base.
     pub fn join(&self, path: &str) -> Result<Self, Error> {
         if path.is_empty() {
-            Err(Error::InvalidPath(path.into()))
+            Err(Error::EmptyPath)
         } else {
             let url = self.url.join(path).map(Arc::new)?;
             Ok(Locator { url })
@@ -63,30 +60,6 @@ impl TryFrom<&str> for Locator {
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let url = Url::parse(s).map(Arc::new)?;
         Ok(Locator { url })
-    }
-}
-
-impl TryFrom<&Path> for Locator {
-    type Error = Error;
-
-    fn try_from(p: &Path) -> Result<Self, Self::Error> {
-        let path = p
-            .canonicalize()
-            .map_err(|_| Error::InvalidPath(p.as_os_str().to_owned()))?;
-        let url = Url::from_file_path(path)
-            .map(Arc::new)
-            .map_err(|_| Error::InvalidPath(p.as_os_str().to_owned()))?;
-        Ok(Locator { url })
-    }
-}
-
-impl TryInto<PathBuf> for &Locator {
-    type Error = Error;
-
-    fn try_into(self) -> Result<PathBuf, Self::Error> {
-        self.url
-            .to_file_path()
-            .map_err(|_| Error::InvalidPath(self.url.as_str().into()))
     }
 }
 

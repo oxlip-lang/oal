@@ -18,7 +18,6 @@ use oal_compiler::tree::Tree;
 use oal_model::{locator::Locator, span::Span};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::io;
 use unicode::{position_to_utf8, utf8_range_to_position};
 
 /// A folder in the workspace.
@@ -210,7 +209,7 @@ impl Workspace {
     }
 
     /// Reads a file from the workspace.
-    fn read_file(&mut self, loc: &Locator) -> io::Result<String> {
+    fn read_file(&mut self, loc: &Locator) -> anyhow::Result<String> {
         match self.docs.entry(loc.clone()) {
             Entry::Occupied(e) => Ok(e.get().clone()),
             Entry::Vacant(e) => {
@@ -225,8 +224,13 @@ impl Workspace {
 struct WorkspaceLoader<'a>(&'a mut Workspace);
 
 impl<'a> Loader<anyhow::Error> for WorkspaceLoader<'a> {
+    /// Returns true if the given locator points to a valid source file.
+    fn is_valid(&mut self, loc: &Locator) -> bool {
+        DefaultFileSystem.is_valid(loc)
+    }
+
     /// Loads a source file.
-    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
+    fn load(&mut self, loc: &Locator) -> anyhow::Result<String> {
         self.0.read_file(loc)
     }
 

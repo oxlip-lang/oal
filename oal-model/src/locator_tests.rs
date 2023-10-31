@@ -19,5 +19,5 @@ fn locator_join() {
 
     let loc = Locator::try_from("file://a").expect("expected a locator");
     let err = loc.join("").expect_err("expected an error");
-    assert!(matches!(err, Error::InvalidPath(_)));
+    assert!(matches!(err, Error::EmptyPath));
 }

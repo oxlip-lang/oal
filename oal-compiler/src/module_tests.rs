@@ -10,7 +10,12 @@ struct ContextCycle {
 }
 
 impl Loader<anyhow::Error> for ContextCycle {
-    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
+    fn is_valid(&mut self, loc: &Locator) -> bool {
+        let s = loc.url().as_str();
+        s == "file:///module.oal" || s == "file:///base.oal"
+    }
+
+    fn load(&mut self, loc: &Locator) -> anyhow::Result<String> {
         let code = if *loc == self.base {
             r#"use "module.oal";"#
         } else if *loc == self.module {
@@ -62,7 +67,12 @@ struct ContextSort {
 }
 
 impl Loader<anyhow::Error> for ContextSort {
-    fn load(&mut self, loc: &Locator) -> std::io::Result<String> {
+    fn is_valid(&mut self, loc: &Locator) -> bool {
+        let s = loc.url().as_str();
+        s == "file:///module1.oal" || s == "file:///module2.oal"
+    }
+
+    fn load(&mut self, loc: &Locator) -> anyhow::Result<String> {
         let code = if *loc == self.base {
             r#"
             use "module2.oal" as mod;
@@ -114,8 +124,53 @@ fn module_sort() -> anyhow::Result<()> {
 
     assert_eq!(order.len(), 3, "expected 3 compilation units");
     assert_eq!(order[0], module1, "expect module1 to be compiled first");
-    assert_eq!(order[1], module2, "expect module1 to be compiled first");
-    assert_eq!(order[2], base, "expect module1 to be compiled first");
+    assert_eq!(order[1], module2, "expect module2 to be compiled second");
+    assert_eq!(order[2], base, "expect base to be compiled last");
+
+    Ok(())
+}
+
+struct ContextInvalid;
+
+impl Loader<anyhow::Error> for ContextInvalid {
+    fn is_valid(&mut self, loc: &Locator) -> bool {
+        assert_eq!(loc.url().as_str(), "file:///invalid.oal");
+        false
+    }
+
+    fn load(&mut self, _loc: &Locator) -> anyhow::Result<String> {
+        let code = r#"
+            use "invalid.oal";
+        "#;
+        Ok(code.to_owned())
+    }
+
+    fn parse(&mut self, loc: Locator, input: String) -> anyhow::Result<Tree> {
+        let (tree, errs) = oal_syntax::parse(loc, input);
+        assert!(errs.is_empty());
+        let tree = tree.expect("parsing failed");
+        Ok(tree)
+    }
+
+    fn compile(&mut self, _mods: &ModuleSet, _loc: &Locator) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn module_invalid() -> anyhow::Result<()> {
+    let base = Locator::try_from("file:base.oal")?;
+
+    let mut ctx = ContextInvalid;
+
+    let err = load(&mut ctx, &base).expect_err("expected an error");
+
+    assert!(matches!(
+        err.downcast_ref::<Error>()
+            .expect("expected compiler error")
+            .kind,
+        Kind::InvalidModule(_)
+    ));
 
     Ok(())
 }
