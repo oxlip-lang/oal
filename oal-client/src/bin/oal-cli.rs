@@ -1,6 +1,5 @@
 use oal_client::cli::Processor;
 use oal_client::{config, DefaultFileSystem, FileSystem};
-use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
     let proc = Processor::new();
@@ -17,8 +16,7 @@ fn main() -> anyhow::Result<()> {
     let mut builder = oal_openapi::Builder::new(spec);
 
     if let Some(ref loc) = base {
-        let path: PathBuf = loc.try_into()?;
-        let file = std::fs::File::open(path)?;
+        let file = DefaultFileSystem.open_file(loc)?;
         let base = serde_yaml::from_reader(file)?;
         builder = builder.with_base(base);
     }

@@ -1,3 +1,4 @@
+use oal_model::locator::Locator;
 use oal_model::span::Span;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -19,8 +20,8 @@ pub enum Kind {
     InvalidLiteral,
     #[error("invalid identifier")]
     InvalidIdentifier,
-    #[error("io error: {0}")]
-    IoError(#[from] std::io::Error),
+    #[error("invalid module: {0}")]
+    InvalidModule(Locator),
 }
 
 #[derive(Debug)]

@@ -55,8 +55,10 @@ impl ModuleSet {
 }
 
 pub trait Loader<E: From<Error>> {
+    /// Returns true if the given locator points to a valid source file.
+    fn is_valid(&mut self, loc: &Locator) -> bool;
     /// Loads a source file.
-    fn load(&mut self, loc: &Locator) -> std::io::Result<String>;
+    fn load(&mut self, loc: &Locator) -> std::result::Result<String, E>;
     /// Parses a source file into a concrete syntax tree.
     fn parse(&mut self, loc: Locator, input: String) -> std::result::Result<Tree, E>;
     /// Compiles a module.
@@ -73,7 +75,7 @@ where
     let mut graph = Graph::new();
     let mut queue = Vec::new();
 
-    let input = loader.load(base).map_err(Error::from)?;
+    let input = loader.load(base)?;
     let main = loader.parse(base.clone(), input)?;
     let mut mods = ModuleSet::new(main);
 
@@ -88,20 +90,25 @@ where
         let mut imports = Vec::new();
         let prog = Program::cast(module.root()).expect("expected a program");
         for import in prog.imports() {
-            let s = import.node().span();
-            let i = loc
+            let span = import.node().span();
+            let target = loc
                 .join(import.module())
-                .map_err(|err| Error::from(err).at(s.clone()))?;
-            imports.push((i, s));
+                .map_err(|err| Error::from(err).at(span.clone()))?;
+            if !loader.is_valid(&target) {
+                return Err(
+                    Error::new(Kind::InvalidModule(target), "cannot load import")
+                        .at(span)
+                        .into(),
+                );
+            }
+            imports.push(target);
         }
 
-        for (import, span) in imports {
+        for import in imports {
             if let Some(m) = deps.get(&import) {
                 graph.add_edge(*m, n, ());
             } else {
-                let input = loader
-                    .load(&import)
-                    .map_err(|err| Error::from(err).at(span))?;
+                let input = loader.load(&import)?;
                 let module = loader.parse(import.clone(), input)?;
                 mods.insert(module);
 

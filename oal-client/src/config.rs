@@ -2,6 +2,7 @@ use clap::Parser as ClapParser;
 use oal_model::locator::Locator;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use url::Url;
 
 /// Compiles a program into an OpenAPI description in YAML.
 #[derive(ClapParser, Debug)]
@@ -42,6 +43,12 @@ pub struct Config {
     root: Locator,
 }
 
+fn path_locator(p: &Path) -> anyhow::Result<Locator> {
+    let path = p.canonicalize()?;
+    let url = Url::from_file_path(path).expect("absolute path should convert to URL");
+    Ok(Locator::from(url))
+}
+
 impl Config {
     pub fn new(cfg: Option<&Path>) -> anyhow::Result<Self> {
         let args: Args = Args::parse();
@@ -49,13 +56,13 @@ impl Config {
         let config = cfg.or(args.config.as_deref());
 
         let (root, file) = if let Some(path) = config {
-            let root = Locator::try_from(path)?;
+            let root = path_locator(path)?;
             let cfg = std::fs::read_to_string(path)?;
             let file = toml::from_str::<File>(&cfg)?;
             (root, file)
         } else {
             let cwd = std::env::current_dir()?;
-            let loc = Locator::try_from(cwd.as_path())?;
+            let loc = path_locator(cwd.as_path())?;
             let root = loc.as_base();
             let file = File::default();
             (root, file)
