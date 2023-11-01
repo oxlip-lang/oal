@@ -36,3 +36,10 @@ OPTIONS:
 ```
 oal-cli --conf examples/oal.toml
 ```
+
+## Experimental: WebAssembly support
+Release to WebAssembly requires the installation of [`wasm-pack`](https://rustwasm.github.io/wasm-pack/installer/).
+
+```
+make wasm
+```

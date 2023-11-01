@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = [ "oal-model", "oal-client", "oal-openapi", "oal-syntax", "oal-compiler" ]
+members = [
+    "oal-model",
+    "oal-client",
+    "oal-openapi",
+    "oal-syntax",
+    "oal-compiler",
+    "oal-wasm"
+]
