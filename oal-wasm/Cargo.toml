@@ -1,0 +1,32 @@
+[package]
+name = "oal-wasm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Emmanuel Bastien <os@ebastien.name>"]
+license = "Apache-2.0"
+description = "A high-level functional programming language for designing OpenAPI definitions"
+readme = "../README.md"
+homepage = "https://www.oxlip-lang.org"
+repository = "https://github.com/oxlip-lang/oal"
+keywords = ["api"]
+categories = ["compilers"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+oal-model = { path = "../oal-model" }
+oal-syntax = { path = "../oal-syntax" }
+oal-compiler = { path = "../oal-compiler" }
+oal-openapi = { path = "../oal-openapi" }
+ariadne = "0.3"
+serde_yaml = "0.9"
+anyhow = "1.0"
+wasm-bindgen = "0.2"
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
