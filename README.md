@@ -2,15 +2,17 @@
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # The Oxlip API Language
-OAL is a high-level functional programming language for designing [OpenAPI](https://www.openapis.org/what-is-openapi) definitions.
+Oxlip is a high-level functional programming language for designing [OpenAPI](https://www.openapis.org/what-is-openapi) definitions.
 As an [Interface Description Language](https://en.wikipedia.org/wiki/Interface_description_language), it is not general purpose.
 The motivation is to alleviate the pain of managing OpenAPI in JSON or YAML by hand and at scale.
-OAL defines algebraic abstractions over [REST](https://en.wikipedia.org/wiki/Representational_state_transfer) concepts, not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/).
+Oxlip defines algebraic abstractions over [REST](https://en.wikipedia.org/wiki/Representational_state_transfer) concepts, not too dissimilar to [Sass/SCSS over CSS](https://sass-lang.com/).
 
 There are pros and cons to both _API-design-first_ and OpenAPI generated from implementation.
-As OpenAPI is better produced or consumed by machines rather than humans, OAL tries to help _API-design-first_ teams with better tooling.
+As OpenAPI is better produced or consumed by machines rather than humans, Oxlip tries to help _API-design-first_ teams with better tooling.
 
 ## [Documentation](https://www.oxlip-lang.org/)
+
+## [Playground](https://oxlip-lang.github.io/oxlip-playground)
 
 ## Installation
 This step requires a [local Rust and Cargo installation](https://doc.rust-lang.org/cargo/getting-started/installation.html).
