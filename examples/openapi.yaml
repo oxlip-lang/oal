@@ -153,10 +153,6 @@ paths:
         type: string
       style: form
 components:
-  securitySchemes:
-    default:
-      type: http
-      scheme: bearer
   schemas:
     obj1:
       description: some stuff
@@ -207,7 +203,7 @@ components:
               - example: /some/path/_id_number_/template
                 type: string
                 format: uri-reference
-              - $ref: '#/components/schemas/hash-cb758f651fb245708a22c16f571257df5fc461175d089af9284f8d2c38125453'
+              - $ref: '#/components/schemas/hash-d31b2f251c984df5575331831c174f719158747bfcbc58788d44da87badfa415'
     obj2:
       allOf:
       - $ref: '#/components/schemas/obj1'
@@ -217,7 +213,7 @@ components:
             type: integer
             minimum: 0
             maximum: 999
-    hash-cb758f651fb245708a22c16f571257df5fc461175d089af9284f8d2c38125453:
+    hash-d31b2f251c984df5575331831c174f719158747bfcbc58788d44da87badfa415:
       type: object
       properties:
         name:
@@ -227,4 +223,8 @@ components:
         children:
           type: array
           items:
-            $ref: '#/components/schemas/hash-cb758f651fb245708a22c16f571257df5fc461175d089af9284f8d2c38125453'
+            $ref: '#/components/schemas/hash-d31b2f251c984df5575331831c174f719158747bfcbc58788d44da87badfa415'
+  securitySchemes:
+    default:
+      type: http
+      scheme: bearer
