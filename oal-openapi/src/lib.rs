@@ -126,7 +126,7 @@ impl Builder {
     fn boolean_schema(&self, _: &spec::PrimBoolean) -> Schema {
         Schema {
             schema_data: Default::default(),
-            schema_kind: SchemaKind::Type(Type::Boolean {}),
+            schema_kind: SchemaKind::Type(Type::Boolean(BooleanType::default())),
         }
     }
 
