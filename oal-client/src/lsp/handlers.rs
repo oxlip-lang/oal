@@ -82,7 +82,7 @@ pub fn go_to_definition(
     let pos = params.text_document_position_params.position;
     let loc = Locator::from(params.text_document_position_params.text_document.uri);
 
-    let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
+    let Some((_, folder)) = state.folders.iter().find(|(_, f)| f.contains(&loc)) else {
         // Location not found in any folder.
         return Ok(None);
     };
@@ -112,7 +112,7 @@ pub fn references(
     let pos = params.text_document_position.position;
     let loc = Locator::from(params.text_document_position.text_document.uri);
 
-    let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
+    let Some((_, folder)) = state.folders.iter().find(|(_, f)| f.contains(&loc)) else {
         // Location not found in any folder.
         return Ok(None);
     };
@@ -134,7 +134,7 @@ pub fn prepare_rename(
     let pos = params.position;
     let loc = Locator::from(params.text_document.uri);
 
-    let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
+    let Some((_, folder)) = state.folders.iter().find(|(_, f)| f.contains(&loc)) else {
         // Location not found in any folder.
         return Ok(None);
     };
@@ -167,7 +167,7 @@ pub fn rename(
     let loc = Locator::from(params.text_document_position.text_document.uri);
     let new_name = params.new_name;
 
-    let Some(folder) = state.folders.iter().find(|f| f.contains(&loc)) else {
+    let Some((_, folder)) = state.folders.iter().find(|(_, f)| f.contains(&loc)) else {
         // Location not found in any folder.
         return Ok(None);
     };

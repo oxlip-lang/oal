@@ -2,17 +2,20 @@ use anyhow::anyhow;
 use crossbeam_channel::select;
 use lsp_server::{Connection, Message, Notification};
 use lsp_types::notification::{
-    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
+    DidChangeTextDocument, DidChangeWorkspaceFolders, DidCloseTextDocument, DidOpenTextDocument,
+    PublishDiagnostics,
 };
 use lsp_types::request::{GotoDefinition, PrepareRenameRequest, References, Rename};
 use lsp_types::{
     InitializeParams, PositionEncodingKind, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncCapability, TextDocumentSyncKind, WorkspaceFileOperationsServerCapabilities,
+    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use lsp_types::{OneOf, RenameOptions};
 use oal_client::lsp::dispatcher::{NotificationDispatcher, RequestDispatcher};
 use oal_client::lsp::state::GlobalState;
 use oal_client::lsp::{handlers, Folder, Workspace};
+use std::collections::HashMap;
 use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
@@ -35,6 +38,16 @@ fn main() -> anyhow::Result<()> {
             prepare_provider: Some(true),
             work_done_progress_options: Default::default(),
         })),
+        workspace: Some(WorkspaceServerCapabilities {
+            workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                supported: Some(true),
+                change_notifications: Some(OneOf::Left(true)),
+            }),
+            file_operations: Some(WorkspaceFileOperationsServerCapabilities {
+                // TODO: register for operations on configuration files
+                ..Default::default()
+            }),
+        }),
         ..Default::default()
     })
     .unwrap();
@@ -49,12 +62,13 @@ fn main() -> anyhow::Result<()> {
         .and_then(|e| e.contains(&PositionEncodingKind::UTF16).then_some(()))
         .ok_or_else(|| anyhow!("UTF-16 not supported by client"))?;
 
-    let folders = params
-        .workspace_folders
-        .unwrap_or_default()
-        .into_iter()
-        .flat_map(Folder::new)
-        .collect::<Vec<_>>();
+    let mut folders = HashMap::new();
+    for f in params.workspace_folders.unwrap_or_default().into_iter() {
+        let uri = f.uri.clone();
+        if let Ok(folder) = Folder::new(f) {
+            folders.insert(uri, folder);
+        }
+    }
 
     let workspace = Workspace::default();
 
@@ -88,7 +102,7 @@ fn refresh(state: &mut GlobalState) -> anyhow::Result<()> {
         return Ok(());
     }
     state.is_stale = false;
-    for f in state.folders.iter_mut() {
+    for (_, f) in state.folders.iter_mut() {
         f.eval(&mut state.workspace);
         let diags = state.workspace.diagnostics()?;
         for (loc, diagnostics) in diags {
@@ -121,7 +135,6 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
                     }
                     Message::Response(_resp) => {}
                     Message::Notification(not) => {
-                        // TODO: react to folder changes
                         NotificationDispatcher::new(state, not)
                         .on::<DidOpenTextDocument>(|state, params| {
                             state.workspace.open(params)?;
@@ -135,6 +148,19 @@ fn main_loop(state: &mut GlobalState) -> anyhow::Result<()> {
                         })?
                         .on::<DidChangeTextDocument>(|state, params| {
                             state.workspace.change(params)?;
+                            state.is_stale = true;
+                            Ok(())
+                        })?
+                        .on::<DidChangeWorkspaceFolders>(|state, params| {
+                            for f in params.event.removed {
+                                state.folders.remove(&f.uri);
+                            }
+                            for f in params.event.added {
+                                let uri = f.uri.clone();
+                                if let Ok(folder) = Folder::new(f) {
+                                    state.folders.insert(uri, folder);
+                                }
+                            }
                             state.is_stale = true;
                             Ok(())
                         })?;
