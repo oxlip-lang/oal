@@ -4,23 +4,23 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use url::Url;
 
-/// Compiles a program into an OpenAPI description in YAML.
+/// Compiles an Oxlip program into an OpenAPI description in YAML.
 #[derive(ClapParser, Debug)]
 struct Args {
     /// The relative URL to the main program
-    #[clap(short = 'm', long = "main")]
+    #[arg(short = 'm', long = "main")]
     main: Option<String>,
 
     /// The relative URL to the target OpenAPI description
-    #[clap(short = 't', long = "target")]
+    #[arg(short = 't', long = "target")]
     target: Option<String>,
 
     /// The relative URL to a base OpenAPI description
-    #[clap(short = 'b', long = "base")]
+    #[arg(short = 'b', long = "base")]
     base: Option<String>,
 
     /// The path to the configuration file
-    #[clap(short = 'c', long = "conf", parse(from_os_str))]
+    #[arg(short = 'c', long = "conf")]
     config: Option<PathBuf>,
 }
 
