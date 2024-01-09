@@ -22,7 +22,7 @@ oal-model = { path = "../oal-model" }
 oal-syntax = { path = "../oal-syntax" }
 oal-compiler = { path = "../oal-compiler" }
 oal-openapi = { path = "../oal-openapi" }
-ariadne = "0.3"
+ariadne = "0.4"
 serde_yaml = "0.9"
 anyhow = "1.0"
 wasm-bindgen = "0.2"
