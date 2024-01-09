@@ -33,6 +33,12 @@ impl<'a, T: Core> Identifier<'a, T> {
     }
 }
 
+impl<'a, T: Core> PartialEq for Identifier<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.node().as_str() == other.node().as_str()
+    }
+}
+
 terminal_node!(Gram, Primitive, k if k.is_primitive());
 
 #[derive(Debug, PartialEq, Eq)]
@@ -309,11 +315,14 @@ impl<'a, T: Core> Qualifier<'a, T> {
     const IDENTIFIER_POS: usize = 1;
 
     pub fn ident(&self) -> Option<atom::Ident> {
-        self.node().children().nth(Self::IDENTIFIER_POS).map(|n| {
-            Identifier::cast(n)
-                .expect("qualifier must be an identifier")
-                .ident()
-        })
+        self.identifier().map(|i| i.ident())
+    }
+
+    pub fn identifier(&self) -> Option<Identifier<'a, T>> {
+        self.node()
+            .children()
+            .nth(Self::IDENTIFIER_POS)
+            .map(|n| Identifier::cast(n).expect("qualifier must be an identifier"))
     }
 }
 
