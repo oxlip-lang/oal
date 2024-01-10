@@ -129,7 +129,7 @@ impl Workspace {
         Ok(mods)
     }
 
-    /// Evaluates a program. Resets evaluation errors.
+    /// Evaluates a program.
     pub fn eval(&mut self, mods: &ModuleSet) -> anyhow::Result<Spec> {
         match oal_compiler::eval::eval(mods) {
             Err(err) => {
