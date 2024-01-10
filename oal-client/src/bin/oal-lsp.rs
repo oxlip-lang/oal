@@ -104,15 +104,15 @@ fn refresh(state: &mut GlobalState) -> anyhow::Result<()> {
     state.is_stale = false;
     for (_, f) in state.folders.iter_mut() {
         f.eval(&mut state.workspace);
-        let diags = state.workspace.diagnostics()?;
-        for (loc, diagnostics) in diags {
-            let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
-                uri: loc.url().clone(),
-                diagnostics,
-                version: None,
-            });
-            state.conn.sender.send(Message::Notification(info))?;
-        }
+    }
+    let diags = state.workspace.diagnostics()?;
+    for (loc, diagnostics) in diags {
+        let info = notify::<PublishDiagnostics>(PublishDiagnosticsParams {
+            uri: loc.url().clone(),
+            diagnostics,
+            version: None,
+        });
+        state.conn.sender.send(Message::Notification(info))?;
     }
     Ok(())
 }
