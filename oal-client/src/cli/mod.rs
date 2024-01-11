@@ -1,6 +1,7 @@
 use crate::{DefaultFileSystem, FileSystem};
 use anyhow::anyhow;
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
+use log::debug;
 use oal_compiler::module::{Loader, ModuleSet};
 use oal_compiler::spec::Spec;
 use oal_compiler::tree::Tree;
@@ -75,7 +76,7 @@ impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
 
     /// Parses a source file into a concrete syntax tree.
     fn parse(&mut self, loc: Locator, input: String) -> anyhow::Result<Tree> {
-        eprintln!("Parsing module {loc}");
+        debug!("Parsing module {loc}");
         let (tree, mut errs) = oal_syntax::parse(loc.clone(), input);
         if let Some(err) = errs.pop() {
             // We don't care about error recovery for the command line interface.
@@ -93,7 +94,7 @@ impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
 
     /// Compiles a program.
     fn compile(&mut self, mods: &ModuleSet, loc: &Locator) -> anyhow::Result<()> {
-        eprintln!("Compiling module {loc}");
+        debug!("Compiling module {loc}");
         if let Err(err) = oal_compiler::compile::compile(mods, loc) {
             let span = match err.span() {
                 Some(s) => s.clone(),
