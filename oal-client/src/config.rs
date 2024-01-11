@@ -8,20 +8,28 @@ use url::Url;
 #[derive(ClapParser, Debug)]
 struct Args {
     /// The relative URL to the main program
-    #[arg(short = 'm', long = "main")]
+    #[arg(short = 'm', long)]
     main: Option<String>,
 
     /// The relative URL to the target OpenAPI description
-    #[arg(short = 't', long = "target")]
+    #[arg(short = 't', long)]
     target: Option<String>,
 
     /// The relative URL to a base OpenAPI description
-    #[arg(short = 'b', long = "base")]
+    #[arg(short = 'b', long)]
     base: Option<String>,
 
     /// The path to the configuration file
     #[arg(short = 'c', long = "conf")]
     config: Option<PathBuf>,
+
+    /// Increase message verbosity
+    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
+    verbose: u8,
+
+    /// Silence all output
+    #[arg(short = 'q', long, conflicts_with = "verbose")]
+    quiet: bool,
 }
 
 #[derive(Deserialize, Default, Debug)]
@@ -90,5 +98,13 @@ impl Config {
             Some(p) => Ok(Some(self.root.join(p)?)),
             None => Ok(None),
         }
+    }
+
+    pub fn is_quiet(&self) -> bool {
+        self.args.quiet
+    }
+
+    pub fn verbosity(&self) -> usize {
+        self.args.verbose as usize
     }
 }
