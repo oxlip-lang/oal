@@ -9,6 +9,7 @@ mod tests;
 use crate::config::Config;
 use crate::{DefaultFileSystem, FileSystem};
 use anyhow::anyhow;
+use log::debug;
 use lsp_types::{
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
 };
@@ -68,6 +69,7 @@ impl Folder {
         self.mods = None;
         self.spec = None;
         if let Ok(main) = self.config.main() {
+            debug!("evaluating {}", main);
             if let Ok(mods) = ws.load(&main) {
                 self.spec = ws.eval(&mods).ok();
                 self.mods = Some(mods);
