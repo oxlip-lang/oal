@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use crossbeam_channel::select;
+use log::info;
 use lsp_server::{Connection, Message, Notification};
 use lsp_types::notification::{
     DidChangeTextDocument, DidChangeWorkspaceFolders, DidCloseTextDocument, DidOpenTextDocument,
@@ -19,8 +20,15 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
+    stderrlog::new()
+        .quiet(false)
+        .verbosity(log::Level::Info)
+        .timestamp(stderrlog::Timestamp::Second)
+        .init()
+        .unwrap();
+
     // Note that we must have our logging only write out to stderr.
-    eprintln!("starting Oxlip API Language server");
+    info!("starting Oxlip API Language server");
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this could
     // also be implemented to use sockets or HTTP.
@@ -84,7 +92,7 @@ fn main() -> anyhow::Result<()> {
     threads.join()?;
 
     // Shut down gracefully.
-    eprintln!("shutting down Oxlip API Language server");
+    info!("shutting down Oxlip API Language server");
     Ok(())
 }
 
