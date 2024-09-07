@@ -5,6 +5,8 @@ use oal_compiler::tree::Tree;
 use oal_model::locator::Locator;
 use oal_model::span::Span;
 use wasm_bindgen::prelude::*;
+extern crate console_error_panic_hook;
+
 
 /// The identifier for the unique source.
 const INPUT: &str = "file:///main.oal";
@@ -22,6 +24,7 @@ pub struct CompilationResult {
 /// The compiler interface with JavaScript.
 #[wasm_bindgen]
 pub fn compile(input: &str) -> CompilationResult {
+    console_error_panic_hook::set_once();
     match process(input) {
         Ok(api) => CompilationResult {
             api,
