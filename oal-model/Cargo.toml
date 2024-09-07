@@ -12,7 +12,7 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
-string-interner = "0.14"
+string-interner = "0.17"
 generational_token_list = "0.1"
 generational-indextree = "1.1"
 generational-arena = "0.2"
