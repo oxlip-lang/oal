@@ -64,7 +64,7 @@ impl Cursor {
 
 pub struct TokenList<L: Lexeme> {
     arena: ListArena<L>,
-    dict: StringInterner,
+    dict: StringInterner<string_interner::DefaultBackend>,
     loc: Locator,
 }
 
