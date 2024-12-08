@@ -43,6 +43,7 @@ impl Display for Span {
 }
 
 /// A span of Unicode code points.
+#[derive(Clone, Debug)]
 pub struct CharSpan {
     pub start: usize,
     pub end: usize,

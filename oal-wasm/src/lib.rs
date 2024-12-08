@@ -7,7 +7,6 @@ use oal_model::span::Span;
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
 
-
 /// The identifier for the unique source.
 const INPUT: &str = "file:///main.oal";
 
@@ -93,12 +92,12 @@ fn process(input: &str) -> anyhow::Result<String> {
 
 /// Generates an error report.
 fn report<M: ToString>(input: &str, span: Span, msg: M) -> anyhow::Result<String> {
-    let mut builder = Report::build(ReportKind::Error, INPUT, span.start())
+    let char_span = CharSpan::from(input, span);
+    let mut builder = Report::build(ReportKind::Error, char_span.clone())
         .with_config(Config::default().with_color(false))
         .with_message(msg);
-    if !span.range().is_empty() {
-        let s = CharSpan::from(input, span);
-        builder.add_label(Label::new(s))
+    if !ariadne::Span::is_empty(&char_span) {
+        builder.add_label(Label::new(char_span))
     }
     let mut buf = Vec::new();
     builder
@@ -109,6 +108,7 @@ fn report<M: ToString>(input: &str, span: Span, msg: M) -> anyhow::Result<String
 }
 
 /// A span of Unicode code points within the unique source.
+#[derive(Clone, Debug)]
 struct CharSpan(oal_model::span::CharSpan);
 
 impl CharSpan {
