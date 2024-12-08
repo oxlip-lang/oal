@@ -180,7 +180,7 @@ impl<'a, L: Lexeme> TokenRef<'a, L> {
     }
 }
 
-impl<'a, L: Lexeme> Debug for TokenRef<'a, L> {
+impl<L: Lexeme> Debug for TokenRef<'_, L> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?} at {:?}", self.token(), self.span())
     }

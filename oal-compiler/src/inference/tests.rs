@@ -45,7 +45,7 @@ fn infer_tag() -> anyhow::Result<()> {
 
     let prog = Program::cast(mods.main().root()).expect("expected a program");
 
-    let decl1 = prog.declarations().nth(0).expect("expected a declaration");
+    let decl1 = prog.declarations().next().expect("expected a declaration");
     let Tag::Var(t1) = decl1.node().syntax().core_ref().unwrap_tag() else {
         panic!("expected a tag variable")
     };

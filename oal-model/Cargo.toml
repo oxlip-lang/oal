@@ -12,10 +12,10 @@ keywords = ["api"]
 categories = ["compilers"]
 
 [dependencies]
-string-interner = "0.17"
+string-interner = "0.18"
 generational_token_list = "0.1"
 generational-indextree = "1.1"
 generational-arena = "0.2"
-thiserror = "1.0"
+thiserror = "2.0"
 url = "2.4"
 sha2 = "0.10"

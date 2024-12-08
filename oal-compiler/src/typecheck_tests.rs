@@ -39,7 +39,7 @@ fn typecheck_ok() {
     ];
 
     for c in cases {
-        compile(c).expect(format!("error evaluating: {}", c).as_str());
+        compile(c).unwrap_or_else(|_| panic!("error evaluating: {}", c));
     }
 }
 

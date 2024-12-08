@@ -225,7 +225,7 @@ impl Workspace {
 
 struct WorkspaceLoader<'a>(&'a mut Workspace);
 
-impl<'a> Loader<anyhow::Error> for WorkspaceLoader<'a> {
+impl Loader<anyhow::Error> for WorkspaceLoader<'_> {
     /// Returns true if the given locator points to a valid source file.
     fn is_valid(&mut self, loc: &Locator) -> bool {
         DefaultFileSystem.is_valid(loc)

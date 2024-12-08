@@ -40,7 +40,7 @@ pub fn compile(input: &str) -> CompilationResult {
 /// The web loader type for a unique source and no I/O.
 struct WebLoader<'a>(&'a str);
 
-impl<'a> Loader<anyhow::Error> for WebLoader<'a> {
+impl Loader<anyhow::Error> for WebLoader<'_> {
     fn is_valid(&mut self, loc: &Locator) -> bool {
         loc.url().as_str() == INPUT
     }

@@ -57,7 +57,7 @@ fn test_position_to_utf8() {
     let text = "hello\nworld\r\n😉text\r\n!";
     // The position of the character 'e' on the last line.
     let position = lsp_types::Position::new(2, 3);
-    let index = position_to_utf8(&text, position);
+    let index = position_to_utf8(text, position);
     assert_eq!(index, 18);
 }
 
@@ -66,7 +66,7 @@ fn test_position_to_utf8_overflow() {
     let text = "hello\nworld\r\ntext\r\n!";
     // A position past the end of the last line.
     let position = lsp_types::Position::new(2, 10);
-    let index = position_to_utf8(&text, position);
+    let index = position_to_utf8(text, position);
     // We expect the index of the carriage return at the end of the last line.
     assert_eq!(index, 17);
 }
@@ -77,7 +77,7 @@ fn test_utf8_to_position() {
     let text = "hello\nworld\r\n😉text\r\n!";
     let index = 18; // The character 'e' in word "text"
     assert_eq!(&text[index..index + 1], "e");
-    let position = utf8_to_position(&text, index);
+    let position = utf8_to_position(text, index);
     assert_eq!(position.line, 2);
     assert_eq!(position.character, 3);
 }
