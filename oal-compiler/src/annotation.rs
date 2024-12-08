@@ -56,7 +56,7 @@ impl Annotation {
 
     pub fn get_str(&self, s: &str) -> Option<&str> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_str)
     }
 
@@ -66,32 +66,32 @@ impl Annotation {
 
     pub fn get_bool(&self, s: &str) -> Option<bool> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_bool)
     }
 
     pub fn get_num(&self, s: &str) -> Option<f64> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_f64)
     }
 
     pub fn get_int(&self, s: &str) -> Option<i64> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_i64)
     }
 
     pub fn get_size(&self, s: &str) -> Option<usize> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_u64)
             .map(|u| u as usize)
     }
 
     pub fn get_enum(&self, s: &str) -> Option<Vec<String>> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_sequence)
             .map(|seq| {
                 seq.iter()
@@ -103,7 +103,7 @@ impl Annotation {
 
     pub fn get_props(&self, s: &str) -> Option<HashMap<String, String>> {
         self.props
-            .get(&Value::String(s.to_owned()))
+            .get(Value::String(s.to_owned()))
             .and_then(Value::as_mapping)
             .map(|m| {
                 m.iter()

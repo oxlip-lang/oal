@@ -55,7 +55,7 @@ pub enum Lambda<'a> {
     External(syn::Declaration<'a, Core>),
 }
 
-impl<'a> Expr<'a> {
+impl Expr<'_> {
     fn is_schema_like(&self) -> bool {
         matches!(
             self,

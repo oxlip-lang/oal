@@ -224,13 +224,13 @@ pub struct NodeRef<'a, T: Core, G: Grammar> {
 }
 
 // Note: for some reason the derive macro is not doing the right thing for Clone/Copy.
-impl<'a, T: Core, G: Grammar> Clone for NodeRef<'a, T, G> {
+impl<T: Core, G: Grammar> Clone for NodeRef<'_, T, G> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T: Core, G: Grammar> Copy for NodeRef<'a, T, G> {}
+impl<T: Core, G: Grammar> Copy for NodeRef<'_, T, G> {}
 
 #[derive(Debug)]
 pub enum NodeCursor<'a, T: Core, G: Grammar> {
@@ -360,7 +360,7 @@ impl<'a, T: Core, G: Grammar> NodeRef<'a, T, G> {
     }
 }
 
-impl<'a, T: Core, G: Grammar> Debug for NodeRef<'a, T, G> {
+impl<T: Core, G: Grammar> Debug for NodeRef<'_, T, G> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.syntax().trunk())?;
         if self.syntax().has_core() {

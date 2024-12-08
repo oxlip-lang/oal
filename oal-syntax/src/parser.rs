@@ -27,13 +27,13 @@ pub enum ParserTag {
 
 terminal_node!(Gram, Identifier, k if k.is_identifier());
 
-impl<'a, T: Core> Identifier<'a, T> {
+impl<T: Core> Identifier<'_, T> {
     pub fn ident(&self) -> atom::Ident {
         self.node().as_str().into()
     }
 }
 
-impl<'a, T: Core> PartialEq for Identifier<'a, T> {
+impl<T: Core> PartialEq for Identifier<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.node().as_str() == other.node().as_str()
     }
@@ -50,7 +50,7 @@ pub enum PrimitiveKind {
     Int,
 }
 
-impl<'a, T: Core> Primitive<'a, T> {
+impl<T: Core> Primitive<'_, T> {
     pub fn kind(&self) -> PrimitiveKind {
         match self.node().token().kind() {
             TokenKind::PrimitiveNum => PrimitiveKind::Num,
@@ -78,7 +78,7 @@ impl<'a, T: Core> PathElement<'a, T> {
 
 terminal_node!(Gram, PropertyName, TokenKind::Property);
 
-impl<'a, T: Core> PropertyName<'a, T> {
+impl<T: Core> PropertyName<'_, T> {
     pub fn as_text(&self) -> atom::Text {
         self.node().as_str().into()
     }
@@ -86,7 +86,7 @@ impl<'a, T: Core> PropertyName<'a, T> {
 
 terminal_node!(Gram, Method, k if k.is_method());
 
-impl<'a, T: Core> Method<'a, T> {
+impl<T: Core> Method<'_, T> {
     pub fn method(&self) -> atom::Method {
         match self.node().token().kind() {
             TokenKind::MethodGet => atom::Method::Get,
@@ -138,7 +138,7 @@ pub enum ContentTagKind {
     Status,
 }
 
-impl<'a, T: Core> ContentTag<'a, T> {
+impl<T: Core> ContentTag<'_, T> {
     pub fn kind(&self) -> ContentTagKind {
         match self.node().token().kind() {
             TokenKind::ContentHeaders => ContentTagKind::Headers,
@@ -151,7 +151,7 @@ impl<'a, T: Core> ContentTag<'a, T> {
 
 terminal_node!(Gram, Operator, k if k.is_operator());
 
-impl<'a, T: Core> Operator<'a, T> {
+impl<T: Core> Operator<'_, T> {
     pub fn variadic(&self) -> atom::VariadicOperator {
         match self.node().token().kind() {
             TokenKind::OperatorDoubleColon => atom::VariadicOperator::Range,
@@ -177,7 +177,7 @@ terminal_node!(
     TokenKind::OperatorExclamationMark | TokenKind::OperatorQuestionMark
 );
 
-impl<'a, T: Core> OptionMark<'a, T> {
+impl<T: Core> OptionMark<'_, T> {
     pub fn required(&self) -> bool {
         match self.node().token().kind() {
             TokenKind::OperatorExclamationMark => true,
@@ -266,7 +266,7 @@ impl<'a, T: Core> Annotations<'a, T> {
     }
 }
 
-impl<'a, T: Core> Binding<'a, T> {
+impl<T: Core> Binding<'_, T> {
     pub fn ident(&self) -> atom::Ident {
         Identifier::cast(self.node().first())
             .expect("expected identifier")

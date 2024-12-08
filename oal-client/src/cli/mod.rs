@@ -62,7 +62,7 @@ impl Processor {
 
 struct ProcLoader<'a>(&'a Processor);
 
-impl<'a> Loader<anyhow::Error> for ProcLoader<'a> {
+impl Loader<anyhow::Error> for ProcLoader<'_> {
     /// Returns true if the given locator points to a valid source file.
     fn is_valid(&mut self, loc: &Locator) -> bool {
         DefaultFileSystem.is_valid(loc)

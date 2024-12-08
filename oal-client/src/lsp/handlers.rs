@@ -35,9 +35,7 @@ fn node_location(workspace: &mut Workspace, node: NRef) -> anyhow::Result<Locati
 
 /// Finds the definition of the identifier at the given location, if any.
 fn find_definition(tree: &Tree, index: usize) -> Option<Definition> {
-    let Some(ident) = syntax_at::<Identifier<_>>(tree, index) else {
-        return None;
-    };
+    let ident = syntax_at::<Identifier<_>>(tree, index)?;
     let parent = ident.node().ancestors().nth(1).unwrap();
     if let Some(decl) = Declaration::cast(parent) {
         Some(Definition::External(External::new(decl.node())))
@@ -50,9 +48,7 @@ fn find_definition(tree: &Tree, index: usize) -> Option<Definition> {
 
 /// Finds the qualifier at the given identifier location, if any.
 fn find_qualifier(tree: &Tree, index: usize) -> Option<Qualifier<Core>> {
-    let Some(ident) = syntax_at::<Identifier<_>>(tree, index) else {
-        return None;
-    };
+    let ident = syntax_at::<Identifier<_>>(tree, index)?;
     let parent = ident.node().ancestors().nth(1).unwrap();
     Qualifier::cast(parent)
 }

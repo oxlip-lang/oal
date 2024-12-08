@@ -43,10 +43,11 @@ fn compile_cycles() -> anyhow::Result<()> {
     compile(&mods, mods.base()).expect("should compile");
 
     let prog = Program::cast(mods.main().root()).expect("expected a program");
-    let a = prog.declarations().nth(0).expect("expected a declaration");
-    let b = prog.declarations().nth(1).expect("expected a declaration");
-    let c = prog.declarations().nth(2).expect("expected a declaration");
-    let d = prog.declarations().nth(3).expect("expected a declaration");
+    let mut decls = prog.declarations();
+    let a = decls.next().expect("expected a declaration");
+    let b = decls.next().expect("expected a declaration");
+    let c = decls.next().expect("expected a declaration");
+    let d = decls.next().expect("expected a declaration");
 
     assert!(a.node().syntax().core_ref().is_recursive);
     assert!(b.node().syntax().core_ref().is_recursive);
