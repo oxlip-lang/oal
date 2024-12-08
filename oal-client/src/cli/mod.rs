@@ -25,11 +25,10 @@ impl Processor {
         let color = colors.next();
         let loc = span.locator().clone();
         let input = DefaultFileSystem.read_file(&loc)?;
-        let mut builder =
-            Report::build(ReportKind::Error, loc.clone(), span.start()).with_message(msg);
-        if !span.range().is_empty() {
-            let s = CharSpan::from(&input, span);
-            builder.add_label(Label::new(s).with_color(color))
+        let char_span = CharSpan::from(&input, span);
+        let mut builder = Report::build(ReportKind::Error, char_span.clone()).with_message(msg);
+        if !ariadne::Span::is_empty(&char_span) {
+            builder.add_label(Label::new(char_span).with_color(color))
         }
         builder.finish().eprint((loc, Source::from(input)))?;
         Ok(())
@@ -108,6 +107,7 @@ impl Loader<anyhow::Error> for ProcLoader<'_> {
     }
 }
 
+#[derive(Clone)]
 struct CharSpan(oal_model::span::CharSpan);
 
 impl CharSpan {
