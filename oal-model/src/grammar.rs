@@ -74,13 +74,13 @@ impl<T: Core, G: Grammar> SyntaxNode<T, G> {
         self.1.borrow().is_some()
     }
 
-    pub fn core_ref(&self) -> Ref<T> {
+    pub fn core_ref(&self) -> Ref<'_, T> {
         Ref::map(self.1.borrow(), |r| {
             r.as_ref().expect("core should exist").as_ref()
         })
     }
 
-    pub fn core_mut(&self) -> RefMut<T> {
+    pub fn core_mut(&self) -> RefMut<'_, T> {
         RefMut::map(self.1.borrow_mut(), |r| {
             r.get_or_insert_with(Box::default).as_mut()
         })
@@ -133,7 +133,7 @@ impl<T: Core, G: Grammar> SyntaxTree<T, G> {
         self
     }
 
-    pub fn root(&self) -> NodeRef<T, G> {
+    pub fn root(&self) -> NodeRef<'_, T, G> {
         NodeRef::from(self, self.root.unwrap())
     }
 

@@ -94,7 +94,7 @@ where
         &self.loc
     }
 
-    pub fn reference(&self, s: Cursor) -> TokenRef<L> {
+    pub fn reference(&self, s: Cursor) -> TokenRef<'_, L> {
         TokenRef {
             list: self,
             token: s.0.expect("cursor should be valid"),
