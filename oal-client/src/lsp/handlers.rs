@@ -47,7 +47,7 @@ fn find_definition(tree: &Tree, index: usize) -> Option<Definition> {
 }
 
 /// Finds the qualifier at the given identifier location, if any.
-fn find_qualifier(tree: &Tree, index: usize) -> Option<Qualifier<Core>> {
+fn find_qualifier(tree: &Tree, index: usize) -> Option<Qualifier<'_, Core>> {
     let ident = syntax_at::<Identifier<_>>(tree, index)?;
     let parent = ident.node().ancestors().nth(1).unwrap();
     Qualifier::cast(parent)
