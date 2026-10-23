@@ -155,12 +155,12 @@ where
     Ok(ann)
 }
 
-pub fn cast_schema(from: (Expr, AnnRef)) -> Schema {
+pub fn cast_schema(from: (Expr, AnnRef)) -> Result<Schema> {
     let ann = from.1;
     let desc = ann.get_string("description");
     let title = ann.get_string("title");
     let required = ann.get_bool("required");
-    let examples = ann.get_props("examples");
+    let examples = ann.get_examples()?;
 
     let expr = match from.0 {
         Expr::Object(o) => SchemaExpr::Object(*o),
@@ -177,20 +177,20 @@ pub fn cast_schema(from: (Expr, AnnRef)) -> Schema {
         e => panic!("not a schema: {e:?}"),
     };
 
-    Schema {
+    Ok(Schema {
         expr,
         desc,
         title,
         required,
         examples,
-    }
+    })
 }
 
-pub fn cast_content(from: (Expr, AnnRef)) -> Content {
+pub fn cast_content(from: (Expr, AnnRef)) -> Result<Content> {
     if let Expr::Content(c) = from.0 {
-        *c
+        Ok(*c)
     } else if from.0.is_schema_like() {
-        Content::from(cast_schema(from))
+        Ok(Content::from(cast_schema(from)?))
     } else if let Expr::Reference(_, v) = from.0 {
         cast_content(*v)
     } else {
@@ -198,12 +198,12 @@ pub fn cast_content(from: (Expr, AnnRef)) -> Content {
     }
 }
 
-pub fn cast_ranges(from: (Expr, AnnRef)) -> Ranges {
+pub fn cast_ranges(from: (Expr, AnnRef)) -> Result<Ranges> {
     if let Expr::Ranges(r) = from.0 {
-        *r
+        Ok(*r)
     } else if from.0.is_content_like() {
-        let c = cast_content(from);
-        Ranges::from([((c.status, c.media.clone()), c)])
+        let c = cast_content(from)?;
+        Ok(Ranges::from([((c.status, c.media.clone()), c)]))
     } else if let Expr::Reference(_, v) = from.0 {
         cast_ranges(*v)
     } else {
@@ -311,11 +311,11 @@ pub fn eval_transfer<'a>(
     }
 
     let domain = match transfer.domain() {
-        Some(term) => cast_content(eval_terminal(ctx, term, AnnRef::default())?),
+        Some(term) => cast_content(eval_terminal(ctx, term, AnnRef::default())?)?,
         None => Content::default(),
     };
 
-    let ranges = cast_ranges(eval_any(ctx, transfer.range(), AnnRef::default())?);
+    let ranges = cast_ranges(eval_any(ctx, transfer.range(), AnnRef::default())?)?;
 
     let params = match transfer.params() {
         Some(object) => Some(cast_object(eval_object(ctx, object, AnnRef::default())?)),
@@ -376,7 +376,7 @@ pub fn eval_program<'a>(
             // The type checker already asserts that all references are valid schemas.
             refs.insert(
                 ident.clone(),
-                Reference::Schema(cast_schema((expr.clone(), ann.clone()))),
+                Reference::Schema(cast_schema((expr.clone(), ann.clone()))?),
             );
         }
     }
@@ -510,11 +510,13 @@ pub fn eval_content<'a>(
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
     let desc = ann.get_string("description");
-    let examples = ann.get_props("examples");
+    let examples = ann
+        .get_examples()
+        .map_err(|err| err.at(content.node().span()))?;
 
     let schema = match content.body() {
         Some(body) => {
-            let s = cast_schema(eval_any(ctx, body, AnnRef::default())?);
+            let s = cast_schema(eval_any(ctx, body, AnnRef::default())?)?;
             Some(Box::new(s))
         }
         None => None,
@@ -578,14 +580,14 @@ pub fn eval_variadic_operation<'a>(
     let expr = if op == atom::VariadicOperator::Range {
         let mut ranges = Ranges::new();
         for operand in operation.operands() {
-            let r = cast_ranges(eval_any(ctx, operand, AnnRef::default())?);
+            let r = cast_ranges(eval_any(ctx, operand, AnnRef::default())?)?;
             ranges.extend(r.into_iter());
         }
         Expr::Ranges(Box::new(ranges))
     } else {
         let mut schemas = Vec::new();
         for operand in operation.operands() {
-            let s = cast_schema(eval_any(ctx, operand, AnnRef::default())?);
+            let s = cast_schema(eval_any(ctx, operand, AnnRef::default())?)?;
             schemas.push(s);
         }
         let var_op = VariadicOp { op, schemas };
@@ -643,7 +645,7 @@ pub fn eval_property<'a>(
     let required = ann.get_bool("required").or_else(|| property.required());
 
     let name = property.name();
-    let schema = cast_schema(eval_any(ctx, property.rhs(), AnnRef::default())?);
+    let schema = cast_schema(eval_any(ctx, property.rhs(), AnnRef::default())?)?;
 
     let prop = Property {
         name,
@@ -709,7 +711,7 @@ pub fn eval_array<'a>(
     array: syn::Array<'a, Core>,
     ann: AnnRef,
 ) -> Result<(Expr<'a>, AnnRef)> {
-    let schema = cast_schema(eval_any(ctx, array.inner(), AnnRef::default())?);
+    let schema = cast_schema(eval_any(ctx, array.inner(), AnnRef::default())?)?;
     let array = Array { item: schema };
     let expr = Expr::Array(Box::new(array));
     Ok((expr, ann))

@@ -39,6 +39,31 @@ OPTIONS:
 oal-cli --conf examples/oal.toml
 ```
 
+### Media-type examples
+
+The `examples` annotation maps names to external URLs or explicit inline values:
+
+```oal
+res /items on post : <{}> `examples: {request: {value: {name: "sample"}}}`
+    -> <status=200, {}> `examples: {inline: {value: {id: 1}}, remote: "examples/item.json"}`;
+```
+
+A URL string retains the existing shorthand and produces OpenAPI `externalValue`.
+A mapping containing only `value` produces OpenAPI `value`, preserving objects,
+arrays, strings, numbers, booleans and explicit `null`. To embed a URL as a string
+value, write `{value: "https://example.test/item"}` rather than the URL shorthand.
+Example names are strings; quote names containing whitespace or punctuation,
+and names such as `"422"`, `"true"` or `"null"` that YAML would otherwise parse
+as non-string values. Previously ignored malformed entries now produce errors.
+Within backtick-delimited annotations, encode a literal backtick in a quoted
+string as `\u0060`; use `\n` for an embedded newline.
+
+Examples may annotate a schema or a content expression. Content-level examples
+take precedence; when absent, the schema's examples are used. An explicit empty
+mapping on the content suppresses that fallback. Malformed entries, YAML tags,
+non-finite numbers and non-string object keys produce diagnostics instead of
+silently losing example data. Inline values must be representable as JSON.
+
 ## Experimental: WebAssembly support
 Release to WebAssembly requires the installation of [`wasm-pack`](https://rustwasm.github.io/wasm-pack/installer/).
 

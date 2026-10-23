@@ -1,5 +1,6 @@
+use crate::errors::{Error, Kind, Result};
+use crate::spec::{Example, Examples};
 use serde_yaml::{Mapping, Sequence, Value};
-use std::collections::HashMap;
 
 /// An indexed annotation set.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
@@ -101,20 +102,75 @@ impl Annotation {
             })
     }
 
-    pub fn get_props(&self, s: &str) -> Option<HashMap<String, String>> {
-        self.props
-            .get(Value::String(s.to_owned()))
-            .and_then(Value::as_mapping)
-            .map(|m| {
-                m.iter()
-                    .flat_map(|(k, v)| {
-                        let key = k.as_str().map(ToOwned::to_owned);
-                        let val = v.as_str().map(ToOwned::to_owned);
-                        key.and_then(|k| val.map(|v| (k, v)))
-                    })
-                    .collect()
-            })
+    pub fn get_examples(&self) -> Result<Option<Examples>> {
+        let Some(value) = self.props.get("examples") else {
+            return Ok(None);
+        };
+        let mapping = value
+            .as_mapping()
+            .ok_or_else(|| Error::new(Kind::InvalidLiteral, "examples must be a mapping"))?;
+        let mut examples = Examples::new();
+        for (key, value) in mapping {
+            let name = key
+                .as_str()
+                .ok_or_else(|| Error::new(Kind::InvalidLiteral, "example names must be strings"))?;
+            let example = match value {
+                Value::String(url) => Example::External(url.clone()),
+                Value::Mapping(fields) if fields.len() == 1 && fields.contains_key("value") => {
+                    let value = json_example_value(&fields["value"]).map_err(|error| {
+                        Error::new(Kind::InvalidLiteral, format!("example {name:?}: {error}"))
+                    })?;
+                    Example::Inline(value)
+                }
+                _ => {
+                    return Err(Error::new(
+                        Kind::InvalidLiteral,
+                        format!(
+                        "example {name:?} must be a URL string or a mapping containing only value"
+                    ),
+                    ))
+                }
+            };
+            examples.insert(name.to_owned(), example);
+        }
+        Ok(Some(examples))
     }
+}
+
+/// Reject YAML-only values instead of coercing keys or turning NaN into JSON null.
+fn json_example_value(value: &Value) -> std::result::Result<serde_json::Value, &'static str> {
+    use serde_json::Value as Json;
+    Ok(match value {
+        Value::Null => Json::Null,
+        Value::Bool(value) => Json::Bool(*value),
+        Value::Number(value) => {
+            if let Some(value) = value.as_i64() {
+                value.into()
+            } else if let Some(value) = value.as_u64() {
+                value.into()
+            } else {
+                serde_json::Number::from_f64(value.as_f64().ok_or("invalid JSON number")?)
+                    .ok_or("example numbers must be finite")?
+                    .into()
+            }
+        }
+        Value::String(value) => Json::String(value.clone()),
+        Value::Sequence(values) => Json::Array(
+            values
+                .iter()
+                .map(json_example_value)
+                .collect::<std::result::Result<_, _>>()?,
+        ),
+        Value::Mapping(values) => {
+            let mut object = serde_json::Map::new();
+            for (key, value) in values {
+                let key = key.as_str().ok_or("example object keys must be strings")?;
+                object.insert(key.to_owned(), json_example_value(value)?);
+            }
+            Json::Object(object)
+        }
+        Value::Tagged(_) => return Err("YAML tags are not JSON example values"),
+    })
 }
 
 impl TryFrom<&str> for Annotation {
@@ -124,4 +180,48 @@ impl TryFrom<&str> for Annotation {
         let props = serde_yaml::from_str(format!("{{ {value} }}").as_str())?;
         Ok(Annotation { props })
     }
+}
+
+#[test]
+fn test_examples() -> anyhow::Result<()> {
+    let ann = Annotation::try_from(
+        r#"examples: { remote: "examples/sample.json", object: {value: {id: 1}}, nothing: {value: null} }"#,
+    )?;
+    let examples = ann.get_examples()?.unwrap();
+    assert_eq!(
+        examples["remote"],
+        Example::External("examples/sample.json".into())
+    );
+    assert_eq!(
+        examples["object"],
+        Example::Inline(serde_json::json!({"id": 1}))
+    );
+    assert_eq!(
+        examples["nothing"],
+        Example::Inline(serde_json::Value::Null)
+    );
+    assert!(Annotation::default().get_examples()?.is_none());
+    assert_eq!(
+        Annotation::try_from("examples: {}")?.get_examples()?,
+        Some(Examples::new())
+    );
+    Ok(())
+}
+
+#[test]
+fn test_invalid_examples() -> anyhow::Result<()> {
+    for input in [
+        "examples: []",
+        "examples: {1: 'sample.json'}",
+        "examples: {sample: {}}",
+        "examples: {sample: {value: 1, externalValue: 'sample.json'}}",
+        "examples: {sample: {value: .nan}}",
+        "examples: {sample: {value: [.inf]}}",
+        "examples: {sample: {value: {1: 'not a JSON key'}}}",
+        "examples: {sample: {value: !tag 'not JSON'}}",
+    ] {
+        let ann = Annotation::try_from(input)?;
+        assert!(ann.get_examples().is_err(), "accepted {input}");
+    }
+    Ok(())
 }

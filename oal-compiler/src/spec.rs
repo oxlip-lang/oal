@@ -76,13 +76,22 @@ pub struct VariadicOp {
     pub schemas: Vec<Schema>,
 }
 
+/// A named media-type example, either referenced externally or embedded as JSON.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Example {
+    External(String),
+    Inline(serde_json::Value),
+}
+
+pub type Examples = HashMap<String, Example>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Schema {
     pub expr: SchemaExpr,
     pub desc: Option<String>,
     pub title: Option<String>,
     pub required: Option<bool>,
-    pub examples: Option<HashMap<String, String>>,
+    pub examples: Option<Examples>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -150,7 +159,7 @@ pub struct Content {
     pub media: Option<MediaType>,
     pub headers: Option<Object>,
     pub desc: Option<String>,
-    pub examples: Option<HashMap<String, String>>,
+    pub examples: Option<Examples>,
 }
 
 impl From<Schema> for Content {

@@ -441,10 +441,16 @@ impl Builder {
             None => Default::default(),
             Some(examples) => examples
                 .iter()
-                .map(|(name, url)| {
-                    let example = Example {
-                        external_value: Some(url.clone()),
-                        ..Default::default()
+                .map(|(name, value)| {
+                    let example = match value {
+                        spec::Example::External(url) => Example {
+                            external_value: Some(url.clone()),
+                            ..Default::default()
+                        },
+                        spec::Example::Inline(value) => Example {
+                            value: Some(value.clone()),
+                            ..Default::default()
+                        },
                     };
                     (name.clone(), ReferenceOr::Item(example))
                 })

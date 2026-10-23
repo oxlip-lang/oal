@@ -748,6 +748,7 @@ dependencies = [
  "oal-syntax",
  "petgraph",
  "serde",
+ "serde_json",
  "serde_yaml",
  "sha2",
  "thiserror",
