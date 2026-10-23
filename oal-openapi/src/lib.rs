@@ -559,6 +559,7 @@ impl Builder {
                 request_body: self.xfer_request(xfer),
                 responses: self.xfer_responses(xfer),
                 tags: xfer.tags.clone(),
+                security: xfer.security.clone(),
                 ..Default::default()
             };
 

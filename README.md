@@ -45,3 +45,33 @@ Release to WebAssembly requires the installation of [`wasm-pack`](https://rustwa
 ```
 make wasm
 ```
+
+## Operation Security
+
+Declare OpenAPI security requirements on a transfer:
+
+```oal
+# security: [{api_key: []}, {oauth: [read, write]}]
+let protected = get -> {};
+res /items on protected;
+
+# security: []
+let public = get -> {};
+res /health on public;
+```
+
+Requirements in the array are alternatives (OR). Schemes within one requirement
+are all required (AND), for example `security: [{api_key: [], oauth: [read]}]`.
+An empty requirement permits anonymous access: `security: [{}, {oauth: [read]}]`.
+Omitting the annotation inherits document-level security; `security: []`
+explicitly disables it for the operation. A later security annotation replaces
+earlier requirements rather than concatenating alternatives, including when
+the later annotation is empty.
+
+Scheme names and scopes must be strings, with a scope array for every scheme.
+Malformed values produce diagnostics; YAML-only tags are rejected. Use empty
+scope arrays for schemes without OAuth/OpenID scopes. Scheme definitions remain
+in `components.securitySchemes` of the CLI's base OpenAPI document; this feature
+does not add scheme declarations to OAL or a base-document argument to WASM.
+References and scopes are emitted as supplied, not checked against that base.
+These annotations describe authentication requirements; they do not enforce it.

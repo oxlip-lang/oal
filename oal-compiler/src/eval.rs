@@ -304,6 +304,9 @@ pub fn eval_transfer<'a>(
     let summary = ann.get_string("summary");
     let tags = ann.get_enum("tags").unwrap_or_default();
     let id = ann.get_string("operationId");
+    let security = ann
+        .get_security()
+        .map_err(|err| err.at(transfer.node().span()))?;
 
     let mut methods = EnumMap::default();
     for m in transfer.methods() {
@@ -331,6 +334,7 @@ pub fn eval_transfer<'a>(
         summary,
         tags,
         id,
+        security,
     };
 
     let expr = Expr::Transfer(Box::new(xfer));

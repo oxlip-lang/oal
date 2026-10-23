@@ -1,3 +1,5 @@
+use crate::errors::{Error, Kind, Result};
+use crate::spec::SecurityRequirement;
 use serde_yaml::{Mapping, Sequence, Value};
 use std::collections::HashMap;
 
@@ -50,8 +52,64 @@ fn test_deep_extend() {
 
 impl Annotation {
     /// Extends the set by consuming annotations from the other set.
-    pub fn extend(&mut self, other: Self) {
+    pub fn extend(&mut self, mut other: Self) {
+        // Security alternatives must replace, not concatenate: [] clears requirements.
+        if let Some(security) = other.props.remove("security") {
+            self.props.insert("security".into(), security);
+        }
         deep_extend_mapping(&mut self.props, other.props);
+    }
+
+    pub fn get_security(&self) -> Result<Option<Vec<SecurityRequirement>>> {
+        let Some(value) = self.props.get("security") else {
+            return Ok(None);
+        };
+        let Value::Sequence(alternatives) = value else {
+            return Err(Error::new(
+                Kind::InvalidLiteral,
+                "security must be a sequence of requirements",
+            ));
+        };
+        let mut security = Vec::with_capacity(alternatives.len());
+        for alternative in alternatives {
+            let Value::Mapping(schemes) = alternative else {
+                return Err(Error::new(
+                    Kind::InvalidLiteral,
+                    "security requirements must be mappings",
+                ));
+            };
+            let mut requirement = SecurityRequirement::new();
+            for (name, scopes) in schemes {
+                let Value::String(name) = name else {
+                    return Err(Error::new(
+                        Kind::InvalidLiteral,
+                        "security scheme names must be strings",
+                    ));
+                };
+                let Value::Sequence(scopes) = scopes else {
+                    return Err(Error::new(
+                        Kind::InvalidLiteral,
+                        "security scopes must be sequences of strings",
+                    ));
+                };
+                let scopes = scopes
+                    .iter()
+                    .map(|scope| {
+                        if let Value::String(scope) = scope {
+                            Ok(scope.clone())
+                        } else {
+                            Err(Error::new(
+                                Kind::InvalidLiteral,
+                                "security scopes must be strings",
+                            ))
+                        }
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                requirement.insert(name.to_owned(), scopes);
+            }
+            security.push(requirement);
+        }
+        Ok(Some(security))
     }
 
     pub fn get_str(&self, s: &str) -> Option<&str> {
