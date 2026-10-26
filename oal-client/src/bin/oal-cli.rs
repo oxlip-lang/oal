@@ -22,7 +22,7 @@ fn run(config: config::Config) -> anyhow::Result<()> {
     }
 
     let api = builder.into_openapi();
-    let api_yaml = serde_yaml::to_string(&api)?;
+    let api_yaml = oal_openapi::to_yaml(&api)?;
 
     info!("Writing OpenAPI definition to {target}");
     DefaultFileSystem.write_file(&target, api_yaml)?;

@@ -8,6 +8,18 @@ use oal_syntax::atom;
 use openapiv3::*;
 use std::iter::once;
 
+/// Serialize OpenAPI data without folding Unicode separators in string values or keys.
+/// Parsing continues to use the existing YAML parser; only document emission changes.
+pub fn to_yaml<T: serde::Serialize>(document: &T) -> Result<String, serde_saphyr::SerializeError> {
+    serde_saphyr::to_string_with_options(
+        document,
+        serde_saphyr::ser_options! { prefer_block_scalars: false },
+    )
+}
+
+#[cfg(test)]
+mod yaml_tests;
+
 pub struct Builder {
     spec: spec::Spec,
     base: Option<OpenAPI>,
