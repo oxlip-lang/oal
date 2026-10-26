@@ -39,6 +39,35 @@ OPTIONS:
 oal-cli --conf examples/oal.toml
 ```
 
+## Mixed URI Segments
+
+URI segments can combine literal text and typed parameters:
+
+```oal
+res /api/db/{'dataset str}.{'table str} on get -> {};
+res /v{'version int}/files/{'name str}.json on get -> {};
+
+let id = 'id int;
+res /items/item-{id} on get -> {};
+```
+
+These produce `/api/db/{dataset}.{table}`, `/v{version}/files/{name}.json`
+and `/items/item-{id}` without post-processing. Every parameter still has its
+own required OpenAPI path-parameter declaration and primitive type. Literal
+prefixes/suffixes, multiple parameters, URI `concat`, query parameters, URI
+schema examples and generated operation IDs use the same segment structure.
+
+Fragments within a segment must be adjacent; whitespace and comments are still
+allowed inside parameter braces. Existing slash-separated syntax, including
+whitespace between `/` and its parameter braces, is retained. Literal fragments
+use ASCII letters/digits, `_`, `-`, `.`, and percent-encoded data, which is
+preserved verbatim. Encode reserved literal braces as `%7B`/`%7D` and Unicode
+as UTF-8 percent escapes; the compiler does not decode or validate those escapes.
+After a parameter, `~` and `->` retain their OAL operator meaning, and the token
+`on` still begins a relation even without whitespace. Use `%7E`, `%2D%3E` or
+`%6Fn` if those sequences are intended as literal suffixes. A literal `/` starts
+another segment; `%2F` remains part of the current segment.
+
 ## Experimental: WebAssembly support
 Release to WebAssembly requires the installation of [`wasm-pack`](https://rustwasm.github.io/wasm-pack/installer/).
 

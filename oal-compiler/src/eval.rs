@@ -406,6 +406,21 @@ pub fn eval_uri_template<'a>(
                 let s = UriSegment::Variable(Box::new(p));
                 path.push(s);
             }
+            syn::UriSegment::Compound(compound) => {
+                let mut parts = Vec::new();
+                for part in compound.parts() {
+                    parts.push(match part {
+                        syn::UriPart::Element(elem) => {
+                            crate::spec::UriPart::Literal(elem.as_str().into())
+                        }
+                        syn::UriPart::Variable(var) => {
+                            let p = cast_property(eval_any(ctx, var.inner(), AnnRef::default())?);
+                            crate::spec::UriPart::Variable(Box::new(p))
+                        }
+                    });
+                }
+                path.push(UriSegment::Compound(parts));
+            }
         }
     }
 

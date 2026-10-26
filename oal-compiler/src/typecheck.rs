@@ -154,10 +154,10 @@ fn check_relation(relation: syn::Relation<Core>) -> Result<()> {
 }
 
 fn check_uri(uri: syn::UriTemplate<Core>) -> Result<()> {
-    if !uri.segments().all(|s| match s {
-        syn::UriSegment::Element(_) => true,
-        syn::UriSegment::Variable(v) => get_tag(v.inner()).is_primitive_property(),
-    }) {
+    if !uri
+        .variables()
+        .all(|v| get_tag(v.inner()).is_primitive_property())
+    {
         return Err(Error::new(Kind::InvalidType, "ill-formed uri").with(&uri));
     }
     Ok(())

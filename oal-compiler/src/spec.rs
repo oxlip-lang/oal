@@ -8,6 +8,13 @@ use std::fmt::Debug;
 pub enum UriSegment {
     Literal(atom::Text),
     Variable(Box<Property>),
+    Compound(Vec<UriPart>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum UriPart {
+    Literal(atom::Text),
+    Variable(Box<Property>),
 }
 
 impl UriSegment {
@@ -15,7 +22,27 @@ impl UriSegment {
         match self {
             UriSegment::Literal(l) => l.as_ref().is_empty(),
             UriSegment::Variable(_) => false,
+            UriSegment::Compound(parts) => parts
+                .iter()
+                .all(|p| matches!(p, UriPart::Literal(l) if l.as_ref().is_empty())),
         }
+    }
+
+    pub fn variables(&self) -> impl Iterator<Item = &Property> {
+        let single = match self {
+            Self::Variable(p) => Some(p.as_ref()),
+            _ => None,
+        };
+        let parts = match self {
+            Self::Compound(parts) => parts.as_slice(),
+            _ => &[],
+        };
+        single
+            .into_iter()
+            .chain(parts.iter().filter_map(|p| match p {
+                UriPart::Variable(p) => Some(p.as_ref()),
+                UriPart::Literal(_) => None,
+            }))
     }
 }
 
@@ -59,6 +86,14 @@ impl Uri {
             match s {
                 UriSegment::Literal(l) => b.push_str(l.as_ref()),
                 UriSegment::Variable(t) => b.push_str(f(t).as_str()),
+                UriSegment::Compound(parts) => {
+                    for part in parts {
+                        match part {
+                            UriPart::Literal(l) => b.push_str(l.as_ref()),
+                            UriPart::Variable(t) => b.push_str(f(t).as_str()),
+                        }
+                    }
+                }
             }
         }
         b

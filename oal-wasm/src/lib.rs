@@ -148,3 +148,6 @@ fn test_compile_error() {
         .starts_with("Error: not in scope: variable is not defined"));
     assert!(res.api.is_empty());
 }
+
+#[cfg(test)]
+mod mixed_uri_tests;

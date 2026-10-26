@@ -373,10 +373,8 @@ impl Builder {
 
     fn uri_params(&self, uri: &spec::Uri) -> Vec<ReferenceOr<Parameter>> {
         let mut params = Vec::new();
-        for s in uri.path.iter() {
-            if let spec::UriSegment::Variable(p) = s {
-                params.push(ReferenceOr::Item(self.prop_path_param(p)));
-            }
+        for p in uri.path.iter().flat_map(spec::UriSegment::variables) {
+            params.push(ReferenceOr::Item(self.prop_path_param(p)));
         }
         if let Some(o) = uri.params.as_ref() {
             for p in o.props.iter() {
@@ -511,6 +509,13 @@ impl Builder {
                 }
             }
             spec::UriSegment::Variable(t) => t.name.as_ref().to_lowercase(),
+            spec::UriSegment::Compound(parts) => parts
+                .iter()
+                .map(|p| match p {
+                    spec::UriPart::Literal(l) => l.as_ref().to_lowercase(),
+                    spec::UriPart::Variable(t) => t.name.as_ref().to_lowercase(),
+                })
+                .collect(),
         }
     }
 

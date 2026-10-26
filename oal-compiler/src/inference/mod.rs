@@ -112,11 +112,9 @@ pub fn constrain(mods: &ModuleSet, loc: &Locator) -> Result<InferenceSet> {
                 set.push(get_tag(xfer), Tag::Transfer, xfer.span());
             }
         } else if let Some(uri) = syn::UriTemplate::cast(node) {
-            for seg in uri.segments() {
-                if let syn::UriSegment::Variable(var) = seg {
-                    let tag = Tag::Property(Box::new(Tag::Primitive));
-                    set.push(get_tag(var.inner()), tag, var.inner().span())
-                }
+            for var in uri.variables() {
+                let tag = Tag::Property(Box::new(Tag::Primitive));
+                set.push(get_tag(var.inner()), tag, var.inner().span())
             }
             if let Some(params) = uri.params() {
                 set.push(get_tag(params.node()), Tag::Object, params.node().span());

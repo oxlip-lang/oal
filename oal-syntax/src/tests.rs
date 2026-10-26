@@ -165,6 +165,30 @@ fn parse_decl_uri() {
 }
 
 #[test]
+fn parse_mixed_uri_keeps_segment_and_part_boundaries() {
+    parse(
+        "let a = /api/v{'version int}/{'dataset str}.{'table str}.json;",
+        |p: Prog| {
+            let uri = UriTemplate::cast(assert_term(assert_decl(p, "a").rhs())).unwrap();
+            assert_eq!(uri.segments().count(), 3);
+            assert_eq!(uri.variables().count(), 3);
+            let segments: Vec<_> = uri.segments().collect();
+            assert!(matches!(segments[0], UriSegment::Element(_)));
+            let UriSegment::Compound(c) = &segments[2] else {
+                panic!("expected mixed segment")
+            };
+            let parts: Vec<_> = c.parts().collect();
+            assert_eq!(parts.len(), 4);
+            assert!(matches!(parts[0], crate::parser::UriPart::Variable(_)));
+            let crate::parser::UriPart::Element(dot) = &parts[1] else {
+                panic!("expected literal")
+            };
+            assert_eq!(dot.as_str(), ".");
+        },
+    );
+}
+
+#[test]
 fn parse_decl_transfer() {
     parse("let a = get -> {};", |p: Prog| {
         let xfer = Transfer::cast(assert_decl(p, "a").rhs()).expect("expected transfer");

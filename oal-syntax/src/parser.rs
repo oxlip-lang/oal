@@ -70,7 +70,7 @@ impl<'a, T: Core> PathElement<'a, T> {
         match self.node().token().kind() {
             // Note that path separators are omitted from the string representation.
             TokenKind::PathElementRoot => "",
-            TokenKind::PathElementSegment => self.node().as_str(),
+            TokenKind::PathElementSegment | TokenKind::PathElementSuffix => self.node().as_str(),
             _ => unreachable!(),
         }
     }
@@ -216,6 +216,7 @@ syntax_nodes!(
     Binding,
     Declaration,
     UriVariable,
+    UriCompound,
     UriPath,
     UriParams,
     UriTemplate,
@@ -377,10 +378,12 @@ impl<'a, T: Core> Array<'a, T> {
 }
 
 impl<'a, T: Core> UriVariable<'a, T> {
-    const INNER_POS: usize = 2;
-
     pub fn inner(&self) -> NodeRef<'a, T, Gram> {
-        self.node().nth(Self::INNER_POS)
+        // Both /{expr} and an in-segment {expr} end with expression, closing brace.
+        self.node()
+            .reverse_children()
+            .nth(1)
+            .expect("expected URI variable expression")
     }
 }
 
@@ -401,6 +404,38 @@ impl<'a, T: Core> Recursion<'a, T> {
 pub enum UriSegment<'a, T: Core> {
     Element(PathElement<'a, T>),
     Variable(UriVariable<'a, T>),
+    Compound(UriCompound<'a, T>),
+}
+
+#[derive(Debug)]
+pub enum UriPart<'a, T: Core> {
+    Element(PathElement<'a, T>),
+    Variable(UriVariable<'a, T>),
+}
+
+impl<'a, T: Core> UriCompound<'a, T> {
+    pub fn parts(&self) -> impl Iterator<Item = UriPart<'a, T>> {
+        self.node().children().filter_map(|c| {
+            if let Some(v) = UriVariable::cast(c) {
+                Some(UriPart::Variable(v))
+            } else {
+                PathElement::cast(c).map(UriPart::Element)
+            }
+        })
+    }
+}
+
+impl<'a, T: Core> UriSegment<'a, T> {
+    pub fn parts(self) -> impl Iterator<Item = UriPart<'a, T>> {
+        let (single, compound) = match self {
+            Self::Element(e) => (Some(UriPart::Element(e)), None),
+            Self::Variable(v) => (Some(UriPart::Variable(v)), None),
+            Self::Compound(c) => (None, Some(c)),
+        };
+        single
+            .into_iter()
+            .chain(compound.into_iter().flat_map(|c| c.parts()))
+    }
 }
 
 impl<'a, T: Core> UriPath<'a, T> {
@@ -412,7 +447,7 @@ impl<'a, T: Core> UriPath<'a, T> {
             } else if let Some(p) = PathElement::cast(c) {
                 Some(UriSegment::Element(p))
             } else {
-                None
+                UriCompound::cast(c).map(UriSegment::Compound)
             }
         })
     }
@@ -434,6 +469,15 @@ impl<'a, T: Core> UriTemplate<'a, T> {
                 .expect("expected URI parameters")
                 .inner()
         })
+    }
+
+    pub fn variables(&self) -> impl Iterator<Item = UriVariable<'a, T>> {
+        self.segments()
+            .flat_map(UriSegment::parts)
+            .filter_map(|p| match p {
+                UriPart::Variable(v) => Some(v),
+                UriPart::Element(_) => None,
+            })
     }
 }
 
@@ -791,9 +835,26 @@ pub fn parse_uri_var<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
 }
 
 pub fn parse_uri_segment<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
-    parse_token(c, s, TokenKind::PathElementSegment)
+    let (s, head) = parse_token(c, s, TokenKind::PathElementSegment)
         .or_else(|_| parse_uri_var(c, s))
-        .or_else(|_| parse_uri_root(c, s))
+        .or_else(|_| parse_uri_root(c, s))?;
+    let parts = &mut vec![head];
+    let s = repeat(c, s, parts, &[parse_uri_suffix]);
+    if parts.len() == 1 {
+        Ok((s, parts.pop().unwrap()))
+    } else {
+        Ok((s, c.compose(SyntaxKind::UriCompound, parts)))
+    }
+}
+
+fn parse_uri_suffix<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
+    if let Ok(result) = parse_token(c, s, TokenKind::PathElementSuffix) {
+        return Ok(result);
+    }
+    let (s, n0) = parse_token(c, s, TokenKind::PathVariableSuffix)?;
+    let (s, n1) = parse_expression(c, s)?;
+    let (s, n2) = parse_token(c, s, TokenKind::ControlBraceRight)?;
+    Ok((s, c.compose(SyntaxKind::UriVariable, &[n0, n1, n2])))
 }
 
 pub fn parse_uri_path<T: Core>(c: &mut Context<T>, s: Cursor) -> ParserResult {
