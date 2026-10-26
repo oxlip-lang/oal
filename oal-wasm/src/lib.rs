@@ -4,6 +4,8 @@ use oal_compiler::module::{Loader, ModuleSet};
 use oal_compiler::tree::Tree;
 use oal_model::locator::Locator;
 use oal_model::span::Span;
+pub use openapiv3::OpenAPI;
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
 
@@ -20,11 +22,60 @@ pub struct CompilationResult {
     pub error: String,
 }
 
-/// The compiler interface with JavaScript.
+/// Compile with the default document, retaining the existing Rust entry point.
 #[wasm_bindgen]
 pub fn compile(input: &str) -> CompilationResult {
     console_error_panic_hook::set_once();
-    match process(input) {
+    compilation_result(process(input, None))
+}
+
+/// Compile OAL source with a typed base document, using the CLI builder's rules.
+pub fn compile_with_document(input: &str, base: OpenAPI) -> CompilationResult {
+    console_error_panic_hook::set_once();
+    compilation_result(process(input, Some(base)))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilationInput {
+    source: String,
+}
+
+fn parse_document_request(input: &str, doc: &str) -> anyhow::Result<(String, OpenAPI)> {
+    let input: CompilationInput =
+        serde_json::from_str(input).map_err(|err| anyhow!("invalid compilation input: {err}"))?;
+    let base = serde_json::from_str(doc).map_err(|err| anyhow!("invalid base document: {err}"))?;
+    Ok((input.source, base))
+}
+
+fn json_object(value: &JsValue, context: &str) -> anyhow::Result<String> {
+    if value.is_null() || !value.is_object() || js_sys::Array::is_array(value) {
+        return Err(anyhow!("invalid {context}: expected a JSON object"));
+    }
+    js_sys::JSON::stringify(value)
+        .map_err(|_| anyhow!("invalid {context}: cannot serialize as JSON"))?
+        .as_string()
+        .ok_or_else(|| anyhow!("invalid {context}: cannot serialize as JSON"))
+}
+
+/// JSON-object WASM interface, complementing operation security in oal#14.
+/// The historic compile(oalText) export remains unchanged.
+#[wasm_bindgen(js_name = compileDocument)]
+pub fn compile_document(input: js_sys::Object, doc: js_sys::Object) -> CompilationResult {
+    console_error_panic_hook::set_once();
+    let request = (|| {
+        let input = json_object(&input, "compilation input")?;
+        let doc = json_object(&doc, "base document")?;
+        parse_document_request(&input, &doc)
+    })();
+    match request {
+        Ok((input, base)) => compile_with_document(&input, base),
+        Err(err) => compilation_result(Err(err)),
+    }
+}
+
+fn compilation_result(result: anyhow::Result<String>) -> CompilationResult {
+    match result {
         Ok(api) => CompilationResult {
             api,
             error: String::default(),
@@ -79,12 +130,15 @@ impl Loader<anyhow::Error> for WebLoader<'_> {
 }
 
 /// Runs the end-to-end compilation process on a single input.
-fn process(input: &str) -> anyhow::Result<String> {
+fn process(input: &str, base: Option<OpenAPI>) -> anyhow::Result<String> {
     let loader = &mut WebLoader(input);
     let main = Locator::try_from(INPUT).unwrap();
     let mods = oal_compiler::module::load(loader, &main)?;
     let spec = oal_compiler::eval::eval(&mods)?;
-    let builder = oal_openapi::Builder::new(spec);
+    let mut builder = oal_openapi::Builder::new(spec);
+    if let Some(base) = base {
+        builder = builder.with_base(base);
+    }
     let api = builder.into_openapi();
     let api_yaml = serde_yaml::to_string(&api)?;
     Ok(api_yaml)
@@ -148,3 +202,6 @@ fn test_compile_error() {
         .starts_with("Error: not in scope: variable is not defined"));
     assert!(res.api.is_empty());
 }
+
+#[cfg(test)]
+mod base_document_tests;

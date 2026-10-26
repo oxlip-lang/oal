@@ -45,3 +45,53 @@ Release to WebAssembly requires the installation of [`wasm-pack`](https://rustwa
 ```
 make wasm
 ```
+
+### Base document input
+
+The historic JavaScript `compile(oalText)` function is unchanged. A separate
+WASM entry point accepts two JSON-compatible objects:
+
+```js
+const result = compileDocument(
+  { source: "res /items on get -> {};" },
+  {
+    openapi: "3.0.3",
+    info: { title: "Items API", version: "1.0.0" },
+    paths: {},
+    components: {
+      securitySchemes: {
+        bearer: { type: "http", scheme: "bearer" }
+      }
+    },
+    security: [{ bearer: [] }]
+  }
+);
+try {
+  if (result.error) throw new Error(result.error);
+  console.log(result.api);
+} finally {
+  result.free();
+}
+```
+
+Both arguments are required. The first must contain only the string `source`;
+the second is a full OpenAPI 3.0 base document, not a partial patch or YAML text.
+The required fields include `openapi`, `info.title`, `info.version`, and `paths`.
+Malformed objects or OAL return the existing `{api: "", error: "..."}` result.
+Inputs are serialized with JSON semantics and are not modified. Cyclic objects
+and serialization errors produce diagnostics. Use ordinary JSON-compatible data,
+not functions, BigInts, custom getters or `toJSON` implementations.
+
+The existing CLI builder defines ownership: generated `paths` and
+`components.schemas` **replace** those entire base collections. Other metadata,
+document security, non-schema components and supported `x-` extensions are
+retained through the typed OpenAPI model. This is not a deep merge and does not
+preserve arbitrary unknown fields or original formatting; normal serialization
+defaults may appear. A supplied base does not inherit the default title/server.
+Reference resolution and complete OpenAPI semantic validation are not performed.
+
+Rust callers retain `oal_wasm::compile(input: &str)` and can also call
+`oal_wasm::compile_with_document(input: &str, base: oal_wasm::OpenAPI)`.
+The CLI and its `--base` interface are unchanged. The new WASM entry point uses
+the same builder without appending YAML fragments. Always deploy the generated
+JavaScript bindings together with the matching WASM binary.
