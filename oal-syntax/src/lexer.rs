@@ -70,6 +70,7 @@ pub enum TokenKind {
     #[regex("[1-5]XX")]
     LiteralHttpStatus,
     #[regex("'[0-9a-zA-Z$@_-]+")]
+    #[regex(r#"'"([^"\\\x00-\x1f]|\\[^\r\n])*""#)]
     Property,
     #[token("{")]
     ControlBraceLeft,
@@ -349,7 +350,19 @@ pub fn tokenize(loc: Locator, input: &str) -> (Option<TokenList<Token>>, Vec<Par
                         TokenValue::Symbol(list.register(parse_prefixed_string(slice)))
                     }
                     TokenKind::Property => {
-                        TokenValue::Symbol(list.register(parse_prefixed_string(slice)))
+                        let name = parse_prefixed_string(slice);
+                        if name.starts_with('"') {
+                            // JSON decoding also validates escapes and surrogate pairs.
+                            match serde_json::from_str::<String>(name) {
+                                Ok(name) => TokenValue::Symbol(list.register(&name)),
+                                Err(_) => {
+                                    errors.push(ParserError::new(Span::new(loc.clone(), range)));
+                                    continue;
+                                }
+                            }
+                        } else {
+                            TokenValue::Symbol(list.register(name))
+                        }
                     }
                     TokenKind::CommentBlock | TokenKind::CommentLine | TokenKind::Space => {
                         TokenValue::Symbol(list.register(slice))
@@ -380,4 +393,38 @@ fn test_tokenize() {
 
     assert!(errors.is_empty());
     assert_eq!(list.end(), input.len());
+}
+
+#[test]
+fn test_quoted_property_tokens() {
+    for input in [
+        r#"'"user.name""#,
+        r#"'"display name""#,
+        r#"'"quote\"\\\n\u263a""#,
+        r#"'"""#,
+    ] {
+        let loc = Locator::try_from("file:///quoted.oal").unwrap();
+        let (list, errors) = tokenize(loc, input);
+        assert!(errors.is_empty(), "{input}");
+        assert_eq!(list.unwrap().end(), input.len());
+        let mut lexer = TokenKind::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(TokenKind::Property)));
+        assert_eq!(lexer.next(), None);
+    }
+}
+
+#[test]
+fn test_invalid_quoted_property_tokens() {
+    for input in [
+        r#"'"unterminated"#,
+        r#"'"\q""#,
+        r#"'"\uZZZZ""#,
+        r#"'"\ud800""#,
+        r#"'"\udc00""#,
+        "'\"raw\nnewline\"",
+    ] {
+        let loc = Locator::try_from("file:///quoted.oal").unwrap();
+        let (_, errors) = tokenize(loc, input);
+        assert!(!errors.is_empty(), "{input}");
+    }
 }

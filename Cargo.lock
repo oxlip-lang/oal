@@ -786,6 +786,7 @@ dependencies = [
  "generational_token_list",
  "logos",
  "oal-model",
+ "serde_json",
  "string-interner",
  "thiserror",
 ]

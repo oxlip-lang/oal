@@ -34,6 +34,25 @@ OPTIONS:
     -t, --target <TARGET>    The relative URL to the target OpenAPI description
 ```
 
+### Property names
+
+Bare names such as `'user_id` are unchanged. Use an apostrophe followed by a
+JSON string for names containing dots, spaces, Unicode or other characters:
+
+```oal
+res /users on get -> {
+  '"user.name"! str,
+  '"display name" str,
+  '"quote\" and backslash\\" str
+};
+```
+
+JSON escapes (including Unicode surrogate pairs) are decoded; malformed escapes
+are reported as lexical errors. The required/optional suffix (`!`/`?`) follows
+the closing quote. Quoted names work in object properties, query/path parameters
+and headers, subject to the naming rules of the target protocol. This does not
+change OAL string literal or annotation syntax.
+
 ### Compiling the example program
 ```
 oal-cli --conf examples/oal.toml
